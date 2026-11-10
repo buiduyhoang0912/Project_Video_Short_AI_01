@@ -14,9 +14,9 @@ def seed_data():
     Base.metadata.create_all(bind=engine)
 
     shop_names = [
-        "Van Tech Store",
-        "Hoang Fashion",
-        "ClipShop Home",
+    "Van Gaming Store",
+    "Hoang Fashion",
+    "ClipShop Home",
     ]
 
     category_names = [

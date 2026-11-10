@@ -5,6 +5,9 @@ Tài liệu API tự sinh: http://127.0.0.1:8000/docs
 """
 from contextlib import asynccontextmanager
 
+from pathlib import Path
+from fastapi.staticfiles import StaticFiles
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy.exc import OperationalError
@@ -31,6 +34,12 @@ async def lifespan(app: FastAPI):
 
 
 app = FastAPI(title=settings.APP_NAME, lifespan=lifespan)
+
+uploads_dir = Path(__file__).resolve().parents[1] / "uploads"
+(uploads_dir / "videos").mkdir(parents=True, exist_ok=True)
+(uploads_dir / "thumbnails").mkdir(parents=True, exist_ok=True)
+
+app.mount("/uploads", StaticFiles(directory=uploads_dir), name="uploads")
 
 # CORS: cho phép trang FE (khác cổng/khác domain) gọi được API này
 app.add_middleware(

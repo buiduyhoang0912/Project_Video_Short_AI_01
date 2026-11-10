@@ -11,3 +11,5 @@ env/
 # IDE
 .vscode/
 .idea/
+
+/uploads/

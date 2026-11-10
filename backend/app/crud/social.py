@@ -10,6 +10,7 @@ from app.models.social import AiChatLog, Comment, Follow, Like
 VIDEOS = table(
     "videos",
     column("id", Integer),
+    column("user_id", Integer),
     column("like_count", Integer),
     column("comment_count", Integer),
     column("share_count", Integer),
@@ -139,3 +140,11 @@ def save_ai_log(
     db.refresh(log)
 
     return log
+
+
+def video_owner_id(db: Session, video_id: int):
+    return db.scalar(
+        select(VIDEOS.c.user_id).where(
+            VIDEOS.c.id == video_id
+        )
+    )

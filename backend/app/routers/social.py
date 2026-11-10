@@ -108,13 +108,22 @@ def create_comment(
             422, "Nội dung bình luận không được để trống"
         )
 
+
     if data.parent_id is not None:
         parent = db.get(Comment, data.parent_id)
 
         if parent is None or parent.video_id != video_id:
             raise HTTPException(
-                400, "Bình luận trả lời phải cùng video"
+                status_code=400,
+                detail="Bình luận trả lời phải cùng video"
             )
+
+        if parent.parent_id is not None:
+            raise HTTPException(
+                status_code=400,
+                detail="Chỉ được trả lời bình luận 1 cấp"
+            )
+
 
     comment = Comment(
         video_id=video_id,
@@ -175,12 +184,21 @@ def delete_comment(
 
     uid = current_user_id(user)
 
-    if (
-        comment.user_id != uid
-        and getattr(user, "role", "USER") != "ADMIN"
-    ):
+
+    uid = current_user_id(user)
+
+    is_comment_owner = comment.user_id == uid
+
+    is_video_owner = (
+        crud.video_owner_id(db, comment.video_id) == uid
+    )
+
+    is_admin = getattr(user, "role", "USER") == "ADMIN"
+
+    if not (is_comment_owner or is_video_owner or is_admin):
         raise HTTPException(
-            403, "Bạn không có quyền xóa bình luận"
+            status_code=403,
+            detail="Bạn không có quyền xóa bình luận này"
         )
 
     video_id = comment.video_id

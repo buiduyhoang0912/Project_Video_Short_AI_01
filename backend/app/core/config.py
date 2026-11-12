@@ -22,6 +22,10 @@ class Settings(BaseSettings):
     CORS_ORIGINS: str = "*"
     FFPROBE_PATH: str = "ffprobe"
 
+    JWT_SECRET_KEY: str = "change-me-to-a-long-random-string"
+    JWT_ALGORITHM: str = "HS256"
+    JWT_EXPIRE_MINUTES: int = 60
+
     @property
     def database_url(self) -> str:
         # mysql+pymysql://user:password@host:port/database

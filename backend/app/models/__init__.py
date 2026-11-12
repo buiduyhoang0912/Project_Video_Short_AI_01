@@ -9,3 +9,4 @@ from app.models.product_image import ProductImage
 from app.models.order import Address, Order, OrderItem
 from app.models.cart import Cart, CartItem
 from app.models.video import Video, VideoProduct
+from app.models.revoked_token import RevokedToken

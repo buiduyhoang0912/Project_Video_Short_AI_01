@@ -1,12 +1,20 @@
 from datetime import datetime
-from typing import Literal
+from typing import Annotated, Literal
 
-from pydantic import BaseModel, ConfigDict, Field, field_validator
+from pydantic import AfterValidator, BaseModel, ConfigDict, Field, field_validator
 
+
+def check_video_description(value: str) -> str:
+    if len(value.encode("utf-8")) > 65_535:
+        raise ValueError("Mô tả không được vượt quá 65.535 byte UTF-8.")
+    return value
+
+
+VideoDescription = Annotated[str, AfterValidator(check_video_description)]
 
 class VideoCreate(BaseModel):
     title: str = Field(min_length=1, max_length=255)
-    description: str | None = None
+    description: VideoDescription | None = None
     hashtags: list[str] | None = None
     video_url: str = Field(min_length=1, max_length=500)
     thumbnail_url: str | None = Field(default=None, max_length=500)
@@ -53,3 +61,6 @@ class VideoProductCreate(BaseModel):
 
 class VideoProductRead(VideoProductCreate):
     model_config = ConfigDict(from_attributes=True)
+
+class VideoDescriptionUpdate(BaseModel):
+    description: VideoDescription | None

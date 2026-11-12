@@ -20,6 +20,7 @@ class Settings(BaseSettings):
 
     # Chuỗi các origin cách nhau bằng dấu phẩy, hoặc "*"
     CORS_ORIGINS: str = "*"
+    FFPROBE_PATH: str = "ffprobe"
 
     @property
     def database_url(self) -> str:

@@ -13,3 +13,5 @@ env/
 .idea/
 
 /uploads/
+scratch/
+.pytest_cache/

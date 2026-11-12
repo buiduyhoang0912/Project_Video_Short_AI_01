@@ -163,3 +163,32 @@ Khi lỗi, API trả về JSON dạng `{"detail": "..."}`. Ví dụ: 404 khi kh�
 ## 11. (Không bắt buộc) Chạy MySQL bằng Docker
 
 Chỉ dành cho bạn nào đã biết Docker và không muốn cài MySQL. Trong `backend/` chạy `docker compose up -d`: MySQL chạy ở cổng **3307**, tự tạo bảng từ `sql/init.sql`. Khi đó sửa `.env` thành `DB_PORT=3307`, `DB_USER=app_user`, `DB_PASSWORD=app_password`.
+
+
+## Auth API (đăng ký / đăng nhập / JWT)
+
+| Method | Đường dẫn | Mô tả |
+|---|---|---|
+| POST | `/auth/register` | Đăng ký (201). Trùng email/username → 409, dữ liệu sai → 422. Mật khẩu lưu bằng bcrypt |
+| POST | `/auth/login` | Body `{"identifier": "<email hoặc username>", "password": "..."}` → 200 + JWT, sai → 401 |
+| POST | `/auth/logout` | Cần `Authorization: Bearer <token>`; thu hồi token (bảng `revoked_tokens`) |
+| GET | `/auth/me` | Thông tin người dùng hiện tại; thiếu/sai/hết hạn/đã logout → 401 |
+
+### Cách chạy
+```
+cd backend
+pip install -r requirements.txt
+copy .env.example .env        # rồi sửa DB_* và JWT_SECRET_KEY
+uvicorn app.main:app --reload
+```
+Mở http://127.0.0.1:8000/docs.
+
+### Cấu hình JWT (trong `.env`, KHÔNG commit)
+- `JWT_SECRET_KEY`: khóa ngẫu nhiên, tạo bằng `python -c "import secrets;print(secrets.token_urlsafe(48))"`
+- `JWT_ALGORITHM` (mặc định `HS256`), `JWT_EXPIRE_MINUTES` (mặc định `60`)
+- Token bắt buộc có claim `sub`, `jti`, `exp`; thiếu claim → 401.
+
+### Cách test
+- **Tự động** (SQLite in-memory, không cần MySQL): `cd backend && pytest`
+- **Swagger**: vào `/docs`, gọi `/auth/login`, bấm **Authorize**, dán token (chỉ phần token) rồi gọi `/auth/me`, `/auth/logout`.
+- Ảnh test Swagger nằm trong thư mục `docs/auth-test/`.

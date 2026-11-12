@@ -118,3 +118,21 @@ class UserPublicRead(BaseModel):
 
     # Tầng API tạo URL được phép truy cập từ avatar_key.
     avatar_url: str | None = None
+
+class UserLogin(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    # Chap nhan email hoac username
+    identifier: str = Field(min_length=1, max_length=255)
+    password: SecretStr = Field(min_length=1, max_length=72)
+
+    @field_validator("identifier", mode="before")
+    @classmethod
+    def normalize_identifier(cls, value):
+        return value.strip().lower() if isinstance(value, str) else value
+
+
+class TokenResponse(BaseModel):
+    access_token: str
+    token_type: str = "bearer"
+    expires_in: int

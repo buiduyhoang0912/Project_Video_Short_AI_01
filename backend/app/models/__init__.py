@@ -9,3 +9,8 @@ from app.models.shop import Shop
 from app.models.category import Category
 from app.models.product import Product
 from app.models.product_image import ProductImage
+
+from app.db.session import Base
+from app.models.item import Item
+from app.models.order import Address, Order, OrderItem
+from app.models.cart import Cart, CartItem

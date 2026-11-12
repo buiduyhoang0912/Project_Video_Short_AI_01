@@ -20,6 +20,7 @@ class Settings(BaseSettings):
 
     # Chuỗi các origin cách nhau bằng dấu phẩy, hoặc "*"
     CORS_ORIGINS: str = "*"
+    FFPROBE_PATH: str = "ffprobe"
 
     JWT_SECRET_KEY: str = "change-me-to-a-long-random-string"
     JWT_ALGORITHM: str = "HS256"

@@ -21,6 +21,10 @@ class Settings(BaseSettings):
     # Chuỗi các origin cách nhau bằng dấu phẩy, hoặc "*"
     CORS_ORIGINS: str = "*"
 
+    JWT_SECRET_KEY: str = "change-me-to-a-long-random-string"
+    JWT_ALGORITHM: str = "HS256"
+    JWT_EXPIRE_MINUTES: int = 60
+
     @property
     def database_url(self) -> str:
         # mysql+pymysql://user:password@host:port/database

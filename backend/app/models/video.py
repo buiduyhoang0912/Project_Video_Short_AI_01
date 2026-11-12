@@ -25,9 +25,6 @@ class Video(Base):
     thumbnail_url = Column(String(500), nullable=True)
     duration_seconds = Column(INTEGER(unsigned=True), nullable=False)
     view_count = Column(BIGINT(unsigned=True), nullable=False, server_default=text("0"))
-    like_count = Column(BIGINT(unsigned=True), nullable=False, server_default=text("0"))
-    comment_count = Column(BIGINT(unsigned=True), nullable=False, server_default=text("0"))
-    share_count = Column(BIGINT(unsigned=True), nullable=False, server_default=text("0"))
     status = Column(
         ENUM("VISIBLE", "HIDDEN"), nullable=False, server_default="VISIBLE"
     )
@@ -47,5 +44,3 @@ class VideoProduct(Base):
         primary_key=True,
         index=True,
     )
-
-    

@@ -41,6 +41,17 @@ CREATE TABLE IF NOT EXISTS follows (
         ON DELETE CASCADE
 );
 
+CREATE TABLE IF NOT EXISTS video_shares (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    video_id INT NOT NULL,
+    user_id INT NULL,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (video_id) REFERENCES videos(id)
+        ON DELETE CASCADE,
+    FOREIGN KEY (user_id) REFERENCES users(id)
+        ON DELETE SET NULL
+);
+
 CREATE TABLE IF NOT EXISTS ai_chat_logs (
     id INT AUTO_INCREMENT PRIMARY KEY,
     user_id INT NOT NULL,

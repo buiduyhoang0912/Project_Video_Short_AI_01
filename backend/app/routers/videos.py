@@ -1,4 +1,4 @@
-import logging
+﻿import logging
 import re
 import subprocess
 from pathlib import Path
@@ -7,7 +7,7 @@ from tempfile import TemporaryDirectory
 from fastapi import APIRouter, Depends, File, Form, HTTPException, Response, UploadFile
 from sqlalchemy.orm import Session
 
-from app.core.video_auth import get_video_user
+from app.core.dependencies import get_current_user as get_video_user, get_optional_user
 from app.core.video_media import (
     UploadTooLargeError,
     prepare_thumbnail_upload,
@@ -84,6 +84,38 @@ def remove_uploaded_files(video_url, thumbnail_url):
             logging.getLogger(__name__).exception(
                 "Không thể dọn tệp %s", filename
             )
+
+@router.get("/feed")
+def video_feed(
+    limit: int = 20,
+    user: User | None = Depends(get_optional_user),
+    db: Session = Depends(get_db),
+):
+    """Feed cong khai: khach (khong token) van xem duoc; token sai/het han -> 401."""
+    from sqlalchemy import select
+
+    from app.models.video import Video
+
+    limit = max(1, min(limit, 50))
+    rows = db.scalars(
+        select(Video)
+        .where(Video.status == "VISIBLE")
+        .order_by(Video.created_at.desc(), Video.id.desc())
+        .limit(limit)
+    ).all()
+    return {
+        "viewer_id": user.id if user else None,
+        "items": [
+            {
+                "id": v.id,
+                "title": v.title,
+                "video_url": v.video_url,
+                "thumbnail_url": v.thumbnail_url,
+            }
+            for v in rows
+        ],
+    }
+
 
 @router.post("", status_code=201)
 def create_video(

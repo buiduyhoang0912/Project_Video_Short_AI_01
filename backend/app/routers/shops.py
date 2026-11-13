@@ -1,4 +1,4 @@
-"""API cửa hàng: /api/shops
+﻿"""API cửa hàng: /api/shops
 
 - GET  /api/shops            Xem danh sách cửa hàng công khai
 - GET  /api/shops/me         Xem cửa hàng của người bán đang đăng nhập
@@ -14,7 +14,7 @@ from app.crud import seller_application as sa_crud
 from app.crud import shop as shop_crud
 from app.db.session import get_db
 from app.models.user import User
-from app.routers.auth import get_current_user
+from app.core.dependencies import get_current_user
 from app.schemas.shop import ShopCreate, ShopOut, ShopUpdate
 
 router = APIRouter(prefix="/shops", tags=["Shops"])

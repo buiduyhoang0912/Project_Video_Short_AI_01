@@ -1,9 +1,3 @@
+"""Tuong thich nguoc: dung dependency chung trong app.core.dependencies."""
 
-from fastapi import HTTPException
-
-
-def get_current_user():
-    raise HTTPException(
-        status_code=501,
-        detail="Module tương tác đang chờ tích hợp Auth JWT của nhóm",
-    )
+from app.core.dependencies import get_current_user, get_optional_user  # noqa: F401

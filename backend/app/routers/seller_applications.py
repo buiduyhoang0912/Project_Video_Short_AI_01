@@ -1,4 +1,4 @@
-"""API đơn đăng ký bán hàng: /api/seller-applications
+﻿"""API đơn đăng ký bán hàng: /api/seller-applications
 
 - POST /api/seller-applications               Gửi đơn đăng ký bán hàng (mỗi người 1 đơn PENDING)
 - GET  /api/seller-applications/me            Xem các đơn đăng ký của chính mình
@@ -17,7 +17,7 @@ from app.crud import seller_application as sa_crud
 from app.crud import shop as shop_crud
 from app.db.session import get_db
 from app.models.user import User
-from app.routers.auth import get_current_user
+from app.core.dependencies import get_current_user, require_admin
 from app.schemas.seller_application import (
     SellerApplicationCreate,
     SellerApplicationRead,
@@ -25,15 +25,6 @@ from app.schemas.seller_application import (
 )
 
 router = APIRouter(prefix="/seller-applications", tags=["Seller Applications"])
-
-
-def require_admin(user: User = Depends(get_current_user)) -> User:
-    if user.role != "ADMIN":
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Chỉ Admin mới có quyền thực hiện thao tác này",
-        )
-    return user
 
 
 @router.post(

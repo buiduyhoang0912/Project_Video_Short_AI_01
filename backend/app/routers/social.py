@@ -1,4 +1,3 @@
-
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy import delete, select
 from sqlalchemy.exc import IntegrityError
@@ -44,16 +43,12 @@ def like_video(
     if crud.find_like(db, uid, video_id) is not None:
         return {
             "message": "Bạn đã thích video này",
-            "liked": True
+            "liked": True,
         }
 
     db.add(Like(user_id=uid, video_id=video_id))
 
     try:
-        db.flush()
-        crud.change_video_count(
-            db, video_id, "like_count", 1
-        )
         db.commit()
     except IntegrityError:
         db.rollback()
@@ -80,10 +75,6 @@ def unlike_video(
 
     if found is not None:
         db.delete(found)
-        db.flush()
-        crud.change_video_count(
-            db, video_id, "like_count", -1
-        )
         db.commit()
 
     return {"message": "Đã bỏ thích", "liked": False}
@@ -108,22 +99,20 @@ def create_comment(
             422, "Nội dung bình luận không được để trống"
         )
 
-
     if data.parent_id is not None:
         parent = db.get(Comment, data.parent_id)
 
         if parent is None or parent.video_id != video_id:
             raise HTTPException(
                 status_code=400,
-                detail="Bình luận trả lời phải cùng video"
+                detail="Bình luận trả lời phải cùng video",
             )
 
         if parent.parent_id is not None:
             raise HTTPException(
                 status_code=400,
-                detail="Chỉ được trả lời bình luận 1 cấp"
+                detail="Chỉ được trả lời bình luận 1 cấp",
             )
-
 
     comment = Comment(
         video_id=video_id,
@@ -133,10 +122,6 @@ def create_comment(
     )
 
     db.add(comment)
-    db.flush()
-    crud.change_video_count(
-        db, video_id, "comment_count", 1
-    )
     db.commit()
     db.refresh(comment)
 
@@ -184,24 +169,18 @@ def delete_comment(
 
     uid = current_user_id(user)
 
-
-    uid = current_user_id(user)
-
     is_comment_owner = comment.user_id == uid
-
     is_video_owner = (
         crud.video_owner_id(db, comment.video_id) == uid
     )
-
     is_admin = getattr(user, "role", "USER") == "ADMIN"
 
     if not (is_comment_owner or is_video_owner or is_admin):
         raise HTTPException(
             status_code=403,
-            detail="Bạn không có quyền xóa bình luận này"
+            detail="Bạn không có quyền xóa bình luận này",
         )
 
-    video_id = comment.video_id
     all_ids = crud.all_comment_ids_in_thread(
         db, comment_id
     )
@@ -209,11 +188,6 @@ def delete_comment(
     db.execute(
         delete(Comment).where(Comment.id.in_(all_ids))
     )
-
-    crud.change_video_count(
-        db, video_id, "comment_count", -len(all_ids)
-    )
-
     db.commit()
 
     return {
@@ -250,7 +224,7 @@ def follow_user(
     db.add(
         Follow(
             follower_id=uid,
-            following_id=following_id
+            following_id=following_id,
         )
     )
 
@@ -294,13 +268,10 @@ def share_video(
     db: Session = Depends(get_db),
     user=Depends(get_current_user),
 ):
-    current_user_id(user)
+    uid = current_user_id(user)
     check_video(db, video_id)
 
-    crud.change_video_count(
-        db, video_id, "share_count", 1
-    )
-    db.commit()
+    crud.record_video_share(db, video_id, uid)
 
     return {"message": "Đã ghi nhận lượt chia sẻ"}
 

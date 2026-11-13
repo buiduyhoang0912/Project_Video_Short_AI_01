@@ -96,6 +96,25 @@ class Follow(Base):
     )
 
 
+class VideoShare(Base):
+    __tablename__ = "video_shares"
+
+    id: Mapped[int] = mapped_column(
+        Integer, primary_key=True, autoincrement=True
+    )
+    video_id: Mapped[int] = mapped_column(
+        ForeignKey("videos.id", ondelete="CASCADE"),
+        index=True
+    )
+    user_id: Mapped[int | None] = mapped_column(
+        ForeignKey("users.id", ondelete="SET NULL"),
+        nullable=True, index=True
+    )
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime, server_default=func.now()
+    )
+
+
 class AiChatLog(Base):
     __tablename__ = "ai_chat_logs"
     __table_args__ = (

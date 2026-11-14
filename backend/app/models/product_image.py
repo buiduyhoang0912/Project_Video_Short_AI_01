@@ -1,9 +1,8 @@
-
 from datetime import datetime, timezone
 
 from sqlalchemy import Boolean, DateTime, ForeignKey, Integer, String
 from sqlalchemy.dialects.mysql import BIGINT
-from sqlalchemy.orm import Mapped, mapped_column
+from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db.session import Base
 
@@ -55,3 +54,13 @@ class ProductImage(Base):
         nullable=False,
         default=utc_now,
     )
+
+    product: Mapped["Product"] = relationship("Product", back_populates="images")  # noqa: F821
+
+    @property
+    def image_url(self) -> str:
+        return self.object_key
+
+    @property
+    def display_order(self) -> int:
+        return self.sort_order

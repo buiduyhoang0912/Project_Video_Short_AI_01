@@ -4,7 +4,7 @@ from decimal import Decimal
 
 from sqlalchemy import DateTime, ForeignKey, Numeric, String, Text
 from sqlalchemy.dialects.mysql import BIGINT, INTEGER
-from sqlalchemy.orm import Mapped, mapped_column
+from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db.session import Base
 
@@ -71,4 +71,10 @@ class Product(Base):
         DateTime,
         nullable=False,
         default=utc_now,
+    )
+
+    images = relationship(
+        "ProductImage",
+        cascade="all, delete-orphan",
+        order_by="ProductImage.sort_order, ProductImage.id",
     )

@@ -64,3 +64,29 @@ class FollowingFeedItem(BaseModel):
     like_count: int = 0
     comment_count: int = 0
     is_liked: bool = False
+    is_following: bool = False
+
+
+class ProfileVideoItem(BaseModel):
+    id: int
+    title: str
+    thumbnail_url: str | None = None
+    video_url: str
+    view_count: int = 0
+    created_at: datetime
+
+
+class UserProfileOut(BaseModel):
+    id: int
+    username: str
+    display_name: str
+    avatar_key: str | None = None
+    avatar_url: str | None = None
+    bio: str | None = None
+    role: str = "USER"
+    created_at: datetime
+    followers_count: int = 0
+    following_count: int = 0
+    is_following: bool = False
+    video_count: int = 0
+    videos: list[ProfileVideoItem] = []

@@ -342,3 +342,27 @@ def test_following_feed_flow(client: TestClient, db_session):
     feed_after = client.get("/api/videos/feed/following", headers=v_headers)
     assert feed_after.status_code == 200
     assert feed_after.json() == []
+
+
+def test_for_you_feed_and_profile(client: TestClient, db_session):
+    db = db_session()
+    creator, _ = make_user(db, "creator_demo", "cdemo@test.com")
+    v = make_video(db, creator.id)
+
+    # 1. Test For You Feed (Public)
+    res_feed = client.get("/api/videos/feed/for-you")
+    assert res_feed.status_code == 200
+    items = res_feed.json()
+    assert len(items) >= 1
+    found = next((item for item in items if item["id"] == v.id), None)
+    assert found is not None
+    assert found["author_username"] == "creator_demo"
+
+    # 2. Test Profile API
+    res_prof = client.get(f"/api/users/{creator.id}/profile")
+    assert res_prof.status_code == 200
+    prof = res_prof.json()
+    assert prof["username"] == "creator_demo"
+    assert prof["video_count"] == 1
+    assert len(prof["videos"]) == 1
+    assert prof["videos"][0]["id"] == v.id

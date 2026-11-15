@@ -136,7 +136,7 @@ def video_owner_id(db: Session, video_id: int):
     )
 
 
-# ---- THEO DOI VA FEED NGUOI THEO DOI (TASK T3D2331) ----
+# ---- THEO DOI VA FEED NGUOI THEO DOI (TASK T3D2331 & T3D2428) ----
 
 
 def get_follow_stats(
@@ -298,6 +298,141 @@ def get_following_feed(
             "like_count": likes_grouped.get(video.id, 0),
             "comment_count": comments_grouped.get(video.id, 0),
             "is_liked": video.id in liked_video_ids,
+            "is_following": True,
         })
 
     return results
+
+
+def get_public_feed(
+    db: Session, current_user_id: int | None = None, skip: int = 0, limit: int = 20
+) -> list[dict]:
+    query = (
+        select(Video, User)
+        .join(User, Video.user_id == User.id)
+        .where(Video.status == "VISIBLE")
+        .order_by(Video.created_at.desc(), Video.id.desc())
+        .offset(skip)
+        .limit(limit)
+    )
+
+    rows = db.execute(query).all()
+    if not rows:
+        return []
+
+    video_ids = [v.id for v, _ in rows]
+
+    liked_video_ids = set()
+    following_author_ids = set()
+    if current_user_id:
+        liked_video_ids = set(
+            db.scalars(
+                select(Like.video_id).where(
+                    Like.user_id == current_user_id,
+                    Like.video_id.in_(video_ids),
+                )
+            ).all()
+        )
+        author_ids = [u.id for _, u in rows]
+        following_author_ids = set(
+            db.scalars(
+                select(Follow.following_id).where(
+                    Follow.follower_id == current_user_id,
+                    Follow.following_id.in_(author_ids),
+                )
+            ).all()
+        )
+
+    likes_grouped = dict(
+        db.execute(
+            select(Like.video_id, func.count(Like.id))
+            .where(Like.video_id.in_(video_ids))
+            .group_by(Like.video_id)
+        ).all()
+    )
+
+    comments_grouped = dict(
+        db.execute(
+            select(Comment.video_id, func.count(Comment.id))
+            .where(Comment.video_id.in_(video_ids))
+            .group_by(Comment.video_id)
+        ).all()
+    )
+
+    results = []
+    for video, user in rows:
+        results.append({
+            "id": video.id,
+            "user_id": video.user_id,
+            "author_name": user.display_name,
+            "author_username": user.username,
+            "author_avatar_key": user.avatar_key,
+            "author_avatar_url": user.avatar_key,
+            "title": video.title,
+            "description": video.description,
+            "video_url": video.video_url,
+            "thumbnail_url": video.thumbnail_url,
+            "duration_seconds": video.duration_seconds,
+            "created_at": video.created_at,
+            "like_count": likes_grouped.get(video.id, 0),
+            "comment_count": comments_grouped.get(video.id, 0),
+            "is_liked": video.id in liked_video_ids,
+            "is_following": user.id in following_author_ids,
+        })
+
+    return results
+
+
+def get_user_profile(
+    db: Session, target_user_id: int, current_user_id: int | None = None
+) -> dict:
+    user = db.get(User, target_user_id)
+    if user is None:
+        return None
+
+    stats = get_follow_stats(db, target_user_id, current_user_id)
+    video_count = (
+        db.scalar(
+            select(func.count(Video.id)).where(
+                Video.user_id == target_user_id,
+                Video.status == "VISIBLE",
+            )
+        )
+        or 0
+    )
+
+    user_videos = db.scalars(
+        select(Video)
+        .where(
+            Video.user_id == target_user_id,
+            Video.status == "VISIBLE",
+        )
+        .order_by(Video.created_at.desc())
+        .limit(30)
+    ).all()
+
+    return {
+        "id": user.id,
+        "username": user.username,
+        "display_name": user.display_name,
+        "avatar_key": user.avatar_key,
+        "avatar_url": user.avatar_key,
+        "bio": getattr(user, "bio", None),
+        "role": getattr(user, "role", "USER"),
+        "created_at": user.created_at,
+        "followers_count": stats["followers_count"],
+        "following_count": stats["following_count"],
+        "is_following": stats["is_following"],
+        "video_count": video_count,
+        "videos": [
+            {
+                "id": v.id,
+                "title": v.title,
+                "thumbnail_url": v.thumbnail_url,
+                "video_url": v.video_url,
+                "view_count": getattr(v, "view_count", 0),
+                "created_at": v.created_at,
+            }
+            for v in user_videos
+        ],
+    }

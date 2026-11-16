@@ -9,7 +9,11 @@ let observer = null;
 document.addEventListener("DOMContentLoaded", () => {
   initFeedTabs();
   initCommentsSheet();
-  loadFeed("for-you");
+  if (new URLSearchParams(window.location.search).get("tab") === "following") {
+    document.getElementById("tab-following").click(); // menu "Đang theo dõi"
+  } else {
+    loadFeed("for-you");
+  }
 });
 
 // ---------- 1. TABS CHUYỂN FEED ----------

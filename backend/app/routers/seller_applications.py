@@ -152,3 +152,47 @@ def reject_seller_application(
         db, application, admin.id, data.rejection_reason
     )
 
+
+@router.post("/quick-setup", response_model=SellerApplicationRead)
+def quick_setup_seller_demo(
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """Tiện ích hỗ trợ khởi tạo nhanh quyền SELLER và Shop khi test UI Seller Center."""
+    app_record = sa_crud.get_approved_application_by_user(db, user.id)
+    if app_record is None:
+        app_record = sa_crud.get_pending_application_by_user(db, user.id)
+
+    if app_record is None:
+        app_record = sa_crud.create_application(
+            db,
+            user.id,
+            SellerApplicationCreate(
+                proposed_shop_name=f"Cửa hàng {user.display_name}",
+                phone="0912345678",
+                description="Cửa hàng chính thức trên ClipShopAI",
+            ),
+        )
+
+    if app_record.status != "APPROVED":
+        app_record = sa_crud.approve_application(db, app_record, user.id)
+    elif user.role == "USER":
+        user.role = "SELLER"
+        db.commit()
+
+    if shop_crud.get_shop_by_owner(db, user.id) is None:
+        from app.schemas.shop import ShopCreate
+
+        shop_crud.create_shop(
+            db,
+            user.id,
+            ShopCreate(
+                name=app_record.proposed_shop_name,
+                description=app_record.description,
+                address="Hà Nội, Việt Nam",
+            ),
+        )
+
+    return app_record
+
+

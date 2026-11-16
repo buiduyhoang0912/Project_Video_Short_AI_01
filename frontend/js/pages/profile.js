@@ -3,19 +3,26 @@
 let targetUserId = null;
 let profileData = null;
 
-document.addEventListener("DOMContentLoaded", () => {
+document.addEventListener("DOMContentLoaded", async () => {
   const urlParams = new URLSearchParams(window.location.search);
   const paramId = urlParams.get("user_id") || urlParams.get("id");
 
-  const currentUser = getCurrentUser();
+  let currentUser = getCurrentUser();
 
   if (paramId) {
     targetUserId = parseInt(paramId, 10);
-  } else if (currentUser && currentUser.id) {
-    targetUserId = currentUser.id;
   } else {
-    // Mặc định xem hồ sơ của tài khoản số 1 nếu chưa đăng nhập và không truyền tham số
-    targetUserId = 1;
+    // Hồ sơ cá nhân: phải xác nhận phiên bằng /auth/me rồi mới tải hồ sơ chính chủ.
+    if (!session.getToken()) return; // chưa đăng nhập: layout.js đã chuyển về trang đăng nhập
+    try {
+      const me = await api.get("/auth/me");
+      session.setUser(me);
+      currentUser = me;
+      targetUserId = me.id;
+    } catch (err) {
+      // 401/khóa: interceptor đã chuyển trang; lỗi khác: layout.js hiện thông báo + nút thử lại
+      return;
+    }
   }
 
   loadProfile(targetUserId);

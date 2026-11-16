@@ -87,7 +87,10 @@ function loginUrl(extra = "") {
 function pageNeedsAuth() {
   const b = document.body.dataset;
   if (b.roles || b.auth === "required") return true;
-  if (b.auth === "self") return !new URLSearchParams(window.location.search).get("id");
+  if (b.auth === "self") {
+    const p = new URLSearchParams(window.location.search);
+    return !(p.get("id") || p.get("user_id")); // feed dùng ?user_id=, nơi khác dùng ?id=
+  }
   return false;
 }
 

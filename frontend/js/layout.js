@@ -134,6 +134,21 @@ function showAccessDenied(message, user) {
   document.body.classList.remove("auth-checking");
 }
 
+// Lỗi khi xác nhận phiên (mạng/500): vẫn chặn nội dung riêng, hiện thông báo + nút thử lại
+function showGuardError(message) {
+  const main = document.querySelector("main");
+  if (main) {
+    main.innerHTML = `
+      <section class="card access-denied">
+        <h2>⚠️ Không xác nhận được phiên đăng nhập</h2>
+        <p>${escapeHtml(message)}</p>
+        <button type="button" class="btn btn-primary" id="btn-guard-retry">Thử lại</button>
+      </section>`;
+    document.getElementById("btn-guard-retry").addEventListener("click", () => window.location.reload());
+  }
+  document.body.classList.remove("auth-checking"); // main chỉ còn thông báo lỗi, không còn nội dung riêng
+}
+
 // Kiểm tra quyền trang: xác nhận phiên bằng GET /auth/me rồi mới hiện nội dung riêng
 async function guardPage() {
   const needs = pageNeedsAuth();
@@ -157,11 +172,13 @@ async function guardPage() {
     }
     document.body.classList.remove("auth-checking");
   } catch (err) {
-    // 401/403(khóa) đã được interceptor xóa phiên và chuyển trang; còn lại là lỗi mạng/server
-    if (needs && err.status === 0) {
-      showAccessDenied("Không kiểm tra được phiên đăng nhập do mất kết nối. Hãy thử lại.");
-    } else if (!needs) {
+    // 401 và 403(khóa) đã được interceptor xóa phiên + chuyển trang; còn lại là lỗi mạng/server (500...)
+    if (!needs) {
       renderLayout();
+    } else if (err.status !== 401 && !(err.status === 403 && /kh[oó]a/i.test(err.message))) {
+      showGuardError(err.status === 0
+        ? "Không kiểm tra được phiên đăng nhập do mất kết nối."
+        : `Không kiểm tra được phiên đăng nhập (lỗi ${err.status}). Vui lòng thử lại sau.`);
     }
   }
 }

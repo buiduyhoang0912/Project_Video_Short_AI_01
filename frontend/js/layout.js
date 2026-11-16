@@ -1,49 +1,68 @@
-// Layout chung: tự chèn header (menu) và footer vào mọi trang
+// Layout chung: tự chèn header (menu) và footer vào mọi trang, đồng thời kiểm tra quyền truy cập trang.
+//
+// Khai báo trên <body> của trang cần bảo vệ:
+//   data-auth="required"        -> phải đăng nhập
+//   data-auth="self"            -> phải đăng nhập, trừ khi URL có ?id= (xem hồ sơ công khai)
+//   data-roles="SELLER"         -> phải đăng nhập và đúng role (nhiều role: "SELLER,ADMIN")
 
+// access: "all" = mọi người | "auth" = đã đăng nhập | "role:X" = chỉ role X
 const MENU = [
-  { href: "index.html", label: "Trang chủ" },
-  { href: "pages/feed.html", label: "🔥 Feed Video" },
-  { href: "pages/search.html", label: "🔍 Tìm kiếm" },
-  { href: "pages/profile.html", label: "👤 Hồ sơ" },
-  { href: "pages/items.html", label: "Items (Mẫu)" },
+  { href: "pages/feed.html", label: "🔥 Dành cho bạn", access: "all", id: "for-you" },
+  { href: "pages/feed.html?tab=following", label: "👥 Đang theo dõi", access: "auth", id: "following" },
+  { href: "pages/search.html", label: "🔍 Tìm kiếm", access: "all" },
+  { href: "pages/shop.html", label: "🏬 Shop", access: "all" },
+  { href: "pages/cart.html", label: "🛒 Giỏ hàng", access: "auth" },
+  { href: "pages/profile.html", label: "👤 Hồ sơ cá nhân", access: "auth", id: "profile" },
+  { href: "pages/seller.html", label: "🧾 Seller Center", access: "role:SELLER" },
+  { href: "pages/admin.html", label: "🛡️ Admin", access: "role:ADMIN" },
 ];
 
 function getCurrentUser() {
-  try {
-    const raw = localStorage.getItem("current_user");
-    return raw ? JSON.parse(raw) : null;
-  } catch (e) {
-    return null;
-  }
+  return session.getUser();
+}
+
+function canSee(access, user) {
+  if (access === "all") return true;
+  if (!user) return false;
+  if (access === "auth") return true;
+  if (access.startsWith("role:")) return user.role === access.slice(5);
+  return false;
+}
+
+function isMenuActive(item, user) {
+  const path = window.location.pathname;
+  const params = new URLSearchParams(window.location.search);
+  const file = item.href.split("?")[0];
+  if (!path.endsWith("/" + file)) return false;
+  if (item.id === "following") return params.get("tab") === "following";
+  if (item.id === "for-you") return params.get("tab") !== "following";
+  if (item.id === "profile") return !params.get("id") || (user && String(user.id) === params.get("id"));
+  return true;
+}
+
+function roleLabel(role) {
+  return { USER: "Người dùng", SELLER: "Seller", ADMIN: "Admin" }[role] || role;
 }
 
 function renderLayout() {
   const root = document.body.dataset.root || "./";
-  const currentPath = window.location.pathname;
+  const user = session.getToken() ? session.getUser() : null;
 
-  const links = MENU.map((item) => {
-    const isActive =
-      currentPath.endsWith("/" + item.href) ||
-      (item.href === "index.html" && (currentPath.endsWith("/") || currentPath.endsWith("/index.html")));
-    return `<a href="${root}${item.href}" class="${isActive ? "active" : ""}">${item.label}</a>`;
-  }).join("");
+  const links = MENU.filter((item) => canSee(item.access, user))
+    .map((item) => {
+      const active = isMenuActive(item, user);
+      return `<a href="${root}${item.href}" class="${active ? "active" : ""}"${active ? ' aria-current="page"' : ""}>${item.label}</a>`;
+    })
+    .join("");
 
-  const user = getCurrentUser();
-  const token = localStorage.getItem("token") || localStorage.getItem("access_token");
-
-  let authHtml = "";
-  if (token && user) {
-    authHtml = `
-      <div class="header-user">
-        <span class="user-greeting">Hi, <strong>${user.display_name || user.username}</strong></span>
-        <button id="btn-header-logout" class="btn btn-small">Đăng xuất</button>
-      </div>
-    `;
-  } else {
-    authHtml = `
-      <button id="btn-quick-login" class="btn btn-primary btn-small">Đăng nhập</button>
-    `;
-  }
+  const authHtml = user
+    ? `<div class="header-user">
+         <span class="user-greeting">Hi, <strong>${escapeHtml(user.display_name || user.username)}</strong>
+           <span class="role-badge role-${escapeHtml(user.role)}">${escapeHtml(roleLabel(user.role))}</span></span>
+         <button id="btn-header-logout" class="btn btn-small">Đăng xuất</button>
+       </div>`
+    : `<a href="${loginUrlFromRoot(root)}" class="btn btn-small">Đăng nhập</a>
+       <a href="${root}pages/register.html" class="btn btn-primary btn-small">Đăng ký</a>`;
 
   const headerEl = document.getElementById("app-header");
   if (headerEl) {
@@ -53,26 +72,12 @@ function renderLayout() {
           <img src="${root}assets/images/logo.svg" alt="logo" width="28" height="28">
           <span>ClipShop AI</span>
         </a>
-        <nav class="nav">${links}</nav>
         <div class="header-right">${authHtml}</div>
+        <nav class="nav" aria-label="Menu chính">${links}</nav>
       </div>`;
 
     const btnLogout = document.getElementById("btn-header-logout");
-    if (btnLogout) {
-      btnLogout.addEventListener("click", () => {
-        localStorage.removeItem("token");
-        localStorage.removeItem("access_token");
-        localStorage.removeItem("current_user");
-        window.location.reload();
-      });
-    }
-
-    const btnLogin = document.getElementById("btn-quick-login");
-    if (btnLogin) {
-      btnLogin.addEventListener("click", () => {
-        showLoginModal();
-      });
-    }
+    if (btnLogout) btnLogout.addEventListener("click", logout);
   }
 
   const footerEl = document.getElementById("app-footer");
@@ -82,54 +87,84 @@ function renderLayout() {
   }
 }
 
-function showLoginModal() {
-  let modal = document.getElementById("global-login-modal");
-  if (!modal) {
-    modal = document.createElement("div");
-    modal.id = "global-login-modal";
-    modal.className = "modal-overlay";
-    modal.innerHTML = `
-      <div class="modal-card">
-        <div class="modal-header">
-          <h3>Đăng nhập nhanh</h3>
-          <button class="modal-close-btn" onclick="document.getElementById('global-login-modal').classList.remove('active')">&times;</button>
-        </div>
-        <div class="modal-body">
-          <div style="margin-bottom:12px;">
-            <label>Tài khoản (Username hoặc Email):</label>
-            <input type="text" id="modal-login-user" value="seller01" placeholder="vd: user01, seller01">
-          </div>
-          <div style="margin-bottom:16px;">
-            <label>Mật khẩu:</label>
-            <input type="password" id="modal-login-pass" value="123456" placeholder="Mật khẩu">
-          </div>
-          <div id="modal-login-error" style="color:var(--color-danger);font-size:13px;margin-bottom:10px;display:none;"></div>
-          <button id="modal-login-submit" class="btn btn-primary" style="width:100%;">Đăng nhập</button>
-        </div>
-      </div>
-    `;
-    document.body.appendChild(modal);
+function loginUrlFromRoot() {
+  return loginUrl();
+}
 
-    document.getElementById("modal-login-submit").addEventListener("click", async () => {
-      const u = document.getElementById("modal-login-user").value.trim();
-      const p = document.getElementById("modal-login-pass").value;
-      const errEl = document.getElementById("modal-login-error");
-      try {
-        const res = await api.post("/auth/login", { identifier: u, password: p });
-        localStorage.setItem("token", res.access_token);
-        localStorage.setItem("access_token", res.access_token);
-        // Lấy thông tin user
-        const me = await api.get("/auth/me");
-        localStorage.setItem("current_user", JSON.stringify(me));
-        modal.classList.remove("active");
-        window.location.reload();
-      } catch (err) {
-        errEl.innerText = err.message || "Đăng nhập thất bại";
-        errEl.style.display = "block";
-      }
-    });
+// Đăng xuất: gọi POST /auth/logout, rồi xóa token + thông tin người dùng (kể cả khi gọi API lỗi)
+async function logout() {
+  const btn = document.getElementById("btn-header-logout");
+  if (btn) btn.disabled = true;
+  try {
+    await api.post("/auth/logout");
+  } catch (e) {
+    // token đã hết hạn/đã logout cũng coi như đăng xuất xong
   }
-  modal.classList.add("active");
+  session.clear();
+  const root = document.body.dataset.root || "./";
+  window.location.href = `${root}pages/feed.html`;
+}
+
+// Các trang cũ gọi showLoginModal() khi khách thao tác cần đăng nhập -> chuyển sang trang đăng nhập
+function showLoginModal() {
+  window.location.href = loginUrl();
+}
+
+// Trang đích sau khi đăng nhập: ưu tiên ?next=, nếu không thì theo role
+function pageAfterLogin(user) {
+  const root = document.body.dataset.root || "./";
+  const next = new URLSearchParams(window.location.search).get("next");
+  if (next && /^[\w\-\/]+\.html(\?[\w=&%\-]*)?$/.test(next)) return `${root}${next}`;
+  if (user.role === "ADMIN") return `${root}pages/admin.html`;
+  if (user.role === "SELLER") return `${root}pages/seller.html`;
+  return `${root}pages/feed.html`;
+}
+
+function showAccessDenied(message, user) {
+  const main = document.querySelector("main");
+  const root = document.body.dataset.root || "./";
+  if (main) {
+    main.innerHTML = `
+      <section class="card access-denied">
+        <h2>🚫 Không đủ quyền truy cập</h2>
+        <p>${escapeHtml(message)}</p>
+        <a class="btn btn-primary" href="${root}pages/feed.html">Về trang chủ</a>
+      </section>`;
+  }
+  document.body.classList.remove("auth-checking");
+}
+
+// Kiểm tra quyền trang: xác nhận phiên bằng GET /auth/me rồi mới hiện nội dung riêng
+async function guardPage() {
+  const needs = pageNeedsAuth();
+  const token = session.getToken();
+
+  if (needs) document.body.classList.add("auth-checking");
+  if (needs && !token) {
+    window.location.href = loginUrl();
+    return;
+  }
+  if (!token) return;
+
+  try {
+    const me = await api.get("/auth/me");
+    session.setUser(me);
+    renderLayout(); // cập nhật menu theo role mới nhất từ server
+    const roles = (document.body.dataset.roles || "").split(",").map((s) => s.trim()).filter(Boolean);
+    if (roles.length && !roles.includes(me.role)) {
+      showAccessDenied(`Trang này chỉ dành cho: ${roles.join(", ")}. Tài khoản của bạn là ${me.role}.`, me);
+      return;
+    }
+    document.body.classList.remove("auth-checking");
+  } catch (err) {
+    // 401/403(khóa) đã được interceptor xóa phiên và chuyển trang; còn lại là lỗi mạng/server
+    if (needs && err.status === 0) {
+      showAccessDenied("Không kiểm tra được phiên đăng nhập do mất kết nối. Hãy thử lại.");
+    } else if (!needs) {
+      renderLayout();
+    }
+  }
 }
 
 renderLayout();
+guardPage();

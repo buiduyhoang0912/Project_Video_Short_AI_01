@@ -19,6 +19,7 @@ from app.schemas.social import (
     FollowStats,
     FollowingFeedItem,
     UserFollowItem,
+    UserProfileOut,
 )
 
 router = APIRouter(tags=["Tương tác video"])
@@ -344,6 +345,47 @@ def get_following_feed(
 
     uid = current_user_id(user)
     return crud.get_following_feed(db, uid, skip=skip, limit=limit)
+
+
+# 11B. FEED VIDEO CONG KHAI / DÀNH CHO BẠN (TASK T3D2428)
+@router.get(
+    "/videos/feed/for-you",
+    response_model=list[FollowingFeedItem],
+)
+@router.get(
+    "/feed/for-you",
+    response_model=list[FollowingFeedItem],
+    include_in_schema=False,
+)
+def get_for_you_feed(
+    skip: int = 0,
+    limit: int = 20,
+    db: Session = Depends(get_db),
+    current_user: User | None = Depends(get_optional_current_user),
+):
+    if skip < 0 or not 1 <= limit <= 100:
+        raise HTTPException(422, "Phân trang không hợp lệ")
+
+    cid = current_user.id if current_user else None
+    return crud.get_public_feed(db, current_user_id=cid, skip=skip, limit=limit)
+
+
+# 11C. THONG TIN HO SO NGUOI DUNG (TASK T3D2428)
+@router.get(
+    "/users/{user_id}/profile",
+    response_model=UserProfileOut,
+)
+def get_user_profile(
+    user_id: int,
+    db: Session = Depends(get_db),
+    current_user: User | None = Depends(get_optional_current_user),
+):
+    check_user(db, user_id)
+    cid = current_user.id if current_user else None
+    profile = crud.get_user_profile(db, target_user_id=user_id, current_user_id=cid)
+    if profile is None:
+        raise HTTPException(404, "Không tìm thấy người dùng")
+    return profile
 
 
 # 12. CHIA SE VIDEO

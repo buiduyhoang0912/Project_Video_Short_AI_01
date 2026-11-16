@@ -1,4 +1,3 @@
-
 from datetime import datetime
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -31,3 +30,37 @@ class ChatLogOut(BaseModel):
     role: str
     message: str
     created_at: datetime
+
+
+class FollowStats(BaseModel):
+    user_id: int
+    followers_count: int
+    following_count: int
+    is_following: bool = False
+
+
+class UserFollowItem(BaseModel):
+    id: int
+    username: str
+    display_name: str
+    avatar_key: str | None = None
+    avatar_url: str | None = None
+    followed_at: datetime
+
+
+class FollowingFeedItem(BaseModel):
+    id: int
+    user_id: int
+    author_name: str
+    author_username: str
+    author_avatar_key: str | None = None
+    author_avatar_url: str | None = None
+    title: str
+    description: str | None = None
+    video_url: str
+    thumbnail_url: str | None = None
+    duration_seconds: int
+    created_at: datetime
+    like_count: int = 0
+    comment_count: int = 0
+    is_liked: bool = False

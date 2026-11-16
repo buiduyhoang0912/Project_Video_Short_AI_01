@@ -249,3 +249,96 @@ def test_ai_chat_logs(client: TestClient, db_session):
     assert logs.status_code == 200
     assert len(logs.json()) == 1
     assert logs.json()[0]["message"] == "Gợi ý cho tôi sản phẩm tốt"
+
+
+def test_follow_stats_and_lists(client: TestClient, db_session):
+    db = db_session()
+    user_a, token_a = make_user(db, "user_a", "a@test.com")
+    user_b, token_b = make_user(db, "user_b", "b@test.com")
+    user_c, _ = make_user(db, "user_c", "c@test.com")
+
+    ha = {"Authorization": f"Bearer {token_a}"}
+    hb = {"Authorization": f"Bearer {token_b}"}
+
+    # Ban đầu user_c chưa có ai follow
+    s0 = client.get(f"/api/users/{user_c.id}/follow-stats")
+    assert s0.status_code == 200
+    assert s0.json()["followers_count"] == 0
+    assert s0.json()["following_count"] == 0
+    assert s0.json()["is_following"] is False
+
+    # A và B follow C
+    client.post(f"/api/users/{user_c.id}/follow", headers=ha)
+    client.post(f"/api/users/{user_c.id}/follow", headers=hb)
+
+    # C follow A
+    client.post(f"/api/users/{user_a.id}/follow", headers={"Authorization": f"Bearer {make_user(db, 'temp', 'temp@t.com')[1]}"})
+
+    # Stats của C: 2 followers
+    sc = client.get(f"/api/users/{user_c.id}/follow-stats", headers=ha)
+    assert sc.status_code == 200
+    assert sc.json()["followers_count"] == 2
+    assert sc.json()["is_following"] is True  # A is viewing, A is following C
+
+    # Danh sách followers của C: có A và B
+    followers_res = client.get(f"/api/users/{user_c.id}/followers")
+    assert followers_res.status_code == 200
+    followers = followers_res.json()
+    assert len(followers) == 2
+    usernames = [u["username"] for u in followers]
+    assert "user_a" in usernames
+    assert "user_b" in usernames
+
+    # Danh sách following của A: có C
+    following_res = client.get(f"/api/users/{user_a.id}/following")
+    assert following_res.status_code == 200
+    following = following_res.json()
+    assert len(following) == 1
+    assert following[0]["username"] == "user_c"
+
+
+def test_following_feed_flow(client: TestClient, db_session):
+    db = db_session()
+    viewer, viewer_token = make_user(db, "viewer", "viewer@test.com")
+    creator1, _ = make_user(db, "creator1", "cr1@test.com")
+    creator2, _ = make_user(db, "creator2", "cr2@test.com")
+
+    v_headers = {"Authorization": f"Bearer {viewer_token}"}
+
+    # Chưa follow ai -> feed rỗng
+    feed0 = client.get("/api/videos/feed/following", headers=v_headers)
+    assert feed0.status_code == 200
+    assert feed0.json() == []
+
+    # Viewer follow creator1 (chưa follow creator2)
+    client.post(f"/api/users/{creator1.id}/follow", headers=v_headers)
+
+    # creator1 đăng 2 video, creator2 đăng 1 video
+    v1 = make_video(db, creator1.id)
+    v2 = make_video(db, creator1.id)
+    _ = make_video(db, creator2.id)
+
+    # Viewer like v1
+    client.post(f"/api/videos/{v1.id}/likes", headers=v_headers)
+
+    # Lấy feed
+    feed = client.get("/api/videos/feed/following", headers=v_headers)
+    assert feed.status_code == 200
+    items = feed.json()
+    assert len(items) == 2  # Chỉ có 2 video của creator1
+
+    # Kiểm tra metadata và trạng thái is_liked
+    v1_item = next(item for item in items if item["id"] == v1.id)
+    assert v1_item["author_username"] == "creator1"
+    assert v1_item["like_count"] == 1
+    assert v1_item["is_liked"] is True
+
+    v2_item = next(item for item in items if item["id"] == v2.id)
+    assert v2_item["like_count"] == 0
+    assert v2_item["is_liked"] is False
+
+    # Unfollow creator1 -> feed trống
+    client.delete(f"/api/users/{creator1.id}/follow", headers=v_headers)
+    feed_after = client.get("/api/videos/feed/following", headers=v_headers)
+    assert feed_after.status_code == 200
+    assert feed_after.json() == []

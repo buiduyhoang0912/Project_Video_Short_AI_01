@@ -18,6 +18,10 @@ from app.schemas.social import (
     CommentOut,
     FollowStats,
     FollowingFeedItem,
+    HashtagItem,
+    SearchResultOut,
+    SearchUserItem,
+    SearchVideoItem,
     UserFollowItem,
     UserProfileOut,
 )
@@ -463,3 +467,88 @@ def my_chat_logs(
         .offset(skip)
         .limit(limit)
     ).all()
+
+
+# 16. TIM KIEM VIDEO, NGUOI DUNG, HASHTAG
+@router.get(
+    "/search",
+    response_model=SearchResultOut,
+)
+def search_all(
+    q: str = "",
+    type: str = "all",
+    tag: str | None = None,
+    skip: int = 0,
+    limit: int = 20,
+    db: Session = Depends(get_db),
+    user=Depends(get_optional_current_user),
+):
+    if skip < 0 or not 1 <= limit <= 100:
+        raise HTTPException(422, "Phân trang không hợp lệ")
+
+    uid = user.id if user else None
+    search_type = (type or "all").lower()
+
+    videos = []
+    users = []
+    hashtags = []
+
+    if search_type in ("all", "videos"):
+        videos = crud.search_videos(
+            db,
+            query_str=q if q else None,
+            tag=tag,
+            current_user_id=uid,
+            skip=skip,
+            limit=limit,
+        )
+
+    if search_type in ("all", "users") and not tag:
+        users = crud.search_users(
+            db,
+            query_str=q if q else None,
+            current_user_id=uid,
+            skip=skip,
+            limit=limit,
+        )
+
+    if search_type in ("all", "hashtags") and not tag:
+        hashtags = crud.search_hashtags(
+            db,
+            query_str=q if q else None,
+            limit=limit,
+        )
+
+    return {
+        "query": q or (f"#{tag}" if tag else ""),
+        "type": search_type,
+        "videos": videos,
+        "users": users,
+        "hashtags": hashtags,
+    }
+
+
+# 17. DANH SACH VIDEO THEO HASHTAG
+@router.get(
+    "/search/hashtags/{tag}",
+    response_model=list[SearchVideoItem],
+)
+def get_videos_by_hashtag(
+    tag: str,
+    skip: int = 0,
+    limit: int = 20,
+    db: Session = Depends(get_db),
+    user=Depends(get_optional_current_user),
+):
+    if skip < 0 or not 1 <= limit <= 100:
+        raise HTTPException(422, "Phân trang không hợp lệ")
+
+    uid = user.id if user else None
+    return crud.search_videos(
+        db,
+        tag=tag,
+        current_user_id=uid,
+        skip=skip,
+        limit=limit,
+    )
+

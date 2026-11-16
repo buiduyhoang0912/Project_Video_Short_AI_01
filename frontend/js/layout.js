@@ -3,6 +3,7 @@
 const MENU = [
   { href: "index.html", label: "Trang chủ" },
   { href: "pages/feed.html", label: "🔥 Feed Video" },
+  { href: "pages/search.html", label: "🔍 Tìm kiếm" },
   { href: "pages/profile.html", label: "👤 Hồ sơ" },
   { href: "pages/items.html", label: "Items (Mẫu)" },
 ];

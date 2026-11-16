@@ -1,10 +1,9 @@
-
 from datetime import datetime, timezone
 from decimal import Decimal
 
 from sqlalchemy import DateTime, ForeignKey, Numeric, String, Text
 from sqlalchemy.dialects.mysql import BIGINT, INTEGER
-from sqlalchemy.orm import Mapped, mapped_column
+from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db.session import Base
 
@@ -61,6 +60,12 @@ class Product(Base):
         default=0,
     )
 
+    sold_count: Mapped[int] = mapped_column(
+        INTEGER(unsigned=True),
+        nullable=False,
+        default=0,
+    )
+
     status: Mapped[str] = mapped_column(
         String(20),
         nullable=False,
@@ -72,3 +77,16 @@ class Product(Base):
         nullable=False,
         default=utc_now,
     )
+
+    # Relationships
+    shop: Mapped["Shop"] = relationship("Shop", back_populates="products")  # noqa: F821
+    category: Mapped["Category"] = relationship("Category", back_populates="products")  # noqa: F821
+    images: Mapped[list["ProductImage"]] = relationship(  # noqa: F821
+        "ProductImage", back_populates="product", cascade="all, delete-orphan", order_by="ProductImage.sort_order"
+    )
+    videos: Mapped[list["Video"]] = relationship(  # noqa: F821
+        "Video", secondary="video_products", backref="tagged_products"
+    )
+
+
+from app.models.product_image import ProductImage  # noqa: F401

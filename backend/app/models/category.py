@@ -1,9 +1,8 @@
-
 from datetime import datetime, timezone
 
 from sqlalchemy import DateTime, String, Text
 from sqlalchemy.dialects.mysql import BIGINT
-from sqlalchemy.orm import Mapped, mapped_column
+from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db.session import Base
 
@@ -48,3 +47,5 @@ class Category(Base):
         nullable=False,
         default=utc_now,
     )
+
+    products: Mapped[list["Product"]] = relationship("Product", back_populates="category")  # noqa: F821

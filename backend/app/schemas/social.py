@@ -90,3 +90,48 @@ class UserProfileOut(BaseModel):
     is_following: bool = False
     video_count: int = 0
     videos: list[ProfileVideoItem] = []
+
+
+class SearchVideoItem(BaseModel):
+    id: int
+    user_id: int
+    title: str
+    description: str | None = None
+    hashtags: list[str] | None = None
+    video_url: str
+    thumbnail_url: str | None = None
+    duration_seconds: int
+    view_count: int = 0
+    created_at: datetime
+    author_name: str
+    author_username: str
+    author_avatar_url: str | None = None
+    like_count: int = 0
+    comment_count: int = 0
+    is_liked: bool = False
+
+
+class SearchUserItem(BaseModel):
+    id: int
+    username: str
+    display_name: str
+    avatar_url: str | None = None
+    bio: str | None = None
+    role: str = "USER"
+    followers_count: int = 0
+    following_count: int = 0
+    video_count: int = 0
+    is_following: bool = False
+
+
+class HashtagItem(BaseModel):
+    tag: str
+    video_count: int = 0
+
+
+class SearchResultOut(BaseModel):
+    query: str
+    type: str
+    videos: list[SearchVideoItem] = []
+    users: list[SearchUserItem] = []
+    hashtags: list[HashtagItem] = []

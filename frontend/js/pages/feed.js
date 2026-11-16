@@ -79,6 +79,15 @@ async function loadFeed(type) {
     });
 
     initIntersectionObserver();
+
+    // Tự động cuộn đến video được chọn từ trang Tìm kiếm hoặc link chia sẻ (?v=id)
+    const targetVideoId = new URLSearchParams(window.location.search).get("v");
+    if (targetVideoId) {
+      const targetCard = container.querySelector(`.feed-video-card[data-video-id="${targetVideoId}"]`);
+      if (targetCard) {
+        setTimeout(() => targetCard.scrollIntoView({ behavior: "smooth" }), 150);
+      }
+    }
   } catch (err) {
     container.innerHTML = `
       <div style="color:#ef4444;text-align:center;padding:60px 20px;">

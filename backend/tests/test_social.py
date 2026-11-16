@@ -366,3 +366,97 @@ def test_for_you_feed_and_profile(client: TestClient, db_session):
     assert prof["video_count"] == 1
     assert len(prof["videos"]) == 1
     assert prof["videos"][0]["id"] == v.id
+
+
+def test_search_videos_and_users_and_hashtags(client: TestClient, db_session):
+    db = db_session()
+    user_a, token_a = make_user(db, "alice_wonder", "alice@test.com")
+    user_b, token_b = make_user(db, "bob_builder", "bob@test.com")
+
+    # Tạo 3 video với tiêu đề và hashtag khác nhau
+    v1 = Video(
+        user_id=user_a.id,
+        title="Mẹo nấu ăn siêu ngon #cooking #chef",
+        description="Cách làm món ăn gia đình đơn giản",
+        hashtags=["cooking", "food"],
+        video_url="https://example.com/v1.mp4",
+        thumbnail_url="https://example.com/t1.jpg",
+        duration_seconds=30,
+    )
+    v2 = Video(
+        user_id=user_b.id,
+        title="Lập trình Python cơ bản #python #tech",
+        description="Hướng dẫn lập trình cho người mới",
+        hashtags=["python", "coding"],
+        video_url="https://example.com/v2.mp4",
+        thumbnail_url="https://example.com/t2.jpg",
+        duration_seconds=45,
+    )
+    v3 = Video(
+        user_id=user_a.id,
+        title="Công nghệ AI mới nhất #tech",
+        description="Khám phá trí tuệ nhân tạo",
+        hashtags=["tech", "ai"],
+        video_url="https://example.com/v3.mp4",
+        thumbnail_url="https://example.com/t3.jpg",
+        duration_seconds=60,
+    )
+    db.add_all([v1, v2, v3])
+    db.commit()
+
+    # User B follow User A và like V1
+    h_b = {"Authorization": f"Bearer {token_b}"}
+    client.post(f"/api/users/{user_a.id}/follow", headers=h_b)
+    client.post(f"/api/videos/{v1.id}/likes", headers=h_b)
+
+    # 1. Tìm kiếm video theo từ khoá (query q="nấu ăn")
+    res_v = client.get("/api/search?q=nấu ăn&type=videos")
+    assert res_v.status_code == 200
+    data_v = res_v.json()
+    assert len(data_v["videos"]) == 1
+    assert data_v["videos"][0]["id"] == v1.id
+
+    # 2. Tìm kiếm video theo hashtag "tech"
+    res_tag = client.get("/api/search?tag=tech&type=videos")
+    assert res_tag.status_code == 200
+    tag_videos = res_tag.json()["videos"]
+    assert len(tag_videos) == 2
+    tag_v_ids = {v["id"] for v in tag_videos}
+    assert v2.id in tag_v_ids and v3.id in tag_v_ids
+
+    # 3. Endpoint xem video theo hashtag trực tiếp /api/search/hashtags/{tag}
+    res_direct_tag = client.get("/api/search/hashtags/cooking", headers=h_b)
+    assert res_direct_tag.status_code == 200
+    cooking_vids = res_direct_tag.json()
+    assert len(cooking_vids) == 1
+    assert cooking_vids[0]["id"] == v1.id
+    # Kiểm tra is_liked phản ánh đúng cho user_b
+    assert cooking_vids[0]["is_liked"] is True
+
+    # 4. Tìm kiếm người dùng theo username/display_name
+    res_u = client.get("/api/search?q=alice&type=users", headers=h_b)
+    assert res_u.status_code == 200
+    users = res_u.json()["users"]
+    assert len(users) == 1
+    assert users[0]["username"] == "alice_wonder"
+    assert users[0]["is_following"] is True
+    assert users[0]["followers_count"] == 1
+
+    # 5. Tìm kiếm hashtag
+    res_h = client.get("/api/search?q=cook&type=hashtags")
+    assert res_h.status_code == 200
+    hts = res_h.json()["hashtags"]
+    assert any(h["tag"] == "cooking" for h in hts)
+
+    # 6. Tìm kiếm all (tổng hợp 3 loại)
+    res_all = client.get("/api/search?q=tech&type=all")
+    assert res_all.status_code == 200
+    all_data = res_all.json()
+    assert len(all_data["videos"]) >= 1
+    assert any(h["tag"] == "tech" for h in all_data["hashtags"])
+
+    # 7. Phân trang
+    res_page = client.get("/api/search?type=videos&skip=0&limit=1")
+    assert res_page.status_code == 200
+    assert len(res_page.json()["videos"]) == 1
+

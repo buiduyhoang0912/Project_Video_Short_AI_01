@@ -5,7 +5,7 @@ let profileData = null;
 
 document.addEventListener("DOMContentLoaded", () => {
   const urlParams = new URLSearchParams(window.location.search);
-  const paramId = urlParams.get("user_id");
+  const paramId = urlParams.get("user_id") || urlParams.get("id");
 
   const currentUser = getCurrentUser();
 

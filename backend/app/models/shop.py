@@ -69,3 +69,5 @@ class Shop(Base):
     @property
     def logo_url(self) -> str | None:
         return self.avatar_key
+
+    orders = relationship("Order", back_populates="shop")  # noqa: F821

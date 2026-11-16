@@ -3,10 +3,7 @@ from sqlalchemy import delete, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
-from app.core.social_auth import (
-    get_current_user,
-    get_optional_current_user,
-)
+from app.dependencies.auth import get_current_user, get_optional_user
 from app.crud import social as crud
 from app.db.session import get_db
 from app.models.social import AiChatLog, Comment, Follow, Like
@@ -283,7 +280,7 @@ def unfollow_user(
 def get_user_follow_stats(
     user_id: int,
     db: Session = Depends(get_db),
-    current_user: User | None = Depends(get_optional_current_user),
+    current_user: User | None = Depends(get_optional_user),
 ):
     check_user(db, user_id)
     cid = current_user.id if current_user else None
@@ -365,7 +362,7 @@ def get_for_you_feed(
     skip: int = 0,
     limit: int = 20,
     db: Session = Depends(get_db),
-    current_user: User | None = Depends(get_optional_current_user),
+    current_user: User | None = Depends(get_optional_user),
 ):
     if skip < 0 or not 1 <= limit <= 100:
         raise HTTPException(422, "Phân trang không hợp lệ")
@@ -382,7 +379,7 @@ def get_for_you_feed(
 def get_user_profile(
     user_id: int,
     db: Session = Depends(get_db),
-    current_user: User | None = Depends(get_optional_current_user),
+    current_user: User | None = Depends(get_optional_user),
 ):
     check_user(db, user_id)
     cid = current_user.id if current_user else None
@@ -481,7 +478,7 @@ def search_all(
     skip: int = 0,
     limit: int = 20,
     db: Session = Depends(get_db),
-    user=Depends(get_optional_current_user),
+    user=Depends(get_optional_user),
 ):
     if skip < 0 or not 1 <= limit <= 100:
         raise HTTPException(422, "Phân trang không hợp lệ")
@@ -538,7 +535,7 @@ def get_videos_by_hashtag(
     skip: int = 0,
     limit: int = 20,
     db: Session = Depends(get_db),
-    user=Depends(get_optional_current_user),
+    user=Depends(get_optional_user),
 ):
     if skip < 0 or not 1 <= limit <= 100:
         raise HTTPException(422, "Phân trang không hợp lệ")

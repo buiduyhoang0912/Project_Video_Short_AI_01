@@ -14,7 +14,7 @@ from app.crud import seller_application as sa_crud
 from app.crud import shop as shop_crud
 from app.db.session import get_db
 from app.models.user import User
-from app.routers.auth import get_current_user
+from app.dependencies.auth import get_current_user
 from app.schemas.shop import ShopCreate, ShopOut, ShopUpdate
 
 router = APIRouter(prefix="/shops", tags=["Shops"])

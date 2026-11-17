@@ -167,6 +167,18 @@ class HashtagItem(BaseModel):
     video_count: int = 0
 
 
+class TrendingHashtagItem(BaseModel):
+    rank: int
+    tag: str
+    video_count: int = 0
+    like_count: int = 0
+    comment_count: int = 0
+    share_count: int = 0
+    view_count: int = 0
+    interaction_count: int = 0
+    score: int = 0
+
+
 class SearchResultOut(BaseModel):
     query: str
     type: str

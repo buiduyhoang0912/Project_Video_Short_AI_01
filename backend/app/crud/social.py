@@ -2,7 +2,7 @@ import json
 import re
 import unicodedata
 from collections import Counter
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from decimal import Decimal
 
 import httpx
@@ -833,6 +833,149 @@ def search_hashtags(
 
     results.sort(key=lambda x: (-x["video_count"], x["tag"]))
     return results[:limit]
+
+
+def _extract_tags_for_video_record(
+    hashtags_json, title: str | None, desc: str | None
+) -> set[str]:
+    seen: set[str] = set()
+    if hashtags_json:
+        if isinstance(hashtags_json, list):
+            for tag in hashtags_json:
+                if isinstance(tag, str) and tag.strip():
+                    seen.add(tag.strip().lstrip("#").lower())
+        elif isinstance(hashtags_json, str):
+            try:
+                parsed = json.loads(hashtags_json)
+                if isinstance(parsed, list):
+                    for tag in parsed:
+                        if isinstance(tag, str) and tag.strip():
+                            seen.add(tag.strip().lstrip("#").lower())
+            except Exception:
+                pass
+
+    text_content = f"{title or ''} {desc or ''}"
+    for tag in re.findall(r"#([\w\u0080-\uffff]+)", text_content):
+        if tag.strip():
+            seen.add(tag.strip().lower())
+    return seen
+
+
+def get_trending_hashtags(
+    db: Session,
+    days: int = 7,
+    limit: int = 10,
+) -> list[dict]:
+    """Bảng xếp hạng hashtag nhiều video / tương tác nhất trong N ngày gần đây (mặc định 7 ngày)."""
+    db_now = db.scalar(select(func.now()))
+    if isinstance(db_now, str):
+        try:
+            db_now = datetime.fromisoformat(db_now)
+        except Exception:
+            db_now = datetime.now()
+    elif db_now is None:
+        db_now = datetime.now()
+
+    cutoff = db_now - timedelta(days=max(1, days))
+
+    videos = db.scalars(
+        select(Video).where(Video.status == "VISIBLE")
+    ).all()
+    if not videos:
+        return []
+
+    video_ids = [v.id for v in videos]
+
+    likes_7d = dict(
+        db.execute(
+            select(Like.video_id, func.count(Like.id))
+            .where(
+                Like.video_id.in_(video_ids),
+                Like.created_at >= cutoff,
+            )
+            .group_by(Like.video_id)
+        ).all()
+    )
+    comments_7d = dict(
+        db.execute(
+            select(Comment.video_id, func.count(Comment.id))
+            .where(
+                Comment.video_id.in_(video_ids),
+                Comment.created_at >= cutoff,
+            )
+            .group_by(Comment.video_id)
+        ).all()
+    )
+    shares_7d = dict(
+        db.execute(
+            select(VideoShare.video_id, func.count(VideoShare.id))
+            .where(
+                VideoShare.video_id.in_(video_ids),
+                VideoShare.created_at >= cutoff,
+            )
+            .group_by(VideoShare.video_id)
+        ).all()
+    )
+
+    stats_by_tag: dict[str, dict] = {}
+    for v in videos:
+        tags = _extract_tags_for_video_record(
+            v.hashtags, v.title, v.description
+        )
+        if not tags:
+            continue
+
+        l_cnt = likes_7d.get(v.id, 0)
+        c_cnt = comments_7d.get(v.id, 0)
+        s_cnt = shares_7d.get(v.id, 0)
+        inter_cnt = l_cnt + c_cnt + s_cnt
+        is_recent_video = (
+            v.created_at is not None and v.created_at >= cutoff
+        )
+
+        # Chỉ tính video đăng trong 7 ngày qua hoặc có tương tác mới trong 7 ngày qua
+        if not is_recent_video and inter_cnt == 0:
+            continue
+
+        for tag in tags:
+            entry = stats_by_tag.setdefault(
+                tag,
+                {
+                    "tag": tag,
+                    "video_count": 0,
+                    "like_count": 0,
+                    "comment_count": 0,
+                    "share_count": 0,
+                    "view_count": 0,
+                    "interaction_count": 0,
+                    "score": 0,
+                },
+            )
+            entry["video_count"] += 1
+            entry["like_count"] += l_cnt
+            entry["comment_count"] += c_cnt
+            entry["share_count"] += s_cnt
+            entry["view_count"] += int(getattr(v, "view_count", 0) or 0)
+            entry["interaction_count"] += inter_cnt
+            entry["score"] = (
+                entry["video_count"] + entry["interaction_count"]
+            )
+
+    ranked = sorted(
+        stats_by_tag.values(),
+        key=lambda x: (
+            -x["score"],
+            -x["interaction_count"],
+            -x["video_count"],
+            -x["view_count"],
+            x["tag"],
+        ),
+    )[: max(1, min(limit, 50))]
+
+    for idx, item in enumerate(ranked, start=1):
+        item["rank"] = idx
+
+    return ranked
 
 
 # ---- AI CHATBOT TU VAN MUA SAM (TASK T3D2476) ----

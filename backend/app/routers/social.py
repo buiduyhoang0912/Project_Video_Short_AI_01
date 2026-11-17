@@ -22,6 +22,7 @@ from app.schemas.social import (
     SearchResultOut,
     SearchUserItem,
     SearchVideoItem,
+    TrendingHashtagItem,
     UserFollowItem,
     UserProfileOut,
     VideoDetailOut,
@@ -713,5 +714,29 @@ def get_videos_by_hashtag(
         current_user_id=uid,
         skip=skip,
         limit=limit,
+    )
+
+
+# 18. BANG XEP HANG HASHTAG THINH HANH TRONG 7 NGAY (TASK T3D2BE1)
+@router.get(
+    "/search/trending-hashtags",
+    response_model=list[TrendingHashtagItem],
+)
+@router.get(
+    "/hashtags/trending",
+    response_model=list[TrendingHashtagItem],
+    include_in_schema=False,
+)
+def get_trending_hashtags_ranking(
+    days: int = 7,
+    limit: int = 10,
+    db: Session = Depends(get_db),
+):
+    if not 1 <= days <= 30 or not 1 <= limit <= 50:
+        raise HTTPException(
+            422, "Tham số days hoặc limit không hợp lệ"
+        )
+    return crud.get_trending_hashtags(
+        db, days=days, limit=limit
     )
 

@@ -895,5 +895,86 @@ def test_permission_matrix_comment_delete_and_video_status(
     assert admin_hide.json()["status"] == "HIDDEN"
 
 
+def test_trending_hashtags_7_days_ranking(client: TestClient, db_session):
+    """Kiểm thử bảng xếp hạng hashtag thịnh hành trong 7 ngày (Task T3D2BE1)."""
+    from datetime import datetime, timedelta, timezone
+
+    db = db_session()
+    u1, t1 = make_user(db, "trend_u1", "tu1@test.com")
+    u2, t2 = make_user(db, "trend_u2", "tu2@test.com")
+    h1 = {"Authorization": f"Bearer {t1}"}
+    h2 = {"Authorization": f"Bearer {t2}"}
+
+    now_utc = datetime.now(timezone.utc).replace(tzinfo=None)
+    old_date = now_utc - timedelta(days=15)
+
+    # 1. Video cũ (> 7 ngày trước) không có tương tác mới -> không nằm trong top 7 ngày
+    v_old = Video(
+        user_id=u1.id,
+        title="Video cũ #oldtag",
+        description="Đã đăng 15 ngày trước",
+        hashtags=["oldtag"],
+        video_url="https://example.com/old.mp4",
+        duration_seconds=15,
+        created_at=old_date,
+    )
+
+    # 2. Hai video mới gắn #viral7d và có nhiều tương tác (like + comment + share)
+    v_hot1 = Video(
+        user_id=u1.id,
+        title="Xu hướng công nghệ #viral7d #tech7d",
+        description="Video hot 1",
+        hashtags=["viral7d", "tech7d"],
+        video_url="https://example.com/hot1.mp4",
+        duration_seconds=20,
+        created_at=now_utc - timedelta(days=1),
+    )
+    v_hot2 = Video(
+        user_id=u2.id,
+        title="Mẹo hay mỗi ngày #viral7d",
+        description="Video hot 2",
+        hashtags=["viral7d"],
+        video_url="https://example.com/hot2.mp4",
+        duration_seconds=25,
+        created_at=now_utc - timedelta(days=2),
+    )
+    db.add_all([v_old, v_hot1, v_hot2])
+    db.commit()
+    db.refresh(v_hot1)
+    db.refresh(v_hot2)
+
+    # Tạo tương tác cho v_hot1 và v_hot2 trong 7 ngày qua
+    client.post(f"/api/videos/{v_hot1.id}/likes", headers=h1)
+    client.post(f"/api/videos/{v_hot1.id}/likes", headers=h2)
+    client.post(
+        f"/api/videos/{v_hot1.id}/comments",
+        json={"content": "Hay quá!"},
+        headers=h1,
+    )
+    client.post(f"/api/videos/{v_hot1.id}/share", headers=h2)
+    client.post(f"/api/videos/{v_hot2.id}/likes", headers=h1)
+
+    res = client.get("/api/search/trending-hashtags?days=7&limit=10")
+    assert res.status_code == 200
+    ranking = res.json()
+    assert len(ranking) >= 2
+
+    # #viral7d phải đứng hạng 1 vì có 2 video và 5 lượt tương tác
+    top1 = ranking[0]
+    assert top1["rank"] == 1
+    assert top1["tag"] == "viral7d"
+    assert top1["video_count"] == 2
+    assert top1["interaction_count"] == 5
+
+    # #oldtag (15 ngày trước, 0 tương tác mới) không xuất hiện trong bảng 7 ngày
+    tags_in_ranking = {item["tag"] for item in ranking}
+    assert "oldtag" not in tags_in_ranking
+
+    # Kiểm tra tham số không hợp lệ -> 422
+    bad_res = client.get("/api/search/trending-hashtags?days=0")
+    assert bad_res.status_code == 422
+
+
+
 
 

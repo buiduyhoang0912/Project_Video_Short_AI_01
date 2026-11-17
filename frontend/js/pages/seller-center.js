@@ -103,6 +103,7 @@ async function checkSellerSession() {
 
   try {
     currentUser = await callAuthApi("/auth/me", "GET");
+    if (typeof session !== "undefined") session.setUser(currentUser);
     currentUserBadge.textContent = `👤 ${currentUser.display_name} (${currentUser.role})`;
     logoutSellerBtn.hidden = false;
 
@@ -113,6 +114,8 @@ async function checkSellerSession() {
       await api.post("/seller-applications/quick-setup");
       currentShop = await api.get("/shops/me");
       currentUser = await callAuthApi("/auth/me", "GET");
+      if (typeof session !== "undefined") session.setUser(currentUser);
+      if (typeof renderLayout === "function") renderLayout();
       currentUserBadge.textContent = `👤 ${currentUser.display_name} (${currentUser.role})`;
     }
 
@@ -152,8 +155,10 @@ quickLoginForm.addEventListener("submit", async (event) => {
   try {
     const res = await callAuthApi("/auth/login", "POST", { identifier, password });
     localStorage.setItem("token", res.access_token);
+    if (typeof session !== "undefined") session.save(res.access_token, null);
     showToast("Đăng nhập thành công!");
     await initSellerCenter();
+    if (typeof renderLayout === "function") renderLayout();
   } catch (error) {
     const msg = error.response?.data?.detail || "Sai tài khoản hoặc mật khẩu";
     showToast(msg, "error");
@@ -182,10 +187,12 @@ demoSellerBtn.addEventListener("click", async () => {
       password: demoPassword,
     });
     localStorage.setItem("token", loginRes.access_token);
+    if (typeof session !== "undefined") session.save(loginRes.access_token, null);
 
     await api.post("/seller-applications/quick-setup");
     showToast("Đã khởi tạo tài khoản Seller mẫu & Cửa hàng!");
     await initSellerCenter();
+    if (typeof renderLayout === "function") renderLayout();
   } catch (error) {
     showToast(error.message || "Không thể khởi tạo tài khoản mẫu", "error");
   } finally {
@@ -199,8 +206,10 @@ logoutSellerBtn.addEventListener("click", async () => {
   } catch (_) {
     // Bỏ qua nếu token hết hạn
   }
+  if (typeof session !== "undefined") session.clear();
   localStorage.removeItem("token");
   localStorage.removeItem("access_token");
+  if (typeof renderLayout === "function") renderLayout();
   allProducts = [];
   updateStatsAndAlert();
   showAuthPanel();

@@ -1,10 +1,12 @@
 """API cửa hàng: /api/shops
 
-- GET  /api/shops            Xem danh sách cửa hàng công khai
-- GET  /api/shops/me         Xem cửa hàng của người bán đang đăng nhập
-- GET  /api/shops/{shop_id}  Xem chi tiết thông tin cửa hàng công khai
-- POST /api/shops            Tạo cửa hàng (sau khi đã được Admin duyệt đơn)
-- PUT  /api/shops/{shop_id}  Sửa thông tin cửa hàng của mình
+- GET  /api/shops                      Xem danh sách cửa hàng công khai
+- GET  /api/shops/me                   Xem cửa hàng của người bán đang đăng nhập
+- GET  /api/shops/me/products          Xem danh sách sản phẩm thuộc shop của mình
+- GET  /api/shops/{shop_id}            Xem chi tiết thông tin cửa hàng công khai
+- GET  /api/shops/{shop_id}/products   Xem danh sách sản phẩm của cửa hàng
+- POST /api/shops                      Tạo cửa hàng (sau khi đã được Admin duyệt đơn)
+- PUT  /api/shops/{shop_id}            Sửa thông tin cửa hàng của mình
 """
 
 from typing import Literal
@@ -18,9 +20,9 @@ from app.crud import product as product_crud
 from app.crud import seller_application as sa_crud
 from app.crud import shop as shop_crud
 from app.db.session import get_db
+from app.dependencies.auth import bearer_scheme, get_current_user
 from app.models.revoked_token import RevokedToken
 from app.models.user import User
-from app.routers.auth import bearer_scheme, get_current_user
 from app.schemas.product import ProductOut
 from app.schemas.shop import ShopCreate, ShopOut, ShopUpdate
 
@@ -199,4 +201,3 @@ def update_shop(
         )
 
     return shop_crud.update_shop(db, shop, data)
-

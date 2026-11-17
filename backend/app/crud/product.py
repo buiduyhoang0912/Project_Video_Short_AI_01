@@ -1,15 +1,25 @@
-"""Các hàm thao tác DB cho bảng products và product_images (Task T3D24C4)."""
+"""CRUD cho bảng products, shop, category, product_images và video_products."""
+
+import math
+from decimal import Decimal
 
 from sqlalchemy import delete, func, select
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, joinedload, selectinload
 
 from app.models.cart import CartItem
 from app.models.category import Category
 from app.models.order import OrderItem
 from app.models.product import Product
 from app.models.product_image import ProductImage
+from app.models.shop import Shop
 from app.models.video import VideoProduct
-from app.schemas.product import ProductCreate, ProductUpdate
+from app.schemas.product import (
+    ProductCreate,
+    ProductListItemOut,
+    ProductListResponse,
+    ProductSortBy,
+    ProductUpdate,
+)
 
 
 def get_category(db: Session, category_id: int) -> Category | None:
@@ -18,6 +28,114 @@ def get_category(db: Session, category_id: int) -> Category | None:
 
 def get_product(db: Session, product_id: int) -> Product | None:
     return db.get(Product, product_id)
+
+
+def get_products(
+    db: Session,
+    *,
+    keyword: str | None = None,
+    category_id: int | None = None,
+    min_price: Decimal | float | None = None,
+    max_price: Decimal | float | None = None,
+    shop_id: int | None = None,
+    sort_by: ProductSortBy | str = ProductSortBy.NEWEST,
+    page: int = 1,
+    page_size: int = 10,
+) -> ProductListResponse:
+    """Lấy danh sách sản phẩm theo bộ lọc, phân trang và sắp xếp."""
+    stmt = (
+        select(Product, Shop.name.label("shop_name"), Category.name.label("category_name"))
+        .join(Shop, Product.shop_id == Shop.id)
+        .outerjoin(Category, Product.category_id == Category.id)
+        .where(
+            func.upper(Product.status) == "ACTIVE",
+            func.upper(Shop.status) == "ACTIVE",
+        )
+    )
+
+    if keyword and keyword.strip():
+        search_kw = f"%{keyword.strip()}%"
+        stmt = stmt.where(Product.name.ilike(search_kw))
+
+    if category_id is not None:
+        stmt = stmt.where(Product.category_id == category_id)
+
+    if min_price is not None:
+        stmt = stmt.where(Product.price >= Decimal(str(min_price)))
+    if max_price is not None:
+        stmt = stmt.where(Product.price <= Decimal(str(max_price)))
+
+    if shop_id is not None:
+        stmt = stmt.where(Product.shop_id == shop_id)
+
+    count_stmt = select(func.count()).select_from(stmt.subquery())
+    total: int = db.scalar(count_stmt) or 0
+
+    sort_key = sort_by.value if isinstance(sort_by, ProductSortBy) else sort_by
+    if sort_key == ProductSortBy.PRICE_ASC.value:
+        stmt = stmt.order_by(Product.price.asc(), Product.id.desc())
+    elif sort_key == ProductSortBy.PRICE_DESC.value:
+        stmt = stmt.order_by(Product.price.desc(), Product.id.desc())
+    elif sort_key == ProductSortBy.BEST_SELLING.value:
+        stmt = stmt.order_by(Product.sold_count.desc(), Product.id.desc())
+    else:
+        stmt = stmt.order_by(Product.created_at.desc(), Product.id.desc())
+
+    safe_page = max(page, 1)
+    safe_page_size = max(min(page_size, 100), 1)
+    offset = (safe_page - 1) * safe_page_size
+    stmt = stmt.offset(offset).limit(safe_page_size)
+
+    results = db.execute(stmt).all()
+
+    items: list[ProductListItemOut] = []
+    for product_obj, shop_name, category_name in results:
+        items.append(
+            ProductListItemOut(
+                id=product_obj.id,
+                shop_id=product_obj.shop_id,
+                shop_name=shop_name,
+                category_id=product_obj.category_id,
+                category_name=category_name,
+                name=product_obj.name,
+                price=float(product_obj.price),
+                stock=product_obj.stock,
+                sold_count=product_obj.sold_count,
+                thumbnail_url=product_obj.thumbnail_url,
+                status=product_obj.status,
+                created_at=product_obj.created_at,
+            )
+        )
+
+    total_pages = math.ceil(total / safe_page_size) if total > 0 else 0
+
+    return ProductListResponse(
+        items=items,
+        total=total,
+        page=safe_page,
+        page_size=safe_page_size,
+        total_pages=total_pages,
+    )
+
+
+def get_product_detail(db: Session, product_id: int) -> Product | None:
+    """Lấy chi tiết 1 sản phẩm: kèm ảnh, tồn kho, shop, và video có gắn sản phẩm."""
+    stmt = (
+        select(Product)
+        .options(
+            joinedload(Product.shop),
+            joinedload(Product.category),
+            selectinload(Product.images),
+            selectinload(Product.videos),
+        )
+        .join(Shop, Product.shop_id == Shop.id)
+        .where(
+            Product.id == product_id,
+            func.upper(Product.status) == "ACTIVE",
+            func.upper(Shop.status) == "ACTIVE",
+        )
+    )
+    return db.scalar(stmt)
 
 
 def get_shop_products(
@@ -45,15 +163,26 @@ def get_shop_products(
     return list(db.scalars(query))
 
 
-def create_product(db: Session, shop_id: int, data: ProductCreate) -> Product:
+def create_product(
+    db: Session,
+    shop_id_or_data: int | ProductCreate,
+    data: ProductCreate | None = None,
+) -> Product:
+    if isinstance(shop_id_or_data, ProductCreate):
+        payload = shop_id_or_data
+        target_shop_id = payload.shop_id
+    else:
+        target_shop_id = shop_id_or_data
+        payload = data
+
     product = Product(
-        shop_id=shop_id,
-        category_id=data.category_id,
-        name=data.name.strip(),
-        description=data.description,
-        price=data.price,
-        stock=data.stock,
-        status="ACTIVE",
+        shop_id=target_shop_id,
+        category_id=payload.category_id,
+        name=payload.name.strip(),
+        description=payload.description,
+        price=payload.price,
+        stock=payload.stock,
+        status=getattr(payload, "status", None) or "ACTIVE",
     )
     db.add(product)
     db.commit()
@@ -65,6 +194,7 @@ def update_product(
     db: Session, product: Product, data: ProductUpdate
 ) -> Product:
     update_data = data.model_dump(exclude_unset=True)
+    update_data.pop("thumbnail_url", None)
     if "name" in update_data and isinstance(update_data["name"], str):
         update_data["name"] = update_data["name"].strip()
 
@@ -104,9 +234,6 @@ def product_has_orders(db: Session, product_id: int) -> bool:
 def delete_or_hide_product(
     db: Session, product: Product
 ) -> tuple[str, Product | None, list[str]]:
-    """Nếu sản phẩm đã có đơn hàng thì chỉ ẩn (status='HIDDEN'), không xoá cứng.
-    Nếu chưa có đơn hàng thì xoá cứng và trả về danh sách đường dẫn ảnh để dọn file.
-    """
     if product_has_orders(db, product.id):
         product.status = "HIDDEN"
         db.commit()
@@ -115,7 +242,6 @@ def delete_or_hide_product(
 
     image_keys = [img.object_key for img in product.images]
 
-    # Xoá các liên kết phụ thuộc nếu có (giỏ hàng, video gắn sản phẩm; ảnh tự xoá qua cascade)
     db.execute(delete(CartItem).where(CartItem.product_id == product.id))
     db.execute(delete(VideoProduct).where(VideoProduct.product_id == product.id))
     db.delete(product)
@@ -134,6 +260,25 @@ def get_product_images(db: Session, product_id: int) -> list[ProductImage]:
         )
     )
     return list(db.scalars(query))
+
+
+def add_product_image(
+    db: Session,
+    product_id: int,
+    image_url: str,
+    is_primary: bool = False,
+    display_order: int = 0,
+) -> ProductImage:
+    img = ProductImage(
+        product_id=product_id,
+        object_key=image_url,
+        is_primary=is_primary,
+        sort_order=display_order,
+    )
+    db.add(img)
+    db.commit()
+    db.refresh(img)
+    return img
 
 
 def add_product_images(
@@ -193,3 +338,12 @@ def delete_product_image(db: Session, image: ProductImage) -> str:
 
     db.commit()
     return object_key
+
+
+def link_product_to_video(
+    db: Session, product_id: int, video_id: int
+) -> VideoProduct:
+    vp = VideoProduct(product_id=product_id, video_id=video_id)
+    db.add(vp)
+    db.commit()
+    return vp

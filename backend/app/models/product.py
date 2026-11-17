@@ -1,4 +1,3 @@
-
 from datetime import datetime, timezone
 from decimal import Decimal
 
@@ -61,6 +60,12 @@ class Product(Base):
         default=0,
     )
 
+    sold_count: Mapped[int] = mapped_column(
+        INTEGER(unsigned=True),
+        nullable=False,
+        default=0,
+    )
+
     status: Mapped[str] = mapped_column(
         String(20),
         nullable=False,
@@ -73,8 +78,31 @@ class Product(Base):
         default=utc_now,
     )
 
-    images = relationship(
+    # Relationships
+    shop: Mapped["Shop"] = relationship("Shop", back_populates="products")  # noqa: F821
+    category: Mapped["Category"] = relationship("Category", back_populates="products")  # noqa: F821
+    images: Mapped[list["ProductImage"]] = relationship(  # noqa: F821
         "ProductImage",
+        back_populates="product",
         cascade="all, delete-orphan",
         order_by="ProductImage.sort_order, ProductImage.id",
     )
+    videos: Mapped[list["Video"]] = relationship(  # noqa: F821
+        "Video", secondary="video_products", backref="tagged_products"
+    )
+
+    @property
+    def thumbnail_url(self) -> str | None:
+        if not self.images:
+            return None
+        for img in self.images:
+            if img.is_primary:
+                return img.object_key
+        return self.images[0].object_key
+
+    @property
+    def updated_at(self) -> datetime:
+        return self.created_at
+
+
+from app.models.product_image import ProductImage  # noqa: F401, E402

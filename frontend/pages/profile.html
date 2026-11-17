@@ -1,0 +1,83 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Hồ sơ người dùng | ClipShop AI</title>
+  <link rel="icon" href="../assets/images/logo.svg">
+  <link rel="stylesheet" href="../css/style.css">
+</head>
+<body data-root="../" data-auth="self">
+  <header id="app-header"></header>
+
+  <main class="container">
+    <div id="profile-loading" style="text-align:center;padding:50px;">
+      Đang tải hồ sơ...
+    </div>
+
+    <div id="profile-container" style="display:none;">
+      <!-- Khung thông tin cá nhân -->
+      <section class="profile-card">
+        <div class="profile-header-top">
+          <img id="profile-avatar" src="../assets/images/logo.svg" alt="avatar" class="profile-avatar-large">
+          <div class="profile-user-info">
+            <h1 class="profile-display-name" id="profile-display-name">Tên hiển thị</h1>
+            <div class="profile-username" id="profile-username">@username</div>
+            <span class="profile-role-badge" id="profile-role">USER</span>
+          </div>
+          <div>
+            <!-- NÚT THEO DÕI TRÊN TRANG HỒ SƠ (TASK T3D2428) -->
+            <button id="btn-profile-follow" class="btn-profile-follow not-following" style="display:none;">
+              + Theo dõi
+            </button>
+            <div id="profile-self-badge" class="muted" style="display:none;font-weight:600;">
+              👤 Tài khoản của bạn
+            </div>
+          </div>
+        </div>
+
+        <!-- Thống kê Follow và Video -->
+        <div class="profile-stats-row">
+          <div class="profile-stat-item">
+            <span class="profile-stat-number" id="stat-following">0</span>
+            <span class="profile-stat-label">Đang theo dõi</span>
+          </div>
+          <div class="profile-stat-item">
+            <span class="profile-stat-number" id="stat-followers">0</span>
+            <span class="profile-stat-label">Người theo dõi</span>
+          </div>
+          <div class="profile-stat-item">
+            <span class="profile-stat-number" id="stat-videos">0</span>
+            <span class="profile-stat-label">Video đã đăng</span>
+          </div>
+        </div>
+
+        <div class="profile-bio" id="profile-bio">
+          Chưa có tiểu sử.
+        </div>
+      </section>
+
+      <!-- Danh sách video của tài khoản này -->
+      <section class="card" style="max-width:640px;margin:0 auto;">
+        <h2>Video đã đăng</h2>
+        <div id="profile-videos-empty" class="muted" style="text-align:center;padding:30px;display:none;">
+          Người dùng này chưa đăng video nào.
+        </div>
+        <div id="profile-videos-grid" class="profile-videos-grid">
+          <!-- Video thumbnails sẽ render ở đây -->
+        </div>
+      </section>
+    </div>
+  </main>
+
+  <footer id="app-footer"></footer>
+
+  <!-- Scripts -->
+  <script src="https://cdn.jsdelivr.net/npm/axios@1.7.9/dist/axios.min.js"></script>
+  <script src="../js/config.js"></script>
+  <script src="../js/api.js"></script>
+  <script src="../js/utils.js"></script>
+  <script src="../js/layout.js"></script>
+  <script src="../js/pages/profile.js"></script>
+</body>
+</html>

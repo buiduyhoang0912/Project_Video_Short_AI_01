@@ -8,7 +8,11 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
 class Settings(BaseSettings):
-    model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8")
+    model_config = SettingsConfigDict(
+        env_file=".env",
+        env_file_encoding="utf-8",
+        extra="ignore",
+    )
 
     APP_NAME: str = "KS25 Base API"
 
@@ -25,6 +29,15 @@ class Settings(BaseSettings):
     JWT_SECRET_KEY: str = "change-me-to-a-long-random-string"
     JWT_ALGORITHM: str = "HS256"
     JWT_EXPIRE_MINUTES: int = 60
+
+    # Cấu hình AI Chatbot tư vấn mua sắm (Task T3D2476)
+    GEMINI_API_KEY: str = ""
+    GEMINI_MODEL: str = "gemini-2.0-flash"
+    OPENAI_API_KEY: str = ""
+    OPENAI_MODEL: str = "gpt-4o-mini"
+    AI_PROVIDER: str = "auto"
+    AI_TIMEOUT_SECONDS: float = 15.0
+    AI_DAILY_QUESTION_LIMIT: int = 20
 
     @property
     def database_url(self) -> str:

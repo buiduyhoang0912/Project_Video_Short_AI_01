@@ -557,3 +557,162 @@ def test_hidden_video_unavailable_and_visibility_toggle(
     assert not_found.status_code == 404
 
 
+def test_ai_shopping_chatbot_mysql_grounding_and_links(
+    client: TestClient, db_session
+):
+    from decimal import Decimal
+    from app.models.category import Category
+    from app.models.product import Product
+
+    db = db_session()
+    seller, _ = make_user(db, "seller_ai", "sellerai@test.com", role="SELLER")
+    buyer, buyer_token = make_user(db, "buyer_ai", "buyerai@test.com")
+    headers = {"Authorization": f"Bearer {buyer_token}"}
+
+    shop = Shop(
+        owner_id=seller.id,
+        name="ClipShop Audio",
+        description="Chuyên phụ kiện âm thanh",
+        address="Hà Nội",
+        status="ACTIVE",
+    )
+    cat = Category(name="Tai nghe", description="Tai nghe", status="ACTIVE")
+    db.add_all([shop, cat])
+    db.commit()
+    db.refresh(shop)
+    db.refresh(cat)
+
+    p_good = Product(
+        shop_id=shop.id,
+        category_id=cat.id,
+        name="JBL Tune 520BT",
+        description="Tai nghe không dây âm trầm mạnh mẽ",
+        price=Decimal("350000"),
+        stock=15,
+        sold_count=40,
+        status="ACTIVE",
+    )
+    p_expensive = Product(
+        shop_id=shop.id,
+        category_id=cat.id,
+        name="Sony WH-1000XM5",
+        description="Tai nghe chống ồn cao cấp",
+        price=Decimal("6500000"),
+        stock=5,
+        sold_count=10,
+        status="ACTIVE",
+    )
+    p_hidden = Product(
+        shop_id=shop.id,
+        category_id=cat.id,
+        name="Tai nghe ẩn không bán",
+        description="Sản phẩm ẩn",
+        price=Decimal("200000"),
+        stock=10,
+        status="INACTIVE",
+    )
+    db.add_all([p_good, p_expensive, p_hidden])
+    db.commit()
+    db.refresh(p_good)
+
+    # Hỏi AI tìm tai nghe dưới 500k
+    res = client.post(
+        "/api/ai/chat",
+        json={"message": "Tư vấn cho tôi tai nghe dưới 500k"},
+        headers=headers,
+    )
+    assert res.status_code == 200
+    body = res.json()
+    assert len(body["recommended_products"]) == 1
+    rec = body["recommended_products"][0]
+    assert rec["id"] == p_good.id
+    assert rec["name"] == "JBL Tune 520BT"
+    assert rec["link"] == f"pages/product.html?id={p_good.id}"
+    assert f"pages/product.html?id={p_good.id}" in body["reply"]
+    assert body["used_today"] == 1
+    assert body["remaining_today"] == body["daily_limit"] - 1
+
+
+def test_ai_shopping_chatbot_daily_limit_and_gemini_errors(
+    client: TestClient, db_session, monkeypatch
+):
+    import httpx
+    from app.core.config import settings
+
+    db = db_session()
+    user, token = make_user(db, "limit_user", "limit@test.com")
+    headers = {"Authorization": f"Bearer {token}"}
+
+    # 1. Test giới hạn số câu hỏi mỗi ngày = 2
+    monkeypatch.setattr(settings, "AI_DAILY_QUESTION_LIMIT", 2)
+    monkeypatch.setattr(settings, "GEMINI_API_KEY", "")
+    monkeypatch.setattr(settings, "OPENAI_API_KEY", "")
+
+    r1 = client.post(
+        "/api/ai/chat",
+        json={"message": "Câu hỏi số 1"},
+        headers=headers,
+    )
+    assert r1.status_code == 200
+    assert r1.json()["remaining_today"] == 1
+
+    r2 = client.post(
+        "/api/ai/chat",
+        json={"message": "Câu hỏi số 2"},
+        headers=headers,
+    )
+    assert r2.status_code == 200
+    assert r2.json()["remaining_today"] == 0
+
+    # Câu hỏi số 3 vượt quá giới hạn ngày -> 429
+    r3 = client.post(
+        "/api/ai/chat",
+        json={"message": "Câu hỏi số 3 vượt giới hạn"},
+        headers=headers,
+    )
+    assert r3.status_code == 429
+    assert "giới hạn 2 câu hỏi mỗi ngày" in r3.json()["detail"]
+
+    # 2. Test báo lỗi dễ hiểu khi Gemini Timeout (504) và Hết Quota (429)
+    user2, token2 = make_user(db, "gemini_user", "gem@test.com")
+    h2 = {"Authorization": f"Bearer {token2}"}
+    monkeypatch.setattr(settings, "AI_DAILY_QUESTION_LIMIT", 10)
+    monkeypatch.setattr(settings, "GEMINI_API_KEY", "fake-gemini-key")
+    monkeypatch.setattr(settings, "AI_PROVIDER", "gemini")
+
+    orig_post = httpx.Client.post
+
+    def mock_timeout_post(self, url, *args, **kwargs):
+        if "generativelanguage.googleapis.com" in str(url):
+            raise httpx.TimeoutException("Request timed out")
+        return orig_post(self, url, *args, **kwargs)
+
+    monkeypatch.setattr(httpx.Client, "post", mock_timeout_post)
+    res_timeout = client.post(
+        "/api/ai/chat",
+        json={"message": "Tìm điện thoại"},
+        headers=h2,
+    )
+    assert res_timeout.status_code == 504
+    assert "timeout" in res_timeout.json()["detail"].lower()
+
+    def mock_quota_post(self, url, *args, **kwargs):
+        if "generativelanguage.googleapis.com" in str(url):
+            return httpx.Response(
+                429,
+                json={"error": {"status": "RESOURCE_EXHAUSTED", "message": "Quota exceeded"}},
+                request=httpx.Request("POST", str(url)),
+            )
+        return orig_post(self, url, *args, **kwargs)
+
+    monkeypatch.setattr(httpx.Client, "post", mock_quota_post)
+    res_quota = client.post(
+        "/api/ai/chat",
+        json={"message": "Tìm điện thoại"},
+        headers=h2,
+    )
+    assert res_quota.status_code == 429
+    assert "quota" in res_quota.json()["detail"].lower()
+
+
+

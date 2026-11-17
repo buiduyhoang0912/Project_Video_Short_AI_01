@@ -185,3 +185,370 @@ async function guardPage() {
 
 renderLayout();
 guardPage();
+initAiChatbotWidget();
+
+// ==========================================================
+// TASK T3D2476: UI KHUNG CHAT NỔI - CHATBOT AI TƯ VẤN MUA SẮM
+// ==========================================================
+function initAiChatbotWidget() {
+  if (document.getElementById("ai-chatbot-widget")) return;
+
+  const root = document.body.dataset.root || "./";
+  const widget = document.createElement("div");
+  widget.id = "ai-chatbot-widget";
+  widget.className = "ai-chatbot-widget";
+
+  widget.innerHTML = `
+    <!-- Nút mở khung chat nổi (FAB) -->
+    <button type="button" id="ai-chat-fab" class="ai-chat-fab" aria-label="Mở Trợ lý Mua sắm AI">
+      <span class="ai-fab-icon">🤖</span>
+      <span class="ai-fab-label">Tư vấn AI</span>
+    </button>
+
+    <!-- Khung chat nổi -->
+    <section id="ai-chat-panel" class="ai-chat-panel" aria-label="Khung chat tư vấn mua sắm AI">
+      <header class="ai-chat-header">
+        <div class="ai-chat-header-left">
+          <div class="ai-bot-avatar">🛍️</div>
+          <div>
+            <div class="ai-chat-title">Trợ lý Mua sắm AI</div>
+            <div class="ai-chat-quota" id="ai-quota-badge">Chỉ gợi ý sản phẩm thật tại Shop</div>
+          </div>
+        </div>
+        <button type="button" id="ai-chat-close" class="ai-chat-close-btn" title="Đóng">&times;</button>
+      </header>
+
+      <!-- Gợi ý câu hỏi nhanh -->
+      <div class="ai-quick-prompts">
+        <button type="button" class="ai-chip-btn" data-prompt="Gợi ý cho tôi các sản phẩm bán chạy nhất">🔥 Bán chạy</button>
+        <button type="button" class="ai-chip-btn" data-prompt="Tư vấn điện thoại giá tốt">📱 Điện thoại</button>
+        <button type="button" class="ai-chip-btn" data-prompt="Tìm tai nghe dưới 500k">🎧 Tai nghe &lt;500k</button>
+        <button type="button" class="ai-chip-btn" data-prompt="Shop có áo thun nam nào không?">👕 Áo thun</button>
+        <button type="button" class="ai-chip-btn" data-prompt="Tư vấn laptop gaming">💻 Laptop</button>
+      </div>
+
+      <!-- Danh sách tin nhắn -->
+      <div id="ai-chat-messages" class="ai-chat-messages">
+        <div class="ai-msg-row assistant">
+          <div class="ai-msg-bubble">
+            Xin chào! 👋 Mình là <strong>Trợ lý AI của ClipShop</strong>.<br>
+            Mình sẽ tìm sản phẩm <strong>có thật trong hệ thống</strong> và gửi kèm link cho bạn. Bạn đang muốn tìm mua mặt hàng gì hay tầm giá bao nhiêu?
+          </div>
+        </div>
+      </div>
+
+      <!-- Khung nhập câu hỏi -->
+      <form id="ai-chat-form" class="ai-chat-input-bar" onsubmit="return false;">
+        <input
+          type="text"
+          id="ai-chat-input"
+          placeholder="Nhập nhu cầu mua sắm (vd: tai nghe dưới 500k)..."
+          maxlength="2000"
+          autocomplete="off"
+        >
+        <button type="submit" id="ai-chat-send" class="ai-chat-send-btn">Gửi</button>
+      </form>
+    </section>
+
+    <!-- Modal xem nhanh chi tiết sản phẩm -->
+    <div id="ai-product-modal" class="modal-overlay">
+      <div class="modal-card" style="max-width:460px;">
+        <div class="modal-header">
+          <h3 style="margin:0;" id="ai-modal-title">Chi tiết sản phẩm</h3>
+          <button type="button" id="ai-modal-close" class="modal-close-btn">&times;</button>
+        </div>
+        <div id="ai-modal-body"></div>
+      </div>
+    </div>
+  `;
+
+  document.body.appendChild(widget);
+
+  const fabBtn = document.getElementById("ai-chat-fab");
+  const panelEl = document.getElementById("ai-chat-panel");
+  const closeBtn = document.getElementById("ai-chat-close");
+  const formEl = document.getElementById("ai-chat-form");
+  const inputEl = document.getElementById("ai-chat-input");
+  const modalEl = document.getElementById("ai-product-modal");
+  const modalCloseBtn = document.getElementById("ai-modal-close");
+
+  let historyLoaded = false;
+
+  fabBtn.addEventListener("click", () => {
+    const isOpen = panelEl.classList.toggle("open");
+    fabBtn.classList.toggle("hidden-fab", isOpen);
+    if (isOpen) {
+      inputEl.focus();
+      if (!historyLoaded) {
+        historyLoaded = true;
+        loadAiQuotaAndHistory();
+      }
+    }
+  });
+
+  closeBtn.addEventListener("click", () => {
+    panelEl.classList.remove("open");
+    fabBtn.classList.remove("hidden-fab");
+  });
+
+  if (modalCloseBtn && modalEl) {
+    modalCloseBtn.addEventListener("click", () => modalEl.classList.remove("active"));
+    modalEl.addEventListener("click", (e) => {
+      if (e.target === modalEl) modalEl.classList.remove("active");
+    });
+  }
+
+  widget.querySelectorAll(".ai-chip-btn").forEach((chip) => {
+    chip.addEventListener("click", () => {
+      const promptText = chip.dataset.prompt || "";
+      if (!promptText) return;
+      inputEl.value = promptText;
+      sendAiChatMessage();
+    });
+  });
+
+  formEl.addEventListener("submit", (e) => {
+    e.preventDefault();
+    sendAiChatMessage();
+  });
+
+  async function loadAiQuotaAndHistory() {
+    if (!session.getToken()) {
+      updateAiQuotaUI(null);
+      return;
+    }
+
+    try {
+      const [quota, logs] = await Promise.all([
+        api.get("/ai/quota"),
+        api.get("/ai/chat-logs", { limit: 20 }),
+      ]);
+      updateAiQuotaUI(quota);
+
+      if (Array.isArray(logs) && logs.length > 0) {
+        const ordered = logs.slice().reverse();
+        ordered.forEach((log) => {
+          appendAiMessage(log.role, log.message, []);
+        });
+      }
+    } catch (_) {
+      // Bỏ qua nếu chưa đăng nhập hoặc lỗi mạng tạm thời
+    }
+  }
+
+  function updateAiQuotaUI(quota) {
+    const badgeEl = document.getElementById("ai-quota-badge");
+    const sendBtn = document.getElementById("ai-chat-send");
+    if (!badgeEl) return;
+
+    if (!quota) {
+      badgeEl.textContent = "Đăng nhập để nhận tư vấn mua sắm AI";
+      return;
+    }
+
+    badgeEl.textContent = `Còn ${quota.remaining_today}/${quota.daily_limit} câu hỏi hôm nay`;
+    if (quota.remaining_today <= 0) {
+      badgeEl.classList.add("quota-empty");
+      if (inputEl) {
+        inputEl.disabled = true;
+        inputEl.placeholder = "Đã hết lượt hỏi hôm nay. Hẹn gặp lại ngày mai!";
+      }
+      if (sendBtn) sendBtn.disabled = true;
+    } else {
+      badgeEl.classList.remove("quota-empty");
+      if (inputEl) {
+        inputEl.disabled = false;
+        inputEl.placeholder = "Nhập nhu cầu mua sắm (vd: tai nghe dưới 500k)...";
+      }
+      if (sendBtn) sendBtn.disabled = false;
+    }
+  }
+
+  function formatAiTextToHtml(rawText) {
+    let safe = escapeHtml(rawText || "");
+    // Đổi **chữ đậm**
+    safe = safe.replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>");
+    // Đổi đường dẫn pages/product.html?id=X thành thẻ <a> bấm được
+    safe = safe.replace(
+      /pages\/product\.html\?id=(\d+)/g,
+      (match, pid) =>
+        `<a href="${root}pages/product.html?id=${pid}" class="ai-inline-link" data-product-id="${pid}">🔗 Xem sản phẩm #${pid} &rarr;</a>`
+    );
+    return safe.replace(/\n/g, "<br>");
+  }
+
+  function appendAiMessage(role, text, products = [], isError = false) {
+    const listEl = document.getElementById("ai-chat-messages");
+    if (!listEl) return;
+
+    const row = document.createElement("div");
+    row.className = `ai-msg-row ${role === "user" ? "user" : "assistant"}`;
+
+    const bubble = document.createElement("div");
+    bubble.className = `ai-msg-bubble${isError ? " ai-msg-error" : ""}`;
+    bubble.innerHTML =
+      role === "user" ? escapeHtml(text) : formatAiTextToHtml(text);
+
+    if (Array.isArray(products) && products.length > 0) {
+      const cardsWrap = document.createElement("div");
+      cardsWrap.className = "ai-rec-products-list";
+
+      products.forEach((p) => {
+        const card = document.createElement("div");
+        card.className = "ai-rec-product-card";
+        const priceFormatted = Number(p.price || 0).toLocaleString("vi-VN") + " ₫";
+        const productHref = `${root}${p.link || `pages/product.html?id=${p.id}`}`;
+
+        card.innerHTML = `
+          <div class="ai-rec-prod-info">
+            <div class="ai-rec-prod-name">${escapeHtml(p.name)}</div>
+            <div class="ai-rec-prod-price">${priceFormatted}</div>
+            <div class="ai-rec-prod-meta">
+              🏪 ${escapeHtml(p.shop_name || "ClipShop")} · Kho: ${p.stock || 0}
+            </div>
+          </div>
+          <div class="ai-rec-prod-actions">
+            <a href="${productHref}" class="btn btn-primary btn-small ai-prod-link-btn" data-product-id="${p.id}">
+              Xem SP &rarr;
+            </a>
+          </div>
+        `;
+        cardsWrap.appendChild(card);
+      });
+
+      bubble.appendChild(cardsWrap);
+    }
+
+    // Hỗ trợ mở modal chi tiết sản phẩm hoặc chuyển trang
+    bubble.querySelectorAll("[data-product-id]").forEach((linkEl) => {
+      linkEl.addEventListener("click", async (e) => {
+        const pid = linkEl.dataset.productId;
+        if (!pid) return;
+        // Kiểm tra thử trang product.html có sẵn không; nếu chưa merge thì mở modal chi tiết ngay
+        e.preventDefault();
+        await openProductQuickModal(pid, linkEl.getAttribute("href"));
+      });
+    });
+
+    row.appendChild(bubble);
+    listEl.appendChild(row);
+    listEl.scrollTop = listEl.scrollHeight;
+  }
+
+  async function openProductQuickModal(productId, targetHref) {
+    const modal = document.getElementById("ai-product-modal");
+    const body = document.getElementById("ai-modal-body");
+    const title = document.getElementById("ai-modal-title");
+    if (!modal || !body) {
+      if (targetHref) window.location.href = targetHref;
+      return;
+    }
+
+    modal.classList.add("active");
+    title.textContent = `Sản phẩm #${productId}`;
+    body.innerHTML = `<div class="muted" style="text-align:center;padding:24px;">⏳ Đang tải thông tin sản phẩm từ MySQL...</div>`;
+
+    try {
+      const p = await api.get(`/products/${productId}`);
+      const priceFmt = Number(p.price || 0).toLocaleString("vi-VN") + " ₫";
+      title.textContent = p.name || `Sản phẩm #${productId}`;
+      body.innerHTML = `
+        <div style="display:flex;flex-direction:column;gap:10px;">
+          <div style="font-size:22px;font-weight:700;color:var(--color-danger);">${priceFmt}</div>
+          <div class="muted">
+            🏪 Cửa hàng: <strong>${escapeHtml(p.shop?.name || "ClipShop")}</strong> ·
+            📦 Tồn kho: <strong>${p.stock}</strong> ·
+            🔥 Đã bán: <strong>${p.sold_count || 0}</strong>
+          </div>
+          ${
+            p.category?.name
+              ? `<div>🏷️ Danh mục: <span class="role-badge">${escapeHtml(p.category.name)}</span></div>`
+              : ""
+          }
+          <p style="margin:8px 0;font-size:14px;line-height:1.5;">
+            ${escapeHtml(p.description || "Sản phẩm chính hãng tại ClipShop AI.")}
+          </p>
+          <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:8px;">
+            <a href="${root}pages/shop.html?product_id=${p.id}" class="btn btn-primary btn-small">Đi tới Shop</a>
+          </div>
+        </div>
+      `;
+    } catch (err) {
+      body.innerHTML = `<div class="text-error">${escapeHtml(
+        err.message || "Không tải được chi tiết sản phẩm."
+      )}</div>`;
+    }
+  }
+
+  async function sendAiChatMessage() {
+    const text = (inputEl.value || "").trim();
+    if (!text) return;
+
+    if (!session.getToken()) {
+      appendAiMessage("user", text);
+      inputEl.value = "";
+      appendAiMessage(
+        "assistant",
+        "Vui lòng đăng nhập tài khoản để sử dụng Trợ lý AI tư vấn mua sắm (miễn phí mỗi ngày)!",
+        [],
+        true
+      );
+      return;
+    }
+
+    inputEl.value = "";
+    appendAiMessage("user", text);
+
+    const sendBtn = document.getElementById("ai-chat-send");
+    if (sendBtn) sendBtn.disabled = true;
+
+    // Hiển thị bong bóng đang xử lý
+    const listEl = document.getElementById("ai-chat-messages");
+    const typingRow = document.createElement("div");
+    typingRow.className = "ai-msg-row assistant";
+    typingRow.innerHTML = `<div class="ai-msg-bubble ai-typing">⏳ AI đang tìm sản phẩm trong MySQL và tư vấn...</div>`;
+    listEl.appendChild(typingRow);
+    listEl.scrollTop = listEl.scrollHeight;
+
+    try {
+      const res = await api.post("/ai/chat", { message: text });
+      typingRow.remove();
+
+      appendAiMessage(
+        "assistant",
+        res.reply,
+        res.recommended_products || []
+      );
+
+      updateAiQuotaUI({
+        daily_limit: res.daily_limit,
+        used_today: res.used_today,
+        remaining_today: res.remaining_today,
+      });
+    } catch (err) {
+      typingRow.remove();
+      let friendlyMsg =
+        err.message ||
+        "Không thể kết nối tới Trợ lý AI lúc này. Vui lòng thử lại sau.";
+
+      if (err.status === 504 || err.status === 408) {
+        friendlyMsg =
+          "⏱️ Trợ lý AI phản hồi quá thời gian chờ (timeout). Vui lòng thử lại sau giây lát.";
+      } else if (err.status === 429) {
+        friendlyMsg = `⚠️ ${err.message}`;
+        // Làm mới lại thông tin giới hạn câu hỏi trong ngày
+        try {
+          const q = await api.get("/ai/quota");
+          updateAiQuotaUI(q);
+        } catch (_) {}
+      }
+
+      appendAiMessage("assistant", friendlyMsg, [], true);
+    } finally {
+      const sendBtnAfter = document.getElementById("ai-chat-send");
+      if (sendBtnAfter && !inputEl.disabled) {
+        sendBtnAfter.disabled = false;
+      }
+    }
+  }
+}

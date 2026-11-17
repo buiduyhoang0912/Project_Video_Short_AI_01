@@ -10,6 +10,8 @@ from app.models.social import AiChatLog, Comment, Follow, Like
 from app.models.user import User
 from app.models.video import Video
 from app.schemas.social import (
+    AiChatResponse,
+    AiQuotaOut,
     ChatLogCreate,
     ChatLogOut,
     CommentCreate,
@@ -548,6 +550,86 @@ def my_chat_logs(
         .offset(skip)
         .limit(limit)
     ).all()
+
+
+# 15B. KIEM TRA SO CAU HOI AI CON LAI TRONG NGAY (TASK T3D2476)
+@router.get(
+    "/ai/quota",
+    response_model=AiQuotaOut,
+)
+def get_my_ai_quota(
+    db: Session = Depends(get_db),
+    user=Depends(get_current_user),
+):
+    uid = current_user_id(user)
+    return crud.get_user_daily_chat_quota(db, uid)
+
+
+# 15C. CHATBOT AI TU VAN MUA SAM (TASK T3D2476)
+@router.post(
+    "/ai/chat",
+    response_model=AiChatResponse,
+)
+@router.post(
+    "/ai/chatbot",
+    response_model=AiChatResponse,
+    include_in_schema=False,
+)
+def chat_with_shopping_ai(
+    data: ChatLogCreate,
+    db: Session = Depends(get_db),
+    user=Depends(get_current_user),
+):
+    clean_message = data.message.strip()
+    if not clean_message:
+        raise HTTPException(
+            422, "Tin nhắn không được rỗng"
+        )
+
+    uid = current_user_id(user)
+    quota = crud.get_user_daily_chat_quota(db, uid)
+    if quota["remaining_today"] <= 0:
+        raise HTTPException(
+            status_code=429,
+            detail=(
+                f"Bạn đã sử dụng hết giới hạn {quota['daily_limit']} câu hỏi mỗi ngày "
+                f"({quota['used_today']}/{quota['daily_limit']}). Vui lòng quay lại vào ngày mai!"
+            ),
+        )
+
+    try:
+        reply_text, products, provider_used = (
+            crud.generate_ai_shopping_reply(db, clean_message)
+        )
+    except crud.AiTimeoutError as error:
+        raise HTTPException(
+            status_code=504, detail=str(error)
+        ) from error
+    except crud.AiQuotaExceededError as error:
+        raise HTTPException(
+            status_code=429, detail=str(error)
+        ) from error
+    except crud.AiProviderError as error:
+        raise HTTPException(
+            status_code=503, detail=str(error)
+        ) from error
+
+    user_log = crud.save_ai_log(db, uid, "user", clean_message)
+    assistant_log = crud.save_ai_log(
+        db, uid, "assistant", reply_text
+    )
+    updated_quota = crud.get_user_daily_chat_quota(db, uid)
+
+    return {
+        "reply": reply_text,
+        "user_message": user_log,
+        "assistant_message": assistant_log,
+        "recommended_products": products,
+        "provider": provider_used,
+        "daily_limit": updated_quota["daily_limit"],
+        "used_today": updated_quota["used_today"],
+        "remaining_today": updated_quota["remaining_today"],
+    }
 
 
 # 16. TIM KIEM VIDEO, NGUOI DUNG, HASHTAG

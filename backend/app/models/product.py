@@ -88,5 +88,16 @@ class Product(Base):
         "Video", secondary="video_products", backref="tagged_products"
     )
 
+    @property
+    def thumbnail_url(self) -> str | None:
+        if self.images:
+            primary = next((img for img in self.images if img.is_primary), None)
+            return (primary or self.images[0]).object_key
+        return None
+
+    @property
+    def updated_at(self) -> datetime:
+        return self.created_at
+
 
 from app.models.product_image import ProductImage  # noqa: F401

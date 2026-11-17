@@ -975,6 +975,141 @@ def test_trending_hashtags_7_days_ranking(client: TestClient, db_session):
     assert bad_res.status_code == 422
 
 
+def test_end_to_end_system_integration_flow(client: TestClient, db_session):
+    """Kiểm thử luồng xuyên suốt toàn hệ thống (Task T3D1DB8):
+    Auth -> Shop/Product -> Video -> Feed -> Follow -> Like/Comment -> Search & Trending Hashtags -> Share Page (/video/{id}) -> AI Chatbot -> Product Detail.
+    """
+    from decimal import Decimal
+    from app.models.category import Category
+    from app.models.product import Product
+
+    db = db_session()
+
+    # 1. Đăng ký & Đăng nhập tài khoản người mua qua /auth/register & /auth/login
+    reg_res = client.post(
+        "/auth/register",
+        json={
+            "email": "e2e_buyer@example.com",
+            "username": "e2e_buyer",
+            "display_name": "Người Mua E2E",
+            "password": "Password123",
+        },
+    )
+    assert reg_res.status_code == 201
+
+    login_res = client.post(
+        "/auth/login",
+        json={"identifier": "e2e_buyer", "password": "Password123"},
+    )
+    assert login_res.status_code == 200
+    buyer_token = login_res.json()["access_token"]
+    buyer_headers = {"Authorization": f"Bearer {buyer_token}"}
+
+    # 2. Tạo Seller, Shop, Category, Product và Video gắn Hashtag
+    seller, _ = make_user(db, "e2e_seller", "e2eseller@test.com", role="SELLER")
+    shop = Shop(
+        owner_id=seller.id,
+        name="E2E Tech Store",
+        description="Cửa hàng công nghệ E2E",
+        address="Hà Nội",
+        status="ACTIVE",
+    )
+    cat = Category(name="Điện thoại", description="Smartphone", status="ACTIVE")
+    db.add_all([shop, cat])
+    db.commit()
+    db.refresh(shop)
+    db.refresh(cat)
+
+    product = Product(
+        shop_id=shop.id,
+        category_id=cat.id,
+        name="iPhone 15 Pro",
+        description="Điện thoại flagship quay video sắc nét",
+        price=Decimal("24000000"),
+        stock=10,
+        sold_count=25,
+        status="ACTIVE",
+    )
+    video = Video(
+        user_id=seller.id,
+        title="Đánh giá iPhone 15 Pro quay video #iphone15 #smartphone",
+        description="Review chi tiết camera #iphone15",
+        hashtags=["iphone15", "smartphone"],
+        video_url="https://example.com/iphone15.mp4",
+        thumbnail_url="https://example.com/iphone15.jpg",
+        duration_seconds=40,
+    )
+    db.add_all([product, video])
+    db.commit()
+    db.refresh(product)
+    db.refresh(video)
+
+    # 3. Xem Feed Dành cho bạn -> Follow Seller -> Xem Feed Đang theo dõi
+    for_you = client.get("/api/videos/feed/for-you", headers=buyer_headers)
+    assert for_you.status_code == 200
+    assert any(v["id"] == video.id for v in for_you.json())
+
+    assert (
+        client.post(
+            f"/api/users/{seller.id}/follow", headers=buyer_headers
+        ).status_code
+        == 200
+    )
+    following_feed = client.get(
+        "/api/videos/feed/following", headers=buyer_headers
+    )
+    assert following_feed.status_code == 200
+    assert any(v["id"] == video.id for v in following_feed.json())
+
+    # 4. Thích, Bình luận, Xem riêng video (/api/videos/{id}) & Chia sẻ
+    assert (
+        client.post(
+            f"/api/videos/{video.id}/likes", headers=buyer_headers
+        ).status_code
+        == 200
+    )
+    assert (
+        client.post(
+            f"/api/videos/{video.id}/comments",
+            json={"content": "Video review rất chi tiết!"},
+            headers=buyer_headers,
+        ).status_code
+        == 201
+    )
+    share_res = client.post(
+        f"/api/videos/{video.id}/share", headers=buyer_headers
+    )
+    assert share_res.status_code == 200
+    assert share_res.json()["share_count"] == 1
+
+    single_vid = client.get(f"/api/videos/{video.id}", headers=buyer_headers)
+    assert single_vid.status_code == 200
+    assert single_vid.json()["is_liked"] is True
+    assert single_vid.json()["share_count"] == 1
+
+    # 5. Tìm kiếm & Bảng xếp hạng Hashtag thịnh hành 7 ngày
+    trending = client.get("/api/search/trending-hashtags?days=7")
+    assert trending.status_code == 200
+    assert any(t["tag"] == "iphone15" for t in trending.json())
+
+    # 6. Chatbot AI tư vấn sản phẩm thật trong MySQL -> Mở chi tiết sản phẩm qua API /api/products/{id}
+    ai_res = client.post(
+        "/api/ai/chat",
+        json={"message": "Tư vấn cho tôi điện thoại iPhone 15 Pro"},
+        headers=buyer_headers,
+    )
+    assert ai_res.status_code == 200
+    rec_products = ai_res.json()["recommended_products"]
+    assert len(rec_products) >= 1
+    assert rec_products[0]["id"] == product.id
+    assert f"pages/product.html?id={product.id}" in ai_res.json()["reply"]
+
+    prod_detail = client.get(f"/api/products/{product.id}")
+    assert prod_detail.status_code == 200
+    assert prod_detail.json()["name"] == "iPhone 15 Pro"
+
+
+
 
 
 

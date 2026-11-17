@@ -715,4 +715,185 @@ def test_ai_shopping_chatbot_daily_limit_and_gemini_errors(
     assert "quota" in res_quota.json()["detail"].lower()
 
 
+def test_unauthenticated_access_401_across_social_and_ai_endpoints(
+    client: TestClient, db_session
+):
+    """Kiểm thử trường hợp CHƯA ĐĂNG NHẬP (401 Unauthorized) trên toàn bộ API cần xác thực của module."""
+    db = db_session()
+    owner, _ = make_user(db, "unauth_owner", "unauth_owner@test.com")
+    video = make_video(db, owner.id)
+
+    assert client.post(f"/api/videos/{video.id}/likes").status_code == 401
+    assert client.delete(f"/api/videos/{video.id}/likes").status_code == 401
+    assert (
+        client.post(
+            f"/api/videos/{video.id}/comments",
+            json={"content": "Comment không token"},
+        ).status_code
+        == 401
+    )
+    assert client.delete("/api/comments/1").status_code == 401
+    assert client.post(f"/api/users/{owner.id}/follow").status_code == 401
+    assert client.delete(f"/api/users/{owner.id}/follow").status_code == 401
+    assert client.get("/api/videos/feed/following").status_code == 401
+    assert (
+        client.patch(
+            f"/api/videos/{video.id}/status",
+            json={"status": "HIDDEN"},
+        ).status_code
+        == 401
+    )
+    assert (
+        client.post(
+            "/api/ai/chat",
+            json={"message": "Tư vấn mua sắm"},
+        ).status_code
+        == 401
+    )
+    assert client.get("/api/ai/quota").status_code == 401
+    assert (
+        client.post(
+            "/api/ai/chat-logs",
+            json={"message": "Lưu log không token"},
+        ).status_code
+        == 401
+    )
+    assert client.get("/api/ai/chat-logs").status_code == 401
+
+
+def test_invalid_data_and_not_found_validation_across_modules(
+    client: TestClient, db_session
+):
+    """Kiểm thử trường hợp SAI DỮ LIỆU (400 / 422) và KHÔNG TỒN TẠI (404) trên toàn bộ module."""
+    db = db_session()
+    user, token = make_user(db, "val_user", "val@test.com")
+    headers = {"Authorization": f"Bearer {token}"}
+    v1 = make_video(db, user.id)
+    v2 = make_video(db, user.id)
+
+    # 1. Thao tác trên video/user/comment không tồn tại -> 404
+    assert client.post("/api/videos/999999/likes", headers=headers).status_code == 404
+    assert client.get("/api/videos/999999/stats").status_code == 404
+    assert client.post("/api/videos/999999/share").status_code == 404
+    assert client.post("/api/users/999999/follow", headers=headers).status_code == 404
+    assert client.get("/api/users/999999/profile").status_code == 404
+    assert client.delete("/api/comments/999999", headers=headers).status_code == 404
+
+    # 2. Nội dung bình luận hoặc chat AI chỉ chứa khoảng trắng / rỗng -> 422
+    assert (
+        client.post(
+            f"/api/videos/{v1.id}/comments",
+            json={"content": "   "},
+            headers=headers,
+        ).status_code
+        == 422
+    )
+    assert (
+        client.post(
+            "/api/ai/chat",
+            json={"message": "   "},
+            headers=headers,
+        ).status_code
+        == 422
+    )
+    assert (
+        client.post(
+            "/api/ai/chat-logs",
+            json={"message": "   "},
+            headers=headers,
+        ).status_code
+        == 422
+    )
+
+    # 3. Trả lời bình luận thuộc video khác -> 400
+    c_v1 = client.post(
+        f"/api/videos/{v1.id}/comments",
+        json={"content": "Bình luận ở video 1"},
+        headers=headers,
+    ).json()
+    cross_reply = client.post(
+        f"/api/videos/{v2.id}/comments",
+        json={"content": "Trả lời nhầm sang video 2", "parent_id": c_v1["id"]},
+        headers=headers,
+    )
+    assert cross_reply.status_code == 400
+
+    # 4. Sai tham số phân trang (skip < 0 hoặc limit > 100) -> 422
+    assert client.get(f"/api/videos/{v1.id}/comments?skip=-1").status_code == 422
+    assert client.get(f"/api/users/{user.id}/followers?limit=101").status_code == 422
+    assert client.get("/api/videos/feed/for-you?limit=0").status_code == 422
+    assert client.get("/api/search?skip=-5").status_code == 422
+    assert client.get("/api/search/hashtags/demo?limit=200").status_code == 422
+
+    # 5. Sai giá trị trạng thái video -> 422
+    assert (
+        client.patch(
+            f"/api/videos/{v1.id}/status",
+            json={"status": "INVALID_STATUS"},
+            headers=headers,
+        ).status_code
+        == 422
+    )
+
+
+def test_permission_matrix_comment_delete_and_video_status(
+    client: TestClient, db_session
+):
+    """Kiểm thử phân quyền (SAI QUYỀN 403 vs ĐÚNG QUYỀN 200 cho Chủ video & ADMIN)."""
+    db = db_session()
+    video_owner, token_owner = make_user(db, "vid_owner", "vo@test.com")
+    commenter, token_commenter = make_user(db, "commenter", "cm@test.com")
+    other_user, token_other = make_user(db, "other_u", "ou@test.com")
+    admin_user, token_admin = make_user(
+        db, "admin_u", "admin@test.com", role="ADMIN"
+    )
+
+    h_owner = {"Authorization": f"Bearer {token_owner}"}
+    h_commenter = {"Authorization": f"Bearer {token_commenter}"}
+    h_other = {"Authorization": f"Bearer {token_other}"}
+    h_admin = {"Authorization": f"Bearer {token_admin}"}
+
+    v = make_video(db, video_owner.id)
+
+    # Commenter tạo 2 bình luận trên video của video_owner
+    c1 = client.post(
+        f"/api/videos/{v.id}/comments",
+        json={"content": "Bình luận 1 của commenter"},
+        headers=h_commenter,
+    ).json()
+    c2 = client.post(
+        f"/api/videos/{v.id}/comments",
+        json={"content": "Bình luận 2 của commenter"},
+        headers=h_commenter,
+    ).json()
+
+    # 1. Người dùng khác (other_user) xóa bình luận của commenter -> 403 Forbidden
+    assert (
+        client.delete(f"/api/comments/{c1['id']}", headers=h_other).status_code
+        == 403
+    )
+
+    # 2. Chủ video (video_owner) xóa được bình luận trên video của mình -> 200 OK
+    assert (
+        client.delete(f"/api/comments/{c1['id']}", headers=h_owner).status_code
+        == 200
+    )
+
+    # 3. ADMIN xóa được bình luận bất kỳ -> 200 OK
+    assert (
+        client.delete(f"/api/comments/{c2['id']}", headers=h_admin).status_code
+        == 200
+    )
+
+    # 4. ADMIN có quyền ẩn/hiện video bất kỳ -> 200 OK
+    admin_hide = client.patch(
+        f"/api/videos/{v.id}/status",
+        json={"status": "HIDDEN"},
+        headers=h_admin,
+    )
+    assert admin_hide.status_code == 200
+    assert admin_hide.json()["status"] == "HIDDEN"
+
+
+
 

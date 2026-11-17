@@ -4,12 +4,11 @@ Chạy:  uvicorn app.main:app --reload
 Tài liệu API tự sinh: http://127.0.0.1:8000/docs
 """
 from contextlib import asynccontextmanager
-
 from pathlib import Path
-from fastapi.staticfiles import StaticFiles
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
 from sqlalchemy.exc import OperationalError
 
 from app import models  # noqa: F401 - import để SQLAlchemy biết các bảng
@@ -25,6 +24,7 @@ from app.routers import (
     social,
     videos,
 )
+
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -67,6 +67,7 @@ app.include_router(shops.router, prefix="/api")
 app.include_router(products.router, prefix="/api")
 app.include_router(social.router, prefix="/api")
 app.include_router(auth.router)
+
 
 @app.get("/")
 def root():

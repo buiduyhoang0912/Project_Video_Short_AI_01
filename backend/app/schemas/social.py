@@ -1,4 +1,3 @@
-
 from datetime import datetime
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -31,3 +30,108 @@ class ChatLogOut(BaseModel):
     role: str
     message: str
     created_at: datetime
+
+
+class FollowStats(BaseModel):
+    user_id: int
+    followers_count: int
+    following_count: int
+    is_following: bool = False
+
+
+class UserFollowItem(BaseModel):
+    id: int
+    username: str
+    display_name: str
+    avatar_key: str | None = None
+    avatar_url: str | None = None
+    followed_at: datetime
+
+
+class FollowingFeedItem(BaseModel):
+    id: int
+    user_id: int
+    author_name: str
+    author_username: str
+    author_avatar_key: str | None = None
+    author_avatar_url: str | None = None
+    title: str
+    description: str | None = None
+    video_url: str
+    thumbnail_url: str | None = None
+    duration_seconds: int
+    created_at: datetime
+    like_count: int = 0
+    comment_count: int = 0
+    is_liked: bool = False
+    is_following: bool = False
+
+
+class ProfileVideoItem(BaseModel):
+    id: int
+    title: str
+    thumbnail_url: str | None = None
+    video_url: str
+    view_count: int = 0
+    created_at: datetime
+
+
+class UserProfileOut(BaseModel):
+    id: int
+    username: str
+    display_name: str
+    avatar_key: str | None = None
+    avatar_url: str | None = None
+    bio: str | None = None
+    role: str = "USER"
+    created_at: datetime
+    followers_count: int = 0
+    following_count: int = 0
+    is_following: bool = False
+    video_count: int = 0
+    videos: list[ProfileVideoItem] = []
+
+
+class SearchVideoItem(BaseModel):
+    id: int
+    user_id: int
+    title: str
+    description: str | None = None
+    hashtags: list[str] | None = None
+    video_url: str
+    thumbnail_url: str | None = None
+    duration_seconds: int
+    view_count: int = 0
+    created_at: datetime
+    author_name: str
+    author_username: str
+    author_avatar_url: str | None = None
+    like_count: int = 0
+    comment_count: int = 0
+    is_liked: bool = False
+
+
+class SearchUserItem(BaseModel):
+    id: int
+    username: str
+    display_name: str
+    avatar_url: str | None = None
+    bio: str | None = None
+    role: str = "USER"
+    followers_count: int = 0
+    following_count: int = 0
+    video_count: int = 0
+    is_following: bool = False
+
+
+class HashtagItem(BaseModel):
+    tag: str
+    video_count: int = 0
+
+
+class SearchResultOut(BaseModel):
+    query: str
+    type: str
+    videos: list[SearchVideoItem] = []
+    users: list[SearchUserItem] = []
+    hashtags: list[HashtagItem] = []

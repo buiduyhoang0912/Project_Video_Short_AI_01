@@ -1,38 +1,28 @@
-"""API quản lý sản phẩm, tồn kho và ảnh sản phẩm (Task T3D24C4): /api/products
+"""API cho Sản phẩm (Products), tồn kho và ảnh sản phẩm. Đường dẫn: /api/products"""
 
-- GET    /api/products                         Danh sách sản phẩm (lọc theo shop_id, category_id, q)
-- GET    /api/products/me                      Danh sách sản phẩm thuộc shop của người bán hiện tại
-- GET    /api/products/{product_id}            Chi tiết sản phẩm kèm danh sách ảnh
-- POST   /api/products                         Người bán thêm sản phẩm mới (giá > 0, tồn >= 0)
-- PUT    /api/products/{product_id}            Người bán sửa sản phẩm / tồn kho / trạng thái
-- PATCH  /api/products/{product_id}            Người bán sửa một phần sản phẩm / tồn kho
-- PATCH  /api/products/{product_id}/stock      Người bán cập nhật nhanh tồn kho (stock >= 0)
-- PATCH  /api/products/{product_id}/hide       Người bán ẩn sản phẩm (status = 'HIDDEN')
-- DELETE /api/products/{product_id}            Nếu đã có đơn hàng -> chỉ ẩn (HIDDEN); chưa có đơn -> xoá cứng
-- POST   /api/products/{product_id}/images     Upload nhiều ảnh sản phẩm (lưu vào uploads/products)
-- GET    /api/products/{product_id}/images     Danh sách ảnh của sản phẩm
-- DELETE /api/products/{product_id}/images/{image_id} Xoá 1 ảnh của sản phẩm
-"""
-
+from decimal import Decimal
 from io import BytesIO
 from pathlib import Path
 from typing import Literal
 from uuid import uuid4
 
-from fastapi import APIRouter, Depends, File, HTTPException, UploadFile, status
+from fastapi import APIRouter, Depends, File, HTTPException, Query, UploadFile, status
 from PIL import Image
 from sqlalchemy.orm import Session
 
 from app.crud import product as product_crud
 from app.crud import shop as shop_crud
 from app.db.session import get_db
+from app.dependencies.auth import get_current_user
 from app.models.product import Product
 from app.models.shop import Shop
 from app.models.user import User
-from app.routers.auth import get_current_user
 from app.schemas.product import (
     ProductCreate,
+    ProductDetailOut,
+    ProductListResponse,
     ProductOut,
+    ProductSortBy,
     ProductStockUpdate,
     ProductUpdate,
 )
@@ -52,9 +42,7 @@ ALLOWED_IMAGE_EXTENSIONS = {
 }
 
 
-def get_seller_shop(
-    user: User, db: Session
-) -> Shop:
+def get_seller_shop(user: User, db: Session) -> Shop:
     shop = shop_crud.get_shop_by_owner(db, user.id)
     if shop is None:
         raise HTTPException(
@@ -96,31 +84,42 @@ def _remove_local_upload(object_key: str) -> None:
         pass
 
 
-@router.get("", response_model=list[ProductOut])
+@router.get(
+    "",
+    response_model=ProductListResponse,
+    summary="Danh sách sản phẩm (tìm kiếm, lọc, sắp xếp, phân trang)",
+)
 def list_products(
-    shop_id: int | None = None,
-    category_id: int | None = None,
-    q: str | None = None,
+    q: str | None = Query(None, description="Tìm theo tên sản phẩm"),
+    category_id: int | None = Query(None, description="Lọc theo danh mục"),
+    min_price: Decimal | None = Query(None, ge=0, description="Giá tối thiểu"),
+    max_price: Decimal | None = Query(None, ge=0, description="Giá tối đa"),
+    shop_id: int | None = Query(None, description="Lọc theo shop"),
+    sort_by: ProductSortBy = Query(
+        ProductSortBy.NEWEST,
+        description="Sắp xếp: price_asc, price_desc, newest, best_selling",
+    ),
+    page: int = Query(1, ge=1, description="Trang hiện tại"),
+    page_size: int = Query(10, ge=1, le=100, description="Số sản phẩm mỗi trang"),
     db: Session = Depends(get_db),
 ):
-    if shop_id is not None:
-        return product_crud.get_shop_products(
-            db,
-            shop_id=shop_id,
-            include_hidden=False,
-            keyword=q,
-            category_id=category_id,
+    if min_price is not None and max_price is not None and min_price > max_price:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="min_price không được lớn hơn max_price",
         )
 
-    from sqlalchemy import select
-
-    query = select(Product).where(Product.status == "ACTIVE")
-    if category_id is not None:
-        query = query.where(Product.category_id == category_id)
-    if q:
-        query = query.where(Product.name.contains(q))
-    query = query.order_by(Product.id.desc())
-    return list(db.scalars(query))
+    return product_crud.get_products(
+        db,
+        keyword=q,
+        category_id=category_id,
+        min_price=min_price,
+        max_price=max_price,
+        shop_id=shop_id,
+        sort_by=sort_by,
+        page=page,
+        page_size=page_size,
+    )
 
 
 @router.get("/me", response_model=list[ProductOut])
@@ -142,13 +141,20 @@ def list_my_shop_products(
     )
 
 
-@router.get("/{product_id}", response_model=ProductOut)
-def get_product_detail(product_id: int, db: Session = Depends(get_db)):
-    product = product_crud.get_product(db, product_id)
+@router.get(
+    "/{product_id}",
+    response_model=ProductDetailOut,
+    summary="Chi tiết sản phẩm kèm ảnh, tồn, shop, video",
+)
+def get_product_detail(
+    product_id: int,
+    db: Session = Depends(get_db),
+):
+    product = product_crud.get_product_detail(db, product_id)
     if product is None:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"Không tìm thấy sản phẩm id={product_id}",
+            detail=f"Không tìm thấy sản phẩm id={product_id} hoặc sản phẩm/shop không còn hoạt động.",
         )
     return product
 

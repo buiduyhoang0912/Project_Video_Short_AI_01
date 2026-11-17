@@ -3,10 +3,8 @@
 //
 // Cách dùng (trong các file js/pages/*.js):
 //   const items = await api.get("/items");
-//   const items = await api.get("/items", { q: "com" });          // -> /items?q=com
 //   const created = await api.post("/items", { name: "Trà đá", price: 5000 });
-//   await api.put("/items/1", { name: "Tên mới" });
-//   await api.delete("/items/1");
+//   const me = await api.get("/auth/me");   // đường dẫn /auth/* tự dùng CONFIG.AUTH_BASE_URL
 //
 // Các hàm trả về thẳng dữ liệu JSON (đã lấy sẵn response.data).
 // Nếu lỗi, hàm sẽ throw ApiError -> bắt bằng try/catch và hiện error.message cho người dùng.
@@ -19,6 +17,33 @@ class ApiError extends Error {
   }
 }
 
+// ---------- QUẢN LÝ PHIÊN ĐĂNG NHẬP (một khóa token duy nhất: CONFIG.TOKEN_KEY) ----------
+const session = {
+  getToken() {
+    return localStorage.getItem(CONFIG.TOKEN_KEY);
+  },
+  getUser() {
+    try {
+      const raw = localStorage.getItem(CONFIG.USER_KEY);
+      return raw ? JSON.parse(raw) : null;
+    } catch (e) {
+      return null;
+    }
+  },
+  save(token, user) {
+    localStorage.setItem(CONFIG.TOKEN_KEY, token);
+    if (user) localStorage.setItem(CONFIG.USER_KEY, JSON.stringify(user));
+  },
+  setUser(user) {
+    localStorage.setItem(CONFIG.USER_KEY, JSON.stringify(user));
+  },
+  clear() {
+    localStorage.removeItem(CONFIG.TOKEN_KEY);
+    localStorage.removeItem(CONFIG.USER_KEY);
+    localStorage.removeItem("token"); // khóa cũ, dọn cho sạch
+  },
+};
+
 // Instance axios dùng chung: mọi request tự nối thêm baseURL phía trước
 const http = axios.create({
   baseURL: CONFIG.API_BASE_URL,
@@ -26,12 +51,15 @@ const http = axios.create({
   headers: { "Content-Type": "application/json" },
 });
 
-// Muốn gửi token đăng nhập cho mọi request (khi nhóm làm chức năng login), bỏ comment đoạn dưới:
-// http.interceptors.request.use((config) => {
-//   const token = localStorage.getItem("token");
-//   if (token) config.headers.Authorization = `Bearer ${token}`;
-//   return config;
-// });
+const isAuthPath = (url) => typeof url === "string" && url.startsWith("/auth/");
+
+// Request: /auth/* gọi vào AUTH_BASE_URL; có token thì tự đính kèm Authorization: Bearer
+http.interceptors.request.use((config) => {
+  if (isAuthPath(config.url)) config.baseURL = CONFIG.AUTH_BASE_URL;
+  const token = session.getToken();
+  if (token) config.headers.Authorization = `Bearer ${token}`;
+  return config;
+});
 
 // Lấy câu thông báo lỗi dễ đọc từ response của FastAPI
 function getErrorMessage(data, status) {
@@ -43,6 +71,40 @@ function getErrorMessage(data, status) {
   return `Lỗi ${status}`;
 }
 
+// Đường dẫn trang đăng nhập (tính theo vị trí trang hiện tại) + trang đang mở để quay lại
+function loginUrl(extra = "") {
+  const root = document.body.dataset.root || "./";
+  // trang trong /pages/ (root = "../") thì login.html nằm cùng thư mục; trang gốc thì vào pages/
+  const path = window.location.pathname;
+  const rel = path.includes("/pages/") ? "pages/" + path.split("/pages/")[1] : path.split("/").pop();
+  const next = rel && rel !== "login.html" ? `${rel}${window.location.search}` : "";
+  const q = [next ? `next=${encodeURIComponent(next)}` : "", extra].filter(Boolean).join("&");
+  const base = root === "./" ? "pages/login.html" : "login.html";
+  return `${base}${q ? "?" + q : ""}`;
+}
+
+// Trang có bắt buộc đăng nhập không (khai báo bằng data-auth / data-roles trên <body>)
+function pageNeedsAuth() {
+  const b = document.body.dataset;
+  if (b.roles || b.auth === "required") return true;
+  if (b.auth === "self") {
+    const p = new URLSearchParams(window.location.search);
+    return !(p.get("id") || p.get("user_id")); // feed dùng ?user_id=, nơi khác dùng ?id=
+  }
+  return false;
+}
+
+function showNetworkBanner() {
+  if (document.getElementById("net-banner")) return;
+  const el = document.createElement("div");
+  el.id = "net-banner";
+  el.className = "net-banner";
+  el.innerHTML = `<span>Mất kết nối tới máy chủ. Vui lòng kiểm tra mạng.</span>
+    <button type="button" class="btn btn-small" id="net-retry">Thử lại</button>`;
+  document.body.appendChild(el);
+  document.getElementById("net-retry").addEventListener("click", () => window.location.reload());
+}
+
 // Gom xử lý lỗi một chỗ: đổi lỗi của axios thành ApiError dễ dùng
 http.interceptors.response.use(
   (response) => response,
@@ -50,11 +112,35 @@ http.interceptors.response.use(
     if (error.response) {
       // Server có trả lời nhưng là lỗi (4xx, 5xx)
       const { status, data } = error.response;
-      return Promise.reject(new ApiError(getErrorMessage(data, status), status, data));
+      const message = getErrorMessage(data, status);
+      const url = error.config && error.config.url;
+      const isCredentialCall = url === "/auth/login" || url === "/auth/register";
+      const hadToken = !!session.getToken();
+
+      if (!isCredentialCall) {
+        if (status === 401 && hadToken) {
+          // Phiên hết hạn / token sai / đã đăng xuất -> xóa phiên
+          session.clear();
+          if (pageNeedsAuth()) {
+            window.location.href = loginUrl("expired=1");
+          } else if (typeof showToast === "function") {
+            showToast("Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.", "error");
+            setTimeout(() => window.location.reload(), 1500);
+          }
+        } else if (status === 403 && /kh[oó]a/i.test(message)) {
+          // Tài khoản bị khóa
+          session.clear();
+          window.location.href = loginUrl("locked=1");
+        } else if (status === 403 && typeof showToast === "function") {
+          showToast("Bạn không có quyền thực hiện thao tác này.", "error");
+        }
+      }
+      return Promise.reject(new ApiError(message, status, data));
     }
     // Không có response: server tắt, sai URL, bị chặn CORS, hoặc quá thời gian chờ
+    showNetworkBanner();
     return Promise.reject(new ApiError(
-      "Không kết nối được backend. Backend đã chạy chưa? Kiểm tra CONFIG.API_BASE_URL.", 0,
+      "Không kết nối được máy chủ. Hãy kiểm tra mạng/backend rồi thử lại.", 0,
     ));
   },
 );

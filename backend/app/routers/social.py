@@ -3,15 +3,24 @@ from sqlalchemy import delete, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
-from app.core.social_auth import get_current_user
+from app.dependencies.auth import get_current_user, get_optional_user
 from app.crud import social as crud
 from app.db.session import get_db
 from app.models.social import AiChatLog, Comment, Follow, Like
+from app.models.user import User
 from app.schemas.social import (
     ChatLogCreate,
     ChatLogOut,
     CommentCreate,
     CommentOut,
+    FollowStats,
+    FollowingFeedItem,
+    HashtagItem,
+    SearchResultOut,
+    SearchUserItem,
+    SearchVideoItem,
+    UserFollowItem,
+    UserProfileOut,
 )
 
 router = APIRouter(tags=["Tương tác video"])
@@ -20,6 +29,11 @@ router = APIRouter(tags=["Tương tác video"])
 def check_video(db: Session, video_id: int):
     if not crud.video_exists(db, video_id):
         raise HTTPException(404, "Không tìm thấy video")
+
+
+def check_user(db: Session, user_id: int):
+    if not crud.user_exists(db, user_id):
+        raise HTTPException(404, "Không tìm thấy người dùng")
 
 
 def current_user_id(user) -> int:
@@ -210,10 +224,7 @@ def follow_user(
             400, "Không thể tự theo dõi chính mình"
         )
 
-    if not crud.user_exists(db, following_id):
-        raise HTTPException(
-            404, "Không tìm thấy người dùng"
-        )
+    check_user(db, following_id)
 
     if crud.find_follow(db, uid, following_id) is not None:
         return {
@@ -261,7 +272,124 @@ def unfollow_user(
     }
 
 
-# 8. CHIA SE VIDEO
+# 8. SO NGUOI THEO DOI / DANG THEO DOI (TASK T3D2331)
+@router.get(
+    "/users/{user_id}/follow-stats",
+    response_model=FollowStats,
+)
+def get_user_follow_stats(
+    user_id: int,
+    db: Session = Depends(get_db),
+    current_user: User | None = Depends(get_optional_user),
+):
+    check_user(db, user_id)
+    cid = current_user.id if current_user else None
+    return crud.get_follow_stats(db, user_id, cid)
+
+
+# 9. DANH SACH NGUOI THEO DOI (FOLLOWERS) (TASK T3D2331)
+@router.get(
+    "/users/{user_id}/followers",
+    response_model=list[UserFollowItem],
+)
+def list_followers(
+    user_id: int,
+    skip: int = 0,
+    limit: int = 20,
+    db: Session = Depends(get_db),
+):
+    check_user(db, user_id)
+
+    if skip < 0 or not 1 <= limit <= 100:
+        raise HTTPException(422, "Phân trang không hợp lệ")
+
+    return crud.get_followers_list(db, user_id, skip=skip, limit=limit)
+
+
+# 10. DANH SACH DANG THEO DOI (FOLLOWING) (TASK T3D2331)
+@router.get(
+    "/users/{user_id}/following",
+    response_model=list[UserFollowItem],
+)
+def list_following(
+    user_id: int,
+    skip: int = 0,
+    limit: int = 20,
+    db: Session = Depends(get_db),
+):
+    check_user(db, user_id)
+
+    if skip < 0 or not 1 <= limit <= 100:
+        raise HTTPException(422, "Phân trang không hợp lệ")
+
+    return crud.get_following_list(db, user_id, skip=skip, limit=limit)
+
+
+# 11. FEED VIDEO CUA NHUNG NGUOI DANG THEO DOI (TASK T3D2331)
+@router.get(
+    "/videos/feed/following",
+    response_model=list[FollowingFeedItem],
+)
+@router.get(
+    "/feed/following",
+    response_model=list[FollowingFeedItem],
+    include_in_schema=False,
+)
+def get_following_feed(
+    skip: int = 0,
+    limit: int = 20,
+    db: Session = Depends(get_db),
+    user=Depends(get_current_user),
+):
+    if skip < 0 or not 1 <= limit <= 100:
+        raise HTTPException(422, "Phân trang không hợp lệ")
+
+    uid = current_user_id(user)
+    return crud.get_following_feed(db, uid, skip=skip, limit=limit)
+
+
+# 11B. FEED VIDEO CONG KHAI / DÀNH CHO BẠN (TASK T3D2428)
+@router.get(
+    "/videos/feed/for-you",
+    response_model=list[FollowingFeedItem],
+)
+@router.get(
+    "/feed/for-you",
+    response_model=list[FollowingFeedItem],
+    include_in_schema=False,
+)
+def get_for_you_feed(
+    skip: int = 0,
+    limit: int = 20,
+    db: Session = Depends(get_db),
+    current_user: User | None = Depends(get_optional_user),
+):
+    if skip < 0 or not 1 <= limit <= 100:
+        raise HTTPException(422, "Phân trang không hợp lệ")
+
+    cid = current_user.id if current_user else None
+    return crud.get_public_feed(db, current_user_id=cid, skip=skip, limit=limit)
+
+
+# 11C. THONG TIN HO SO NGUOI DUNG (TASK T3D2428)
+@router.get(
+    "/users/{user_id}/profile",
+    response_model=UserProfileOut,
+)
+def get_user_profile(
+    user_id: int,
+    db: Session = Depends(get_db),
+    current_user: User | None = Depends(get_optional_user),
+):
+    check_user(db, user_id)
+    cid = current_user.id if current_user else None
+    profile = crud.get_user_profile(db, target_user_id=user_id, current_user_id=cid)
+    if profile is None:
+        raise HTTPException(404, "Không tìm thấy người dùng")
+    return profile
+
+
+# 12. CHIA SE VIDEO
 @router.post("/videos/{video_id}/share")
 def share_video(
     video_id: int,
@@ -276,7 +404,7 @@ def share_video(
     return {"message": "Đã ghi nhận lượt chia sẻ"}
 
 
-# 9. XEM SO LUOT TUONG TAC
+# 13. XEM SO LUOT TUONG TAC
 @router.get("/videos/{video_id}/stats")
 def get_stats(
     video_id: int,
@@ -292,7 +420,7 @@ def get_stats(
     return stats
 
 
-# 10. LUU LICH SU CHAT AI
+# 14. LUU LICH SU CHAT AI
 @router.post(
     "/ai/chat-logs",
     response_model=ChatLogOut,
@@ -313,7 +441,7 @@ def create_chat_log(
     )
 
 
-# 11. XEM LICH SU CHAT AI
+# 15. XEM LICH SU CHAT AI
 @router.get(
     "/ai/chat-logs",
     response_model=list[ChatLogOut],
@@ -336,3 +464,88 @@ def my_chat_logs(
         .offset(skip)
         .limit(limit)
     ).all()
+
+
+# 16. TIM KIEM VIDEO, NGUOI DUNG, HASHTAG
+@router.get(
+    "/search",
+    response_model=SearchResultOut,
+)
+def search_all(
+    q: str = "",
+    type: str = "all",
+    tag: str | None = None,
+    skip: int = 0,
+    limit: int = 20,
+    db: Session = Depends(get_db),
+    user=Depends(get_optional_user),
+):
+    if skip < 0 or not 1 <= limit <= 100:
+        raise HTTPException(422, "Phân trang không hợp lệ")
+
+    uid = user.id if user else None
+    search_type = (type or "all").lower()
+
+    videos = []
+    users = []
+    hashtags = []
+
+    if search_type in ("all", "videos"):
+        videos = crud.search_videos(
+            db,
+            query_str=q if q else None,
+            tag=tag,
+            current_user_id=uid,
+            skip=skip,
+            limit=limit,
+        )
+
+    if search_type in ("all", "users") and not tag:
+        users = crud.search_users(
+            db,
+            query_str=q if q else None,
+            current_user_id=uid,
+            skip=skip,
+            limit=limit,
+        )
+
+    if search_type in ("all", "hashtags") and not tag:
+        hashtags = crud.search_hashtags(
+            db,
+            query_str=q if q else None,
+            limit=limit,
+        )
+
+    return {
+        "query": q or (f"#{tag}" if tag else ""),
+        "type": search_type,
+        "videos": videos,
+        "users": users,
+        "hashtags": hashtags,
+    }
+
+
+# 17. DANH SACH VIDEO THEO HASHTAG
+@router.get(
+    "/search/hashtags/{tag}",
+    response_model=list[SearchVideoItem],
+)
+def get_videos_by_hashtag(
+    tag: str,
+    skip: int = 0,
+    limit: int = 20,
+    db: Session = Depends(get_db),
+    user=Depends(get_optional_user),
+):
+    if skip < 0 or not 1 <= limit <= 100:
+        raise HTTPException(422, "Phân trang không hợp lệ")
+
+    uid = user.id if user else None
+    return crud.search_videos(
+        db,
+        tag=tag,
+        current_user_id=uid,
+        skip=skip,
+        limit=limit,
+    )
+

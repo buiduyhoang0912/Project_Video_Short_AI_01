@@ -1,0 +1,103 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Tìm kiếm | ClipShop AI</title>
+  <link rel="icon" href="../assets/images/logo.svg">
+  <link rel="stylesheet" href="../css/style.css">
+</head>
+<body data-root="../">
+  <header id="app-header"></header>
+
+  <main class="container search-page-container">
+    <!-- Thanh tìm kiếm chính -->
+    <section class="search-header-box">
+      <h1 class="search-title">Khám phá & Tìm kiếm</h1>
+      <form id="search-form" class="search-form-wrap" onsubmit="return false;">
+        <div class="search-input-group">
+          <span class="search-icon-prefix">🔍</span>
+          <input
+            type="text"
+            id="search-input"
+            class="search-input-field"
+            placeholder="Tìm kiếm video, người dùng hoặc hashtag..."
+            autocomplete="off"
+          >
+          <button type="button" id="btn-clear-search" class="btn-clear-search" style="display:none;" title="Xoá">&times;</button>
+        </div>
+        <button type="submit" id="btn-submit-search" class="btn btn-primary search-submit-btn">
+          Tìm kiếm
+        </button>
+      </form>
+
+      <!-- Badge lọc theo hashtag đang chọn -->
+      <div id="active-tag-badge" class="active-tag-banner" style="display:none;">
+        <span>Đang lọc theo hashtag: <strong id="current-tag-label">#tag</strong></span>
+        <button type="button" id="btn-remove-tag" class="btn-remove-tag" title="Bỏ lọc">&times;</button>
+      </div>
+    </section>
+
+    <!-- Các Tab: Video, Người dùng, Hashtag -->
+    <div class="search-tabs-nav">
+      <button type="button" class="search-tab-btn active" data-tab="videos">
+        🎥 Video (<span id="count-videos">0</span>)
+      </button>
+      <button type="button" class="search-tab-btn" data-tab="users">
+        👤 Người dùng (<span id="count-users">0</span>)
+      </button>
+      <button type="button" class="search-tab-btn" data-tab="hashtags">
+        🏷️ Hashtag (<span id="count-hashtags">0</span>)
+      </button>
+    </div>
+
+    <!-- Trạng thái tải / thông báo -->
+    <div id="search-loading" class="status-loading" style="display:none;text-align:center;padding:32px;">
+      ⏳ Đang tìm kiếm kết quả...
+    </div>
+    <div id="search-empty" class="search-empty-state" style="display:none;">
+      <div class="empty-icon">🔍</div>
+      <h3 id="empty-title">Không tìm thấy kết quả</h3>
+      <p id="empty-desc" class="muted">Hãy thử tìm kiếm với từ khoá hoặc hashtag khác.</p>
+    </div>
+
+    <!-- Vùng hiển thị kết quả -->
+    <div id="search-results-wrapper">
+      <!-- 1. Danh sách Video -->
+      <div id="results-videos" class="search-tab-content active">
+        <div id="videos-grid" class="search-videos-grid"></div>
+      </div>
+
+      <!-- 2. Danh sách Người dùng -->
+      <div id="results-users" class="search-tab-content">
+        <div id="users-list" class="search-users-list"></div>
+      </div>
+
+      <!-- 3. Danh sách Hashtag -->
+      <div id="results-hashtags" class="search-tab-content">
+        <div id="hashtags-grid" class="search-hashtags-grid"></div>
+      </div>
+    </div>
+
+    <!-- Phân trang / Nút tải thêm -->
+    <div class="search-pagination-wrap" id="pagination-wrapper" style="display:none;">
+      <button type="button" id="btn-load-more" class="btn btn-outline btn-load-more">
+        Xem thêm kết quả
+      </button>
+      <div id="no-more-results" class="muted" style="display:none;margin-top:8px;">
+        Đã hiển thị tất cả kết quả
+      </div>
+    </div>
+  </main>
+
+  <footer id="app-footer"></footer>
+
+  <!-- Scripts -->
+  <script src="https://cdn.jsdelivr.net/npm/axios@1.7.9/dist/axios.min.js"></script>
+  <script src="../js/config.js"></script>
+  <script src="../js/api.js"></script>
+  <script src="../js/utils.js"></script>
+  <script src="../js/layout.js"></script>
+  <script src="../js/pages/search.js"></script>
+</body>
+</html>

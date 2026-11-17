@@ -2,9 +2,7 @@
 
 from datetime import datetime, timezone
 
-import jwt
 from fastapi import APIRouter, Depends, HTTPException, status
-from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from sqlalchemy import or_, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
@@ -16,50 +14,12 @@ from app.core.security import (
     verify_password,
 )
 from app.db.session import get_db
+from app.dependencies.auth import get_current_user, get_token_payload
 from app.models.revoked_token import RevokedToken
 from app.models.user import User
 from app.schemas.user import TokenResponse, UserCreate, UserLogin, UserRead
 
 router = APIRouter(prefix="/auth", tags=["Auth"])
-bearer_scheme = HTTPBearer(auto_error=False)
-
-
-def _unauthorized(detail: str = "Chua dang nhap hoac token khong hop le"):
-    return HTTPException(
-        status_code=status.HTTP_401_UNAUTHORIZED,
-        detail=detail,
-        headers={"WWW-Authenticate": "Bearer"},
-    )
-
-
-def get_token_payload(
-    credentials: HTTPAuthorizationCredentials | None = Depends(bearer_scheme),
-    db: Session = Depends(get_db),
-) -> dict:
-    if credentials is None:
-        raise _unauthorized()
-    try:
-        payload = decode_access_token(credentials.credentials)
-    except jwt.PyJWTError:
-        raise _unauthorized()
-    if db.get(RevokedToken, payload.get("jti")) is not None:
-        raise _unauthorized("Token da bi dang xuat")
-    return payload
-
-
-def get_current_user(
-    payload: dict = Depends(get_token_payload),
-    db: Session = Depends(get_db),
-) -> User:
-    try:
-        user = db.get(User, int(payload["sub"]))
-    except (KeyError, ValueError):
-        raise _unauthorized()
-    if user is None:
-        raise _unauthorized()
-    if user.status != "ACTIVE":
-        raise HTTPException(status_code=403, detail="Tai khoan da bi khoa")
-    return user
 
 
 @router.post("/register", response_model=UserRead, status_code=status.HTTP_201_CREATED)
@@ -93,7 +53,7 @@ def login(data: UserLogin, db: Session = Depends(get_db)):
         )
     )
     if user is None or not verify_password(data.password.get_secret_value(), user.password_hash):
-        raise _unauthorized("Sai email/username hoac mat khau")
+        raise HTTPException(status_code=401, detail="Sai email/username hoac mat khau", headers={"WWW-Authenticate": "Bearer"})
     if user.status != "ACTIVE":
         raise HTTPException(status_code=403, detail="Tai khoan da bi khoa")
 

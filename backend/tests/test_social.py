@@ -249,3 +249,214 @@ def test_ai_chat_logs(client: TestClient, db_session):
     assert logs.status_code == 200
     assert len(logs.json()) == 1
     assert logs.json()[0]["message"] == "Gợi ý cho tôi sản phẩm tốt"
+
+
+def test_follow_stats_and_lists(client: TestClient, db_session):
+    db = db_session()
+    user_a, token_a = make_user(db, "user_a", "a@test.com")
+    user_b, token_b = make_user(db, "user_b", "b@test.com")
+    user_c, _ = make_user(db, "user_c", "c@test.com")
+
+    ha = {"Authorization": f"Bearer {token_a}"}
+    hb = {"Authorization": f"Bearer {token_b}"}
+
+    # Ban đầu user_c chưa có ai follow
+    s0 = client.get(f"/api/users/{user_c.id}/follow-stats")
+    assert s0.status_code == 200
+    assert s0.json()["followers_count"] == 0
+    assert s0.json()["following_count"] == 0
+    assert s0.json()["is_following"] is False
+
+    # A và B follow C
+    client.post(f"/api/users/{user_c.id}/follow", headers=ha)
+    client.post(f"/api/users/{user_c.id}/follow", headers=hb)
+
+    # C follow A
+    client.post(f"/api/users/{user_a.id}/follow", headers={"Authorization": f"Bearer {make_user(db, 'temp', 'temp@t.com')[1]}"})
+
+    # Stats của C: 2 followers
+    sc = client.get(f"/api/users/{user_c.id}/follow-stats", headers=ha)
+    assert sc.status_code == 200
+    assert sc.json()["followers_count"] == 2
+    assert sc.json()["is_following"] is True  # A is viewing, A is following C
+
+    # Danh sách followers của C: có A và B
+    followers_res = client.get(f"/api/users/{user_c.id}/followers")
+    assert followers_res.status_code == 200
+    followers = followers_res.json()
+    assert len(followers) == 2
+    usernames = [u["username"] for u in followers]
+    assert "user_a" in usernames
+    assert "user_b" in usernames
+
+    # Danh sách following của A: có C
+    following_res = client.get(f"/api/users/{user_a.id}/following")
+    assert following_res.status_code == 200
+    following = following_res.json()
+    assert len(following) == 1
+    assert following[0]["username"] == "user_c"
+
+
+def test_following_feed_flow(client: TestClient, db_session):
+    db = db_session()
+    viewer, viewer_token = make_user(db, "viewer", "viewer@test.com")
+    creator1, _ = make_user(db, "creator1", "cr1@test.com")
+    creator2, _ = make_user(db, "creator2", "cr2@test.com")
+
+    v_headers = {"Authorization": f"Bearer {viewer_token}"}
+
+    # Chưa follow ai -> feed rỗng
+    feed0 = client.get("/api/videos/feed/following", headers=v_headers)
+    assert feed0.status_code == 200
+    assert feed0.json() == []
+
+    # Viewer follow creator1 (chưa follow creator2)
+    client.post(f"/api/users/{creator1.id}/follow", headers=v_headers)
+
+    # creator1 đăng 2 video, creator2 đăng 1 video
+    v1 = make_video(db, creator1.id)
+    v2 = make_video(db, creator1.id)
+    _ = make_video(db, creator2.id)
+
+    # Viewer like v1
+    client.post(f"/api/videos/{v1.id}/likes", headers=v_headers)
+
+    # Lấy feed
+    feed = client.get("/api/videos/feed/following", headers=v_headers)
+    assert feed.status_code == 200
+    items = feed.json()
+    assert len(items) == 2  # Chỉ có 2 video của creator1
+
+    # Kiểm tra metadata và trạng thái is_liked
+    v1_item = next(item for item in items if item["id"] == v1.id)
+    assert v1_item["author_username"] == "creator1"
+    assert v1_item["like_count"] == 1
+    assert v1_item["is_liked"] is True
+
+    v2_item = next(item for item in items if item["id"] == v2.id)
+    assert v2_item["like_count"] == 0
+    assert v2_item["is_liked"] is False
+
+    # Unfollow creator1 -> feed trống
+    client.delete(f"/api/users/{creator1.id}/follow", headers=v_headers)
+    feed_after = client.get("/api/videos/feed/following", headers=v_headers)
+    assert feed_after.status_code == 200
+    assert feed_after.json() == []
+
+
+def test_for_you_feed_and_profile(client: TestClient, db_session):
+    db = db_session()
+    creator, _ = make_user(db, "creator_demo", "cdemo@test.com")
+    v = make_video(db, creator.id)
+
+    # 1. Test For You Feed (Public)
+    res_feed = client.get("/api/videos/feed/for-you")
+    assert res_feed.status_code == 200
+    items = res_feed.json()
+    assert len(items) >= 1
+    found = next((item for item in items if item["id"] == v.id), None)
+    assert found is not None
+    assert found["author_username"] == "creator_demo"
+
+    # 2. Test Profile API
+    res_prof = client.get(f"/api/users/{creator.id}/profile")
+    assert res_prof.status_code == 200
+    prof = res_prof.json()
+    assert prof["username"] == "creator_demo"
+    assert prof["video_count"] == 1
+    assert len(prof["videos"]) == 1
+    assert prof["videos"][0]["id"] == v.id
+
+
+def test_search_videos_and_users_and_hashtags(client: TestClient, db_session):
+    db = db_session()
+    user_a, token_a = make_user(db, "alice_wonder", "alice@test.com")
+    user_b, token_b = make_user(db, "bob_builder", "bob@test.com")
+
+    # Tạo 3 video với tiêu đề và hashtag khác nhau
+    v1 = Video(
+        user_id=user_a.id,
+        title="Mẹo nấu ăn siêu ngon #cooking #chef",
+        description="Cách làm món ăn gia đình đơn giản",
+        hashtags=["cooking", "food"],
+        video_url="https://example.com/v1.mp4",
+        thumbnail_url="https://example.com/t1.jpg",
+        duration_seconds=30,
+    )
+    v2 = Video(
+        user_id=user_b.id,
+        title="Lập trình Python cơ bản #python #tech",
+        description="Hướng dẫn lập trình cho người mới",
+        hashtags=["python", "coding"],
+        video_url="https://example.com/v2.mp4",
+        thumbnail_url="https://example.com/t2.jpg",
+        duration_seconds=45,
+    )
+    v3 = Video(
+        user_id=user_a.id,
+        title="Công nghệ AI mới nhất #tech",
+        description="Khám phá trí tuệ nhân tạo",
+        hashtags=["tech", "ai"],
+        video_url="https://example.com/v3.mp4",
+        thumbnail_url="https://example.com/t3.jpg",
+        duration_seconds=60,
+    )
+    db.add_all([v1, v2, v3])
+    db.commit()
+
+    # User B follow User A và like V1
+    h_b = {"Authorization": f"Bearer {token_b}"}
+    client.post(f"/api/users/{user_a.id}/follow", headers=h_b)
+    client.post(f"/api/videos/{v1.id}/likes", headers=h_b)
+
+    # 1. Tìm kiếm video theo từ khoá (query q="nấu ăn")
+    res_v = client.get("/api/search?q=nấu ăn&type=videos")
+    assert res_v.status_code == 200
+    data_v = res_v.json()
+    assert len(data_v["videos"]) == 1
+    assert data_v["videos"][0]["id"] == v1.id
+
+    # 2. Tìm kiếm video theo hashtag "tech"
+    res_tag = client.get("/api/search?tag=tech&type=videos")
+    assert res_tag.status_code == 200
+    tag_videos = res_tag.json()["videos"]
+    assert len(tag_videos) == 2
+    tag_v_ids = {v["id"] for v in tag_videos}
+    assert v2.id in tag_v_ids and v3.id in tag_v_ids
+
+    # 3. Endpoint xem video theo hashtag trực tiếp /api/search/hashtags/{tag}
+    res_direct_tag = client.get("/api/search/hashtags/cooking", headers=h_b)
+    assert res_direct_tag.status_code == 200
+    cooking_vids = res_direct_tag.json()
+    assert len(cooking_vids) == 1
+    assert cooking_vids[0]["id"] == v1.id
+    # Kiểm tra is_liked phản ánh đúng cho user_b
+    assert cooking_vids[0]["is_liked"] is True
+
+    # 4. Tìm kiếm người dùng theo username/display_name
+    res_u = client.get("/api/search?q=alice&type=users", headers=h_b)
+    assert res_u.status_code == 200
+    users = res_u.json()["users"]
+    assert len(users) == 1
+    assert users[0]["username"] == "alice_wonder"
+    assert users[0]["is_following"] is True
+    assert users[0]["followers_count"] == 1
+
+    # 5. Tìm kiếm hashtag
+    res_h = client.get("/api/search?q=cook&type=hashtags")
+    assert res_h.status_code == 200
+    hts = res_h.json()["hashtags"]
+    assert any(h["tag"] == "cooking" for h in hts)
+
+    # 6. Tìm kiếm all (tổng hợp 3 loại)
+    res_all = client.get("/api/search?q=tech&type=all")
+    assert res_all.status_code == 200
+    all_data = res_all.json()
+    assert len(all_data["videos"]) >= 1
+    assert any(h["tag"] == "tech" for h in all_data["hashtags"])
+
+    # 7. Phân trang
+    res_page = client.get("/api/search?type=videos&skip=0&limit=1")
+    assert res_page.status_code == 200
+    assert len(res_page.json()["videos"]) == 1
+

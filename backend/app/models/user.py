@@ -4,7 +4,7 @@ from datetime import datetime, timezone
 
 from sqlalchemy import DateTime, Enum, String
 from sqlalchemy.dialects.mysql import BIGINT
-from sqlalchemy.orm import Mapped, mapped_column
+from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db.session import Base
 
@@ -85,3 +85,8 @@ class User(Base):
         default=utc_now,
         onupdate=utc_now,
     )
+
+    # Quan he nguoc (back_populates khop voi Address/Order/Cart)
+    addresses = relationship("Address", back_populates="user")  # noqa: F821
+    orders = relationship("Order", back_populates="buyer")  # noqa: F821
+    cart = relationship("Cart", back_populates="user", uselist=False)  # noqa: F821

@@ -51,12 +51,18 @@ const http = axios.create({
   headers: { "Content-Type": "application/json" },
 });
 
+<<<<<<< HEAD
+// Tự động đính kèm token đăng nhập cho mọi request nếu có trong localStorage
+http.interceptors.request.use((config) => {
+  const token = localStorage.getItem("token") || localStorage.getItem("access_token");
+=======
 const isAuthPath = (url) => typeof url === "string" && url.startsWith("/auth/");
 
 // Request: /auth/* gọi vào AUTH_BASE_URL; có token thì tự đính kèm Authorization: Bearer
 http.interceptors.request.use((config) => {
   if (isAuthPath(config.url)) config.baseURL = CONFIG.AUTH_BASE_URL;
   const token = session.getToken();
+>>>>>>> feature/t3d24c4-product-crud
   if (token) config.headers.Authorization = `Bearer ${token}`;
   return config;
 });
@@ -149,5 +155,16 @@ const api = {
   get: (path, params) => http.get(path, { params }).then((res) => res.data),
   post: (path, body) => http.post(path, body).then((res) => res.data),
   put: (path, body) => http.put(path, body).then((res) => res.data),
+  patch: (path, body) => http.patch(path, body).then((res) => res.data),
   delete: (path) => http.delete(path).then((res) => res.data),
+<<<<<<< HEAD
+  upload: (path, formData) =>
+    http
+      .post(path, formData, {
+        headers: { "Content-Type": "multipart/form-data" },
+      })
+      .then((res) => res.data),
 };
+=======
+};
+>>>>>>> feature/t3d24c4-product-crud

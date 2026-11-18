@@ -16,6 +16,7 @@ from app.core.config import settings
 from app.db.session import Base, engine
 from app.routers import (
     auth,
+    categories,
     health,
     items,
     products,
@@ -64,6 +65,7 @@ app.include_router(items.router, prefix="/api")
 app.include_router(videos.router, prefix="/api")
 app.include_router(seller_applications.router, prefix="/api")
 app.include_router(shops.router, prefix="/api")
+app.include_router(categories.router, prefix="/api")
 app.include_router(products.router, prefix="/api")
 app.include_router(social.router, prefix="/api")
 app.include_router(auth.router)

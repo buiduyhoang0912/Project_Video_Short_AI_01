@@ -20,6 +20,7 @@ from app.routers import (
     health,
     items,
     products,
+    profile,
     seller_applications,
     shops,
     social,
@@ -48,6 +49,7 @@ uploads_dir = Path(__file__).resolve().parents[1] / "uploads"
 (uploads_dir / "videos").mkdir(parents=True, exist_ok=True)
 (uploads_dir / "thumbnails").mkdir(parents=True, exist_ok=True)
 (uploads_dir / "products").mkdir(parents=True, exist_ok=True)
+(uploads_dir / "avatars").mkdir(parents=True, exist_ok=True)
 
 app.mount("/uploads", StaticFiles(directory=uploads_dir), name="uploads")
 
@@ -68,6 +70,7 @@ app.include_router(shops.router, prefix="/api")
 app.include_router(categories.router, prefix="/api")
 app.include_router(products.router, prefix="/api")
 app.include_router(social.router, prefix="/api")
+app.include_router(profile.router, prefix="/api")
 app.include_router(auth.router)
 
 

@@ -2,7 +2,7 @@
 //
 // Khai báo trên <body> của trang cần bảo vệ:
 //   data-auth="required"        -> phải đăng nhập
-//   data-auth="self"            -> phải đăng nhập, trừ khi URL có ?id= (xem hồ sơ công khai)
+//   data-auth="self"            -> phải đăng nhập, trừ khi URL có ?id= / ?user_id= / ?username= (xem hồ sơ công khai)
 //   data-roles="SELLER"         -> phải đăng nhập và đúng role (nhiều role: "SELLER,ADMIN")
 
 // access: "all" = mọi người | "auth" = đã đăng nhập | "role:X" = chỉ role X
@@ -39,7 +39,12 @@ function isMenuActive(item, user) {
   if (!path.endsWith("/" + file)) return false;
   if (item.id === "following") return params.get("tab") === "following";
   if (item.id === "for-you") return params.get("tab") !== "following";
-  if (item.id === "profile") return !params.get("id") || (user && String(user.id) === params.get("id"));
+  if (item.id === "profile") {
+    const byId = params.get("id") || params.get("user_id");
+    const byName = params.get("username");
+    if (byName) return !!(user && user.username === byName.toLowerCase());
+    return !byId || (user && String(user.id) === byId);
+  }
   return true;
 }
 

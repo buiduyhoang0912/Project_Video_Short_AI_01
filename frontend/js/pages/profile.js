@@ -170,7 +170,7 @@ function renderUserVideos(videos) {
     `;
 
     item.addEventListener("click", () => {
-      window.location.href = `feed.html?v=${v.id}`;
+      window.location.href = `video.html?id=${v.id}`;
     });
 
     gridEl.appendChild(item);

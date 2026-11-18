@@ -460,3 +460,100 @@ def test_search_videos_and_users_and_hashtags(client: TestClient, db_session):
     assert res_page.status_code == 200
     assert len(res_page.json()["videos"]) == 1
 
+
+def test_single_video_view_and_share_count_flow(client: TestClient, db_session):
+    db = db_session()
+    author, token_author = make_user(db, "video_owner", "owner@test.com")
+    viewer, token_viewer = make_user(db, "video_viewer", "viewer2@test.com")
+    v = make_video(db, author.id)
+
+    h_viewer = {"Authorization": f"Bearer {token_viewer}"}
+
+    # 1. Xem riêng 1 video qua /api/videos/{id}
+    r1 = client.get(f"/api/videos/{v.id}", headers=h_viewer)
+    assert r1.status_code == 200
+    d1 = r1.json()
+    assert d1["id"] == v.id
+    assert d1["status"] == "VISIBLE"
+    assert d1["is_available"] is True
+    assert d1["video_url"] == "https://example.com/video.mp4"
+    assert d1["share_count"] == 0
+    assert d1["view_count"] >= 1
+
+    # 2. Chia sẻ video bởi người dùng đã đăng nhập -> trả về share_count = 1
+    s1 = client.post(f"/api/videos/{v.id}/share", headers=h_viewer)
+    assert s1.status_code == 200
+    assert s1.json()["share_count"] == 1
+
+    # 3. Chia sẻ video bởi khách chưa đăng nhập (dùng link chia sẻ) -> share_count = 2
+    s2 = client.post(f"/api/videos/{v.id}/share")
+    assert s2.status_code == 200
+    assert s2.json()["share_count"] == 2
+
+    # 4. Kiểm tra lại qua alias /api/video/{id}
+    r2 = client.get(f"/api/video/{v.id}")
+    assert r2.status_code == 200
+    assert r2.json()["share_count"] == 2
+
+
+def test_hidden_video_unavailable_and_visibility_toggle(
+    client: TestClient, db_session
+):
+    db = db_session()
+    owner, token_owner = make_user(db, "owner_vid", "ownvid@test.com")
+    stranger, token_stranger = make_user(db, "stranger", "stranger@test.com")
+    v = make_video(db, owner.id)
+
+    h_owner = {"Authorization": f"Bearer {token_owner}"}
+    h_stranger = {"Authorization": f"Bearer {token_stranger}"}
+
+    # 1. Người lạ không được phép ẩn video của người khác -> 403
+    forbid = client.patch(
+        f"/api/videos/{v.id}/status",
+        json={"status": "HIDDEN"},
+        headers=h_stranger,
+    )
+    assert forbid.status_code == 403
+
+    # 2. Chủ video ẩn video -> 200
+    hide_res = client.patch(
+        f"/api/videos/{v.id}/status",
+        json={"status": "HIDDEN"},
+        headers=h_owner,
+    )
+    assert hide_res.status_code == 200
+    assert hide_res.json()["status"] == "HIDDEN"
+    assert hide_res.json()["is_available"] is False
+
+    # 3. Khi truy cập trang xem riêng video bị ẩn -> trả về thông báo không còn khả dụng, ẩn video_url
+    detail_hidden = client.get(f"/api/videos/{v.id}")
+    assert detail_hidden.status_code == 200
+    dh = detail_hidden.json()
+    assert dh["status"] == "HIDDEN"
+    assert dh["is_available"] is False
+    assert dh["video_url"] is None
+    assert "không còn khả dụng" in (dh["unavailable_message"] or "").lower()
+
+    # 4. Không thể chia sẻ video đã bị ẩn -> 400
+    share_hidden = client.post(f"/api/videos/{v.id}/share")
+    assert share_hidden.status_code == 400
+
+    # 5. Chủ video hiển thị lại video -> khả dụng trở lại
+    unhide_res = client.patch(
+        f"/api/videos/{v.id}/status",
+        json={"status": "VISIBLE"},
+        headers=h_owner,
+    )
+    assert unhide_res.status_code == 200
+    assert unhide_res.json()["is_available"] is True
+
+    detail_visible = client.get(f"/api/videos/{v.id}")
+    assert detail_visible.status_code == 200
+    assert detail_visible.json()["is_available"] is True
+    assert detail_visible.json()["video_url"] == "https://example.com/video.mp4"
+
+    # 6. Video không tồn tại -> 404
+    not_found = client.get("/api/videos/999999")
+    assert not_found.status_code == 404
+
+

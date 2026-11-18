@@ -1,0 +1,190 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Xem Video & Chia sẻ | ClipShop AI</title>
+  <link rel="icon" href="../assets/images/logo.svg">
+  <link rel="stylesheet" href="../css/style.css">
+</head>
+<body data-root="../">
+  <header id="app-header"></header>
+
+  <main class="container video-detail-page">
+    <!-- Thanh điều hướng phía trên -->
+    <div class="video-top-nav">
+      <a href="feed.html" class="btn btn-small video-back-btn">&larr; Quay lại Feed</a>
+      <div class="video-route-badge" id="video-route-badge">/video/...</div>
+      <button type="button" id="btn-toggle-visibility" class="btn btn-small btn-danger" style="display:none;margin-left:auto;">
+        👁️‍🗨️ Ẩn video
+      </button>
+    </div>
+
+    <!-- Trạng thái đang tải -->
+    <div id="video-loading" class="card" style="text-align:center;padding:64px 20px;">
+      <div style="font-size:32px;margin-bottom:12px;">⏳</div>
+      <div style="font-size:16px;font-weight:600;">Đang tải thông tin video...</div>
+    </div>
+
+    <!-- Trạng thái Video bị ẩn hoặc không còn khả dụng (Yêu cầu Task T3D245C) -->
+    <section id="video-unavailable" class="card video-unavailable-card" style="display:none;">
+      <div class="unavailable-icon">🚫</div>
+      <h1 class="unavailable-title" id="unavailable-title">Video không còn khả dụng</h1>
+      <p class="unavailable-desc" id="unavailable-desc">
+        Video này đã bị ẩn hoặc không còn khả dụng để xem và chia sẻ.
+      </p>
+
+      <!-- Nếu người đang xem là chủ video hoặc Admin thì có thể bật hiển thị lại -->
+      <div id="owner-unhide-wrap" style="display:none;margin-bottom:20px;">
+        <button type="button" id="btn-unhide-video" class="btn btn-small">
+          👁️ Hiển thị lại video (Chủ sở hữu / Admin)
+        </button>
+      </div>
+
+      <div class="unavailable-actions">
+        <a href="feed.html" class="btn btn-primary">🔥 Xem Feed Video</a>
+        <a href="search.html" class="btn">🔍 Tìm kiếm video khác</a>
+      </div>
+    </section>
+
+    <!-- Nội dung chi tiết một video -->
+    <div id="video-detail-content" class="video-detail-grid" style="display:none;">
+      <!-- Cột trái: Trình phát Video dọc 9:16 -->
+      <div class="video-player-col">
+        <div class="single-video-player-box" id="single-player-box">
+          <video
+            id="single-video-player"
+            class="single-video-element"
+            controls
+            autoplay
+            loop
+            playsinline
+            preload="metadata"
+          >
+            Trình duyệt của bạn không hỗ trợ phát video HTML5.
+          </video>
+          <span class="single-video-duration-badge" id="single-video-duration">0:00</span>
+        </div>
+      </div>
+
+      <!-- Cột phải: Thông tin tác giả, mô tả, nút sao chép link, đếm lượt chia sẻ & bình luận -->
+      <div class="video-info-col">
+        <!-- 1. Thông tin tác giả & nút Theo dõi -->
+        <section class="card video-info-card">
+          <div class="video-author-header">
+            <a id="author-profile-link" href="profile.html" class="video-author-left">
+              <img id="author-avatar" src="../assets/images/logo.svg" alt="avatar" class="video-author-avatar">
+              <div>
+                <div class="video-author-name" id="author-display-name">Người đăng</div>
+                <div class="video-author-handle" id="author-username">@username</div>
+              </div>
+            </a>
+
+            <div>
+              <button type="button" id="btn-video-follow" class="btn-profile-follow not-following" style="display:none;">
+                + Theo dõi
+              </button>
+              <span id="video-self-badge" class="badge-self" style="display:none;">Video của bạn</span>
+            </div>
+          </div>
+
+          <!-- Tiêu đề, lượt xem, thời gian, mô tả, hashtag -->
+          <h1 class="single-video-title" id="video-title">Tiêu đề video</h1>
+
+          <div class="single-video-meta">
+            <span>👁️ <strong id="video-views">0</strong> lượt xem</span>
+            <span>·</span>
+            <span id="video-created-at">Vừa xong</span>
+          </div>
+
+          <p class="single-video-description" id="video-description"></p>
+
+          <div class="single-video-hashtags" id="video-hashtags"></div>
+
+          <!-- 2. Thanh tương tác: Thích, Bình luận, Đếm lượt chia sẻ -->
+          <div class="video-interaction-bar">
+            <button type="button" id="btn-like-video" class="interaction-pill-btn">
+              <span class="pill-icon" id="like-heart-icon">🤍</span>
+              <span>Thích</span>
+              <strong id="single-like-count">0</strong>
+            </button>
+
+            <button type="button" id="btn-focus-comment" class="interaction-pill-btn">
+              <span class="pill-icon">💬</span>
+              <span>Bình luận</span>
+              <strong id="single-comment-count">0</strong>
+            </button>
+
+            <button type="button" id="btn-share-video" class="interaction-pill-btn share-pill">
+              <span class="pill-icon">🔗</span>
+              <span>Chia sẻ</span>
+              <strong id="single-share-count">0</strong>
+            </button>
+          </div>
+
+          <!-- 3. Hộp Chia sẻ & Nút Sao chép Link (Yêu cầu chính Task T3D245C) -->
+          <div class="share-link-box">
+            <div class="share-link-header">
+              <span>🔗 Liên kết chia sẻ video (<code id="share-short-path">/video/1</code>)</span>
+              <span class="share-counter-badge">
+                Lượt chia sẻ: <strong id="share-box-count">0</strong>
+              </span>
+            </div>
+            <div class="share-link-input-group">
+              <input
+                type="text"
+                id="share-link-input"
+                class="share-link-input"
+                readonly
+                aria-label="Liên kết chia sẻ video"
+              >
+              <button type="button" id="btn-copy-link" class="btn btn-primary btn-copy-link">
+                📋 Sao chép link
+              </button>
+            </div>
+          </div>
+        </section>
+
+        <!-- 4. Danh sách & Khung nhập Bình luận -->
+        <section class="card video-comments-card">
+          <h3 class="video-comments-heading">
+            💬 Bình luận (<span id="comments-header-count">0</span>)
+          </h3>
+
+          <div id="single-reply-banner" class="comment-replying-banner" style="border-radius:8px;margin-bottom:8px;">
+            <span>Đang trả lời <strong id="single-reply-user">@user</strong></span>
+            <button type="button" id="btn-single-cancel-reply" class="btn-cancel-reply">Hủy</button>
+          </div>
+
+          <form id="single-comment-form" class="single-comment-form" onsubmit="return false;">
+            <input
+              type="text"
+              id="single-comment-input"
+              placeholder="Viết bình luận của bạn..."
+              maxlength="2000"
+              autocomplete="off"
+            >
+            <button type="submit" id="btn-send-single-comment" class="btn btn-primary">
+              Gửi
+            </button>
+          </form>
+
+          <div id="single-comments-list" class="single-comments-list">
+            <!-- Bình luận sẽ hiển thị tại đây -->
+          </div>
+        </section>
+      </div>
+    </div>
+  </main>
+
+  <footer id="app-footer"></footer>
+
+  <!-- Scripts -->
+  <script src="https://cdn.jsdelivr.net/npm/axios@1.7.9/dist/axios.min.js"></script>
+  <script src="../js/config.js"></script>
+  <script src="../js/api.js"></script>
+  <script src="../js/utils.js"></script>
+  <script src="../js/layout.js"></script>
+  <script src="../js/pages/video.js"></script>
+</body>
+</html>

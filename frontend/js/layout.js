@@ -33,6 +33,9 @@ function isMenuActive(item, user) {
   const path = window.location.pathname;
   const params = new URLSearchParams(window.location.search);
   const file = item.href.split("?")[0];
+  if (file === "pages/seller.html" && path.endsWith("/pages/seller-center.html")) {
+    return true;
+  }
   if (!path.endsWith("/" + file)) return false;
   if (item.id === "following") return params.get("tab") === "following";
   if (item.id === "for-you") return params.get("tab") !== "following";

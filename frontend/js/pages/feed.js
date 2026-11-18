@@ -130,6 +130,9 @@ function createVideoCard(video) {
         <span style="font-size:12px;font-weight:normal;opacity:0.8;">(${video.author_name})</span>
       </a>
       <p class="video-desc">${escapeHtml(video.title || "")} ${video.description ? "- " + escapeHtml(video.description) : ""}</p>
+      <a href="video.html?id=${video.id}" style="font-size:12px;font-weight:600;color:#93c5fd;margin-top:6px;display:inline-block;">
+        ↗ Xem trang riêng (/video/${video.id})
+      </a>
     </div>
 
     <!-- Cột nút hành động bên phải video (Action Column) -->
@@ -167,7 +170,7 @@ function createVideoCard(video) {
       </div>
 
       <!-- 4. Nút Chia sẻ -->
-      <div class="action-item share" data-video-id="${video.id}" title="Chia sẻ video">
+      <div class="action-item share" data-video-id="${video.id}" title="Chia sẻ & sao chép link video">
         <div class="action-icon-wrap">
           <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#ffffff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
             <circle cx="18" cy="5" r="3"></circle>
@@ -177,7 +180,7 @@ function createVideoCard(video) {
             <line x1="15.41" y1="6.51" x2="8.59" y2="10.49"></line>
           </svg>
         </div>
-        <span class="action-label">Chia sẻ</span>
+        <span class="action-label" id="share-count-${video.id}">${video.share_count || 0}</span>
       </div>
     </div>
   `;
@@ -317,23 +320,32 @@ async function handleLikeAction(videoId, buttonEl) {
 
 // ---------- 6. XỬ LÝ CHIA SẺ VIDEO ----------
 async function handleShareAction(videoId) {
-  const shareUrl = `${window.location.origin}${window.location.pathname}?v=${videoId}`;
+  const basePath = window.location.pathname.includes("/pages/")
+    ? window.location.pathname.split("/pages/")[0]
+    : "";
+  const shareUrl = `${window.location.origin}${basePath}/pages/video.html?id=${videoId}`;
+
+  const countEl = document.getElementById(`share-count-${videoId}`);
+  const oldCount = countEl ? parseInt(countEl.innerText, 10) || 0 : 0;
 
   try {
-    if (navigator.clipboard) {
+    if (navigator.clipboard && navigator.clipboard.writeText) {
       await navigator.clipboard.writeText(shareUrl);
       showToast("Đã sao chép liên kết video vào bộ nhớ tạm!", "success");
     } else {
       prompt("Sao chép liên kết video bên dưới:", shareUrl);
     }
 
-    // Ghi nhận lượt share lên backend
-    const token = localStorage.getItem("token") || localStorage.getItem("access_token");
-    if (token) {
-      await api.post(`/videos/${videoId}/share`);
+    if (countEl) countEl.innerText = oldCount + 1;
+
+    // Ghi nhận lượt share lên backend và đồng bộ số đếm
+    const res = await api.post(`/videos/${videoId}/share`);
+    if (countEl && res && typeof res.share_count === "number") {
+      countEl.innerText = res.share_count;
     }
   } catch (err) {
-    showToast("Không thể sao chép liên kết", "error");
+    if (countEl) countEl.innerText = oldCount;
+    showToast(err.message || "Không thể chia sẻ liên kết", "error");
   }
 }
 

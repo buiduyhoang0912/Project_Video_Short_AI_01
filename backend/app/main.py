@@ -4,18 +4,27 @@ Chạy:  uvicorn app.main:app --reload
 Tài liệu API tự sinh: http://127.0.0.1:8000/docs
 """
 from contextlib import asynccontextmanager
-
 from pathlib import Path
-from fastapi.staticfiles import StaticFiles
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
 from sqlalchemy.exc import OperationalError
 
 from app import models  # noqa: F401 - import để SQLAlchemy biết các bảng
 from app.core.config import settings
 from app.db.session import Base, engine
-from app.routers import auth, health, items, products, seller_applications, shops, social, videos
+from app.routers import (
+    auth,
+    health,
+    items,
+    products,
+    seller_applications,
+    shops,
+    social,
+    videos,
+)
+
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -37,6 +46,7 @@ app = FastAPI(title=settings.APP_NAME, lifespan=lifespan)
 uploads_dir = Path(__file__).resolve().parents[1] / "uploads"
 (uploads_dir / "videos").mkdir(parents=True, exist_ok=True)
 (uploads_dir / "thumbnails").mkdir(parents=True, exist_ok=True)
+(uploads_dir / "products").mkdir(parents=True, exist_ok=True)
 
 app.mount("/uploads", StaticFiles(directory=uploads_dir), name="uploads")
 
@@ -57,6 +67,7 @@ app.include_router(shops.router, prefix="/api")
 app.include_router(products.router, prefix="/api")
 app.include_router(social.router, prefix="/api")
 app.include_router(auth.router)
+
 
 @app.get("/")
 def root():

@@ -296,13 +296,13 @@
 
         return `
           <div class="search-video-card" data-video-id="${v.id}">
-            <div class="search-video-thumb-wrap" onclick="window.location.href='feed.html?v=${v.id}'">
+            <div class="search-video-thumb-wrap" onclick="window.location.href='video.html?id=${v.id}'">
               <img src="${thumb}" alt="${escapeHtml(v.title)}" class="search-video-thumb" loading="lazy" onerror="this.src='../assets/images/logo.svg'">
               <span class="search-video-duration">${durationFormatted}</span>
               <div class="search-video-play-icon">▶</div>
             </div>
             <div class="search-video-info">
-              <h4 class="search-video-title" onclick="window.location.href='feed.html?v=${v.id}'" title="${escapeHtml(
+              <h4 class="search-video-title" onclick="window.location.href='video.html?id=${v.id}'" title="${escapeHtml(
           v.title
         )}">
                 ${escapeHtml(v.title)}

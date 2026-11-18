@@ -284,6 +284,14 @@ def get_following_feed(
         ).all()
     )
 
+    shares_grouped = dict(
+        db.execute(
+            select(VideoShare.video_id, func.count(VideoShare.id))
+            .where(VideoShare.video_id.in_(video_ids))
+            .group_by(VideoShare.video_id)
+        ).all()
+    )
+
     results = []
     for video, user in rows:
         results.append({
@@ -301,6 +309,7 @@ def get_following_feed(
             "created_at": video.created_at,
             "like_count": likes_grouped.get(video.id, 0),
             "comment_count": comments_grouped.get(video.id, 0),
+            "share_count": shares_grouped.get(video.id, 0),
             "is_liked": video.id in liked_video_ids,
             "is_following": True,
         })
@@ -363,6 +372,14 @@ def get_public_feed(
         ).all()
     )
 
+    shares_grouped = dict(
+        db.execute(
+            select(VideoShare.video_id, func.count(VideoShare.id))
+            .where(VideoShare.video_id.in_(video_ids))
+            .group_by(VideoShare.video_id)
+        ).all()
+    )
+
     results = []
     for video, user in rows:
         results.append({
@@ -380,11 +397,125 @@ def get_public_feed(
             "created_at": video.created_at,
             "like_count": likes_grouped.get(video.id, 0),
             "comment_count": comments_grouped.get(video.id, 0),
+            "share_count": shares_grouped.get(video.id, 0),
             "is_liked": video.id in liked_video_ids,
             "is_following": user.id in following_author_ids,
         })
 
     return results
+
+
+def get_video_detail(
+    db: Session,
+    video_id: int,
+    current_user_id: int | None = None,
+    increment_view: bool = True,
+) -> dict | None:
+    row = db.execute(
+        select(Video, User)
+        .join(User, Video.user_id == User.id)
+        .where(Video.id == video_id)
+    ).first()
+
+    if row is None:
+        return None
+
+    video, user = row
+
+    like_count = (
+        db.scalar(
+            select(func.count(Like.id)).where(Like.video_id == video_id)
+        )
+        or 0
+    )
+    comment_count = (
+        db.scalar(
+            select(func.count(Comment.id)).where(Comment.video_id == video_id)
+        )
+        or 0
+    )
+    share_count = (
+        db.scalar(
+            select(func.count(VideoShare.id)).where(
+                VideoShare.video_id == video_id
+            )
+        )
+        or 0
+    )
+
+    is_liked = False
+    is_following = False
+    if current_user_id is not None:
+        is_liked = find_like(db, current_user_id, video_id) is not None
+        if current_user_id != user.id:
+            is_following = (
+                find_follow(db, current_user_id, user.id) is not None
+            )
+
+    if video.status == "HIDDEN":
+        return {
+            "id": video.id,
+            "user_id": video.user_id,
+            "title": video.title,
+            "description": None,
+            "hashtags": [],
+            "video_url": None,
+            "thumbnail_url": None,
+            "duration_seconds": video.duration_seconds,
+            "view_count": getattr(video, "view_count", 0) or 0,
+            "status": "HIDDEN",
+            "is_available": False,
+            "unavailable_message": "Video này đã bị ẩn và không còn khả dụng.",
+            "created_at": video.created_at,
+            "author_name": user.display_name,
+            "author_username": user.username,
+            "author_avatar_key": user.avatar_key,
+            "author_avatar_url": user.avatar_key,
+            "like_count": like_count,
+            "comment_count": comment_count,
+            "share_count": share_count,
+            "is_liked": is_liked,
+            "is_following": is_following,
+        }
+
+    if increment_view:
+        video.view_count = (getattr(video, "view_count", 0) or 0) + 1
+        db.commit()
+        db.refresh(video)
+
+    tags = video.hashtags
+    if isinstance(tags, str):
+        try:
+            tags = json.loads(tags)
+        except Exception:
+            tags = []
+    if not isinstance(tags, list):
+        tags = []
+
+    return {
+        "id": video.id,
+        "user_id": video.user_id,
+        "title": video.title,
+        "description": video.description,
+        "hashtags": tags,
+        "video_url": video.video_url,
+        "thumbnail_url": video.thumbnail_url,
+        "duration_seconds": video.duration_seconds,
+        "view_count": getattr(video, "view_count", 0) or 0,
+        "status": "VISIBLE",
+        "is_available": True,
+        "unavailable_message": None,
+        "created_at": video.created_at,
+        "author_name": user.display_name,
+        "author_username": user.username,
+        "author_avatar_key": user.avatar_key,
+        "author_avatar_url": user.avatar_key,
+        "like_count": like_count,
+        "comment_count": comment_count,
+        "share_count": share_count,
+        "is_liked": is_liked,
+        "is_following": is_following,
+    }
 
 
 def get_user_profile(
@@ -522,6 +653,14 @@ def search_videos(
         ).all()
     )
 
+    shares_grouped = dict(
+        db.execute(
+            select(VideoShare.video_id, func.count(VideoShare.id))
+            .where(VideoShare.video_id.in_(video_ids))
+            .group_by(VideoShare.video_id)
+        ).all()
+    )
+
     results = []
     for video, user in rows:
         tags = video.hashtags
@@ -549,6 +688,7 @@ def search_videos(
             "author_avatar_url": user.avatar_key,
             "like_count": likes_grouped.get(video.id, 0),
             "comment_count": comments_grouped.get(video.id, 0),
+            "share_count": shares_grouped.get(video.id, 0),
             "is_liked": video.id in liked_video_ids,
         })
 

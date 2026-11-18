@@ -8,6 +8,7 @@ from app.crud import social as crud
 from app.db.session import get_db
 from app.models.social import AiChatLog, Comment, Follow, Like
 from app.models.user import User
+from app.models.video import Video
 from app.schemas.social import (
     ChatLogCreate,
     ChatLogOut,
@@ -21,6 +22,9 @@ from app.schemas.social import (
     SearchVideoItem,
     UserFollowItem,
     UserProfileOut,
+    VideoDetailOut,
+    VideoShareOut,
+    VideoStatusUpdate,
 )
 
 router = APIRouter(tags=["Tương tác video"])
@@ -389,19 +393,99 @@ def get_user_profile(
     return profile
 
 
+# 11D. XEM CHI TIET MOT VIDEO / TRANG CHIA SE (TASK T3D245C)
+@router.get(
+    "/videos/{video_id}",
+    response_model=VideoDetailOut,
+)
+@router.get(
+    "/video/{video_id}",
+    response_model=VideoDetailOut,
+    include_in_schema=False,
+)
+def get_single_video(
+    video_id: int,
+    db: Session = Depends(get_db),
+    current_user: User | None = Depends(get_optional_user),
+):
+    cid = current_user.id if current_user else None
+    detail = crud.get_video_detail(db, video_id=video_id, current_user_id=cid)
+    if detail is None:
+        raise HTTPException(404, "Không tìm thấy video")
+    return detail
+
+
+# 11E. AN / HIEN VIDEO (TASK T3D245C)
+@router.patch("/videos/{video_id}/status")
+def update_video_status(
+    video_id: int,
+    data: VideoStatusUpdate,
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    video = db.get(Video, video_id)
+    if video is None:
+        raise HTTPException(404, "Không tìm thấy video")
+
+    uid = current_user_id(user)
+    is_owner = video.user_id == uid
+    is_admin = getattr(user, "role", "USER") == "ADMIN"
+    if not (is_owner or is_admin):
+        raise HTTPException(
+            status_code=403,
+            detail="Bạn không có quyền thay đổi trạng thái video này",
+        )
+
+    video.status = data.status
+    db.commit()
+    db.refresh(video)
+
+    return {
+        "id": video.id,
+        "status": video.status,
+        "is_available": video.status == "VISIBLE",
+        "message": (
+            "Đã ẩn video"
+            if video.status == "HIDDEN"
+            else "Đã hiển thị lại video"
+        ),
+    }
+
+
 # 12. CHIA SE VIDEO
-@router.post("/videos/{video_id}/share")
+@router.post(
+    "/videos/{video_id}/share",
+    response_model=VideoShareOut,
+)
+@router.post(
+    "/video/{video_id}/share",
+    response_model=VideoShareOut,
+    include_in_schema=False,
+)
 def share_video(
     video_id: int,
     db: Session = Depends(get_db),
-    user=Depends(get_current_user),
+    user: User | None = Depends(get_optional_user),
 ):
-    uid = current_user_id(user)
-    check_video(db, video_id)
+    video = db.get(Video, video_id)
+    if video is None:
+        raise HTTPException(404, "Không tìm thấy video")
 
+    if video.status == "HIDDEN":
+        raise HTTPException(
+            400, "Video này đã bị ẩn và không còn khả dụng"
+        )
+
+    uid = user.id if user else None
     crud.record_video_share(db, video_id, uid)
+    stats = crud.video_stats(db, video_id)
+    share_count = stats["share_count"] if stats else 1
 
-    return {"message": "Đã ghi nhận lượt chia sẻ"}
+    return {
+        "message": "Đã ghi nhận lượt chia sẻ",
+        "video_id": video_id,
+        "share_count": share_count,
+    }
 
 
 # 13. XEM SO LUOT TUONG TAC

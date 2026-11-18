@@ -1,4 +1,5 @@
 from datetime import datetime
+from typing import Literal
 from pydantic import BaseModel, ConfigDict, Field
 
 
@@ -63,6 +64,7 @@ class FollowingFeedItem(BaseModel):
     created_at: datetime
     like_count: int = 0
     comment_count: int = 0
+    share_count: int = 0
     is_liked: bool = False
     is_following: bool = False
 
@@ -108,7 +110,43 @@ class SearchVideoItem(BaseModel):
     author_avatar_url: str | None = None
     like_count: int = 0
     comment_count: int = 0
+    share_count: int = 0
     is_liked: bool = False
+
+
+class VideoDetailOut(BaseModel):
+    id: int
+    user_id: int
+    title: str
+    description: str | None = None
+    hashtags: list[str] = []
+    video_url: str | None = None
+    thumbnail_url: str | None = None
+    duration_seconds: int
+    view_count: int = 0
+    status: Literal["VISIBLE", "HIDDEN"] = "VISIBLE"
+    is_available: bool = True
+    unavailable_message: str | None = None
+    created_at: datetime
+    author_name: str
+    author_username: str
+    author_avatar_key: str | None = None
+    author_avatar_url: str | None = None
+    like_count: int = 0
+    comment_count: int = 0
+    share_count: int = 0
+    is_liked: bool = False
+    is_following: bool = False
+
+
+class VideoStatusUpdate(BaseModel):
+    status: Literal["VISIBLE", "HIDDEN"]
+
+
+class VideoShareOut(BaseModel):
+    message: str
+    video_id: int
+    share_count: int
 
 
 class SearchUserItem(BaseModel):

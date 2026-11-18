@@ -26,6 +26,9 @@ class Settings(BaseSettings):
     CORS_ORIGINS: str = "*"
     FFPROBE_PATH: str = "ffprobe"
 
+    # Địa chỉ công khai của backend, dùng để tạo URL ảnh avatar trả cho frontend
+    PUBLIC_BASE_URL: str = "http://127.0.0.1:8000"
+
     JWT_SECRET_KEY: str = "change-me-to-a-long-random-string"
     JWT_ALGORITHM: str = "HS256"
     JWT_EXPIRE_MINUTES: int = 60

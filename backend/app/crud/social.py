@@ -5,6 +5,7 @@ from collections import Counter
 from sqlalchemy import Integer, String, cast, column, func, or_, select, table
 from sqlalchemy.orm import Session
 
+from app.core.avatar import avatar_url_from_key
 from app.models.social import AiChatLog, Comment, Follow, Like, VideoShare
 from app.models.user import User
 from app.models.video import Video
@@ -195,7 +196,7 @@ def get_followers_list(
             "username": user.username,
             "display_name": user.display_name,
             "avatar_key": user.avatar_key,
-            "avatar_url": user.avatar_key,
+            "avatar_url": avatar_url_from_key(user.avatar_key),
             "followed_at": created_at,
         }
         for user, created_at in rows
@@ -220,7 +221,7 @@ def get_following_list(
             "username": user.username,
             "display_name": user.display_name,
             "avatar_key": user.avatar_key,
-            "avatar_url": user.avatar_key,
+            "avatar_url": avatar_url_from_key(user.avatar_key),
             "followed_at": created_at,
         }
         for user, created_at in rows
@@ -300,7 +301,7 @@ def get_following_feed(
             "author_name": user.display_name,
             "author_username": user.username,
             "author_avatar_key": user.avatar_key,
-            "author_avatar_url": user.avatar_key,
+            "author_avatar_url": avatar_url_from_key(user.avatar_key),
             "title": video.title,
             "description": video.description,
             "video_url": video.video_url,
@@ -388,7 +389,7 @@ def get_public_feed(
             "author_name": user.display_name,
             "author_username": user.username,
             "author_avatar_key": user.avatar_key,
-            "author_avatar_url": user.avatar_key,
+            "author_avatar_url": avatar_url_from_key(user.avatar_key),
             "title": video.title,
             "description": video.description,
             "video_url": video.video_url,
@@ -470,7 +471,7 @@ def get_video_detail(
             "author_name": user.display_name,
             "author_username": user.username,
             "author_avatar_key": user.avatar_key,
-            "author_avatar_url": user.avatar_key,
+            "author_avatar_url": avatar_url_from_key(user.avatar_key),
             "like_count": like_count,
             "comment_count": comment_count,
             "share_count": share_count,
@@ -509,7 +510,7 @@ def get_video_detail(
         "author_name": user.display_name,
         "author_username": user.username,
         "author_avatar_key": user.avatar_key,
-        "author_avatar_url": user.avatar_key,
+        "author_avatar_url": avatar_url_from_key(user.avatar_key),
         "like_count": like_count,
         "comment_count": comment_count,
         "share_count": share_count,
@@ -551,7 +552,7 @@ def get_user_profile(
         "username": user.username,
         "display_name": user.display_name,
         "avatar_key": user.avatar_key,
-        "avatar_url": user.avatar_key,
+        "avatar_url": avatar_url_from_key(user.avatar_key),
         "bio": getattr(user, "bio", None),
         "role": getattr(user, "role", "USER"),
         "created_at": user.created_at,
@@ -685,7 +686,7 @@ def search_videos(
             "created_at": video.created_at,
             "author_name": user.display_name,
             "author_username": user.username,
-            "author_avatar_url": user.avatar_key,
+            "author_avatar_url": avatar_url_from_key(user.avatar_key),
             "like_count": likes_grouped.get(video.id, 0),
             "comment_count": comments_grouped.get(video.id, 0),
             "share_count": shares_grouped.get(video.id, 0),
@@ -762,7 +763,7 @@ def search_users(
             "id": u.id,
             "username": u.username,
             "display_name": u.display_name,
-            "avatar_url": u.avatar_key,
+            "avatar_url": avatar_url_from_key(u.avatar_key),
             "bio": getattr(u, "bio", None),
             "role": getattr(u, "role", "USER"),
             "followers_count": follower_counts.get(u.id, 0),

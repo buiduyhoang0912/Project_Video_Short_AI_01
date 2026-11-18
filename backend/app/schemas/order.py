@@ -1,25 +1,47 @@
-from pydantic import BaseModel
-from typing import List
+"""Schema cho API Đơn hàng & Đặt hàng (Orders)."""
 from datetime import datetime
+from decimal import Decimal
+from pydantic import BaseModel, ConfigDict, Field
+
+
+class OrderCheckout(BaseModel):
+    """Dữ liệu yêu cầu thanh toán/đặt hàng."""
+    address_id: int | None = Field(default=None, description="ID địa chỉ đã lưu của user")
+    recipient_name: str | None = Field(default=None, max_length=100)
+    recipient_phone: str | None = Field(default=None, max_length=20)
+    recipient_address: str | None = Field(default=None, max_length=255)
+    payment_method: str = Field(default="COD", description="Phương thức thanh toán: COD hoặc SIMULATED (Mô phỏng)")
+    cart_item_ids: list[int] | None = Field(default=None, description="Danh sách id trong giỏ cần đặt (None = đặt tất cả)")
+
 
 class OrderCreate(BaseModel):
+    """Schema tạo đơn trực tiếp (cho 1 shop)."""
     shop_id: int
-    address_id: int
-    payment_method: str = "COD"  # COD hoặc MÔ PHỎNG
+    address_id: int | None = None
+    recipient_name: str | None = None
+    recipient_phone: str | None = None
+    recipient_address: str | None = None
+    payment_method: str = "COD"
+
 
 class OrderItemResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
     id: int
     product_id: int
+    product_name: str | None = None
     quantity: int
     unit_price: float
+    line_total: float | None = None
 
-    class Config:
-        from_attributes = True
 
 class OrderResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
     id: int
     buyer_id: int
     shop_id: int
+    shop_name: str | None = None
     total_amount: float
     payment_method: str
     status: str
@@ -27,8 +49,11 @@ class OrderResponse(BaseModel):
     recipient_phone: str
     recipient_address: str
     created_at: datetime
-    items: List[OrderItemResponse] = []
+    items: list[OrderItemResponse] = []
 
-    class Config:
-        from_attributes = True
-        
+
+class OrderCheckoutResponse(BaseModel):
+    message: str
+    total_orders_created: int
+    total_amount: float
+    orders: list[OrderResponse] = []

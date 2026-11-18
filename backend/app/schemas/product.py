@@ -1,9 +1,13 @@
 """Schema dữ liệu cho Sản phẩm (Product), Ảnh, Shop, Video gắn kèm và Phân trang."""
+
 import enum
 from datetime import datetime
 from decimal import Decimal
+from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field
+
+from app.schemas.product_image import ProductImageOut as SellerProductImageOut
 
 
 class ProductSortBy(str, enum.Enum):
@@ -36,9 +40,13 @@ class ProductImageOut(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
     id: int
-    image_url: str
+    product_id: int | None = None
+    object_key: str | None = None
+    image_url: str | None = None
     is_primary: bool = False
+    sort_order: int = 0
     display_order: int = 0
+    created_at: datetime | None = None
 
 
 class VideoBriefOut(BaseModel):
@@ -55,27 +63,31 @@ class VideoBriefOut(BaseModel):
 
 # --- Base & Create/Update ---
 class ProductBase(BaseModel):
-    name: str = Field(min_length=1, max_length=255, examples=["Áo thun phong cách"])
+    name: str = Field(min_length=1, max_length=200, examples=["Áo thun phong cách"])
     description: str | None = Field(default=None, examples=["Chất liệu cotton thoáng mát"])
-    price: Decimal = Field(default=Decimal("0"), ge=0, examples=[150000])
+    price: Decimal = Field(gt=0, examples=[150000])
     stock: int = Field(default=0, ge=0, description="Số lượng tồn kho", examples=[50])
-    category_id: int | None = Field(default=None, examples=[1])
+    category_id: int = Field(..., examples=[1])
     thumbnail_url: str | None = Field(default=None, examples=["https://example.com/thumb.jpg"])
 
 
 class ProductCreate(ProductBase):
-    shop_id: int = Field(..., examples=[1])
+    shop_id: int | None = Field(default=None, examples=[1])
     status: str = Field(default="ACTIVE", examples=["ACTIVE"])
 
 
 class ProductUpdate(BaseModel):
-    name: str | None = Field(default=None, min_length=1, max_length=255)
-    description: str | None = None
-    price: Decimal | None = Field(default=None, ge=0)
-    stock: int | None = Field(default=None, ge=0)
     category_id: int | None = None
+    name: str | None = Field(default=None, min_length=1, max_length=200)
+    description: str | None = None
+    price: Decimal | None = Field(default=None, gt=0)
+    stock: int | None = Field(default=None, ge=0)
     thumbnail_url: str | None = None
-    status: str | None = None
+    status: Literal["ACTIVE", "HIDDEN", "INACTIVE"] | None = None
+
+
+class ProductStockUpdate(BaseModel):
+    stock: int = Field(ge=0)
 
 
 # --- Output Schemas ---
@@ -91,7 +103,7 @@ class ProductListItemOut(BaseModel):
     name: str
     price: float
     stock: int
-    sold_count: int
+    sold_count: int = 0
     thumbnail_url: str | None = None
     status: str
     created_at: datetime
@@ -115,23 +127,23 @@ class ProductDetailOut(BaseModel):
     description: str | None = None
     price: float
     stock: int = Field(..., description="Số lượng tồn kho")
-    sold_count: int = Field(..., description="Đã bán")
+    sold_count: int = Field(default=0, description="Đã bán")
     thumbnail_url: str | None = None
     status: str
     created_at: datetime
-    updated_at: datetime
+    updated_at: datetime | None = None
 
     # Thông tin Shop
-    shop: ShopBriefOut
+    shop: ShopBriefOut | None = None
 
     # Thông tin Danh mục
     category: CategoryBriefOut | None = None
 
     # Danh sách ảnh
-    images: list[ProductImageOut] = []
+    images: list[ProductImageOut] = Field(default_factory=list)
 
     # Danh sách video có gắn sản phẩm
-    videos: list[VideoBriefOut] = []
+    videos: list[VideoBriefOut] = Field(default_factory=list)
 
 
 class ProductOut(BaseModel):
@@ -144,5 +156,6 @@ class ProductOut(BaseModel):
     stock: int
     status: str
     created_at: datetime
+    images: list[SellerProductImageOut] = Field(default_factory=list)
 
     model_config = ConfigDict(from_attributes=True)

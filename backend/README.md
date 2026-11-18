@@ -192,3 +192,20 @@ Mở http://127.0.0.1:8000/docs.
 - **Tự động** (SQLite in-memory, không cần MySQL): `cd backend && pytest`
 - **Swagger**: vào `/docs`, gọi `/auth/login`, bấm **Authorize**, dán token (chỉ phần token) rồi gọi `/auth/me`, `/auth/logout`.
 - Ảnh test Swagger nằm trong thư mục `docs/auth-test/`.
+
+
+## Profile API (hồ sơ cá nhân, avatar, đổi mật khẩu) - T3D1FE9
+
+Các API `/api/me/*` yêu cầu header `Authorization: Bearer <token>` và **luôn tác động lên tài khoản trong token** (không có tham số user_id nên không sửa được hồ sơ người khác).
+
+| Method | Đường dẫn | Mô tả |
+|---|---|---|
+| GET | `/api/me/profile` | Hồ sơ của mình: `id, username, display_name, bio, avatar_url` |
+| PATCH | `/api/me/profile` | Sửa `display_name` (1-100 ký tự), `bio` (tối đa 500, gửi rỗng/`null` để xóa). Trường lạ (role, avatar...) bị 422 |
+| POST | `/api/me/avatar` | Upload avatar, multipart field `file`. Chỉ JPG/PNG (kiểm tra nội dung thật), tối đa **2 MB** (413 nếu vượt), tối đa 4096x4096 px. Lưu `uploads/avatars/<uuid>.jpg\|png`, mã hóa lại ảnh để bỏ EXIF, xóa file cũ |
+| PUT | `/api/me/password` | Body `current_password, new_password, confirm_password`. Sai mật khẩu hiện tại: 400; xác nhận không khớp/mật khẩu mới yếu hoặc trùng cũ: 422. Lưu bcrypt |
+| GET | `/api/profiles/{username}` | **Công khai** (không cần đăng nhập): `id, username, display_name, bio, avatar_url`. Không tồn tại hoặc tài khoản bị khóa: 404 |
+
+- `avatar_url` được tạo từ `avatar_key` (cột `users.avatar_key`, dạng `avatars/<uuid>.jpg`) với `PUBLIC_BASE_URL` trong `.env` (mặc định `http://127.0.0.1:8000`). Khi deploy hãy đổi biến này.
+- Module Video lấy `id` từ API công khai để gắn lưới video (xem `frontend/pages/profile.html`).
+- Test: `pytest tests/test_profile.py`.

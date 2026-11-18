@@ -27,3 +27,16 @@ function showToast(message, type = "success") {
   document.body.appendChild(toast);
   setTimeout(() => toast.remove(), 3000);
 }
+
+
+// Lấy lỗi theo từng ô nhập từ lỗi 422 của FastAPI -> { ten_truong: "thông báo" }
+function getFieldErrors(err) {
+  const result = {};
+  const detail = err && err.data && err.data.detail;
+  if (!Array.isArray(detail)) return result;
+  detail.forEach((e) => {
+    const field = Array.isArray(e.loc) ? e.loc[e.loc.length - 1] : null;
+    if (field && !result[field]) result[field] = String(e.msg).replace(/^Value error,\s*/i, "");
+  });
+  return result;
+}

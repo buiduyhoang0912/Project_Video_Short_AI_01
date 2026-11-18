@@ -33,6 +33,11 @@
             <div id="profile-self-badge" class="muted" style="display:none;font-weight:600;">
               👤 Tài khoản của bạn
             </div>
+            <!-- Chỉ hiện khi xem hồ sơ của chính mình (T3D1FE9) -->
+            <div id="profile-self-actions" class="profile-actions" style="display:none;">
+              <a class="btn btn-small btn-primary" href="profile-edit.html">✏️ Chỉnh sửa hồ sơ</a>
+              <a class="btn btn-small" href="change-password.html">🔒 Đổi mật khẩu</a>
+            </div>
           </div>
         </div>
 
@@ -55,10 +60,15 @@
         <div class="profile-bio" id="profile-bio">
           Chưa có tiểu sử.
         </div>
+        <div class="muted profile-public-link" id="profile-public-row" style="display:none;">
+          Link hồ sơ công khai: <a id="profile-public-link" href="#"></a>
+        </div>
       </section>
 
-      <!-- Danh sách video của tài khoản này -->
-      <section class="card" style="max-width:640px;margin:0 auto;">
+      <!-- VỊ TRÍ DÀNH CHO MODULE VIDEO: lưới video của người dùng được gắn vào #profile-videos-grid.
+           profile.js ghi sẵn data-user-id / data-username lên section này và phát sự kiện
+           "profile:loaded" (detail = { id, username, isSelf }) khi hồ sơ tải xong. -->
+      <section class="card" id="profile-video-slot" data-user-id="" data-username="" style="max-width:640px;margin:0 auto;">
         <h2>Video đã đăng</h2>
         <div id="profile-videos-empty" class="muted" style="text-align:center;padding:30px;display:none;">
           Người dùng này chưa đăng video nào.

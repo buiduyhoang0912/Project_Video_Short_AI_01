@@ -1529,6 +1529,17 @@ body.auth-checking main { visibility: hidden; }
   padding-right: 4px;
 }
 
+/* ---------- Quản lý hồ sơ cá nhân (T3D1FE9) ---------- */
+.form-card { max-width: 560px; margin: 24px auto; }
+.form-card h1 { margin-top: 0; }
+.form-card .muted { margin-top: 2px; }
+.avatar-edit { display: flex; gap: 16px; align-items: center; margin-bottom: 8px; }
+.avatar-edit-input { flex: 1; min-width: 0; }
+.avatar-edit-input input[type="file"] { padding: 6px; }
+.char-count { text-align: right; }
+.profile-actions { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 8px; }
+.profile-public-link { margin-top: 12px; word-break: break-all; }
+
 
 /* ==========================================================
    TASK T3D2476: UI Khung Chat Nổi - Chatbot AI Tư vấn Mua sắm

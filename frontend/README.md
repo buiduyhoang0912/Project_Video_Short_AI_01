@@ -91,3 +91,15 @@ Lưu ý khi tạo trang:
 | Console (F12) báo `blocked by CORS policy` | Kiểm tra `CORS_ORIGINS` trong `backend/.env`, sửa xong nhớ chạy lại backend |
 | Menu/header không hiện | Sai `data-root` ở thẻ `<body>`, hoặc sai đường dẫn file JS. Mở F12 → Console để xem lỗi |
 | Sửa code mà trang không đổi | Tải lại cứng: `Ctrl + F5` |
+
+
+## Trang hồ sơ cá nhân (T3D1FE9)
+
+| Trang | Đường dẫn | Ghi chú |
+|---|---|---|
+| Hồ sơ của tôi | `pages/profile.html` | Cần đăng nhập; có nút Chỉnh sửa hồ sơ / Đổi mật khẩu |
+| Hồ sơ công khai | `pages/profile.html?username=<username>` | Không cần đăng nhập; username không tồn tại thì báo "Không tìm thấy người dùng" |
+| Chỉnh sửa hồ sơ | `pages/profile-edit.html` | Sửa tên, tiểu sử, chọn avatar + xem trước |
+| Đổi mật khẩu | `pages/change-password.html` | 3 ô: hiện tại, mới, xác nhận |
+
+**Gắn lưới video (module Video):** trang hồ sơ có sẵn `<section id="profile-video-slot" data-user-id data-username>` chứa `#profile-videos-grid`. Khi hồ sơ tải xong, `profile.js` điền `data-user-id`/`data-username` và phát sự kiện `profile:loaded` (`detail = { id, username, isSelf }`) để module Video lắng nghe và render lưới.

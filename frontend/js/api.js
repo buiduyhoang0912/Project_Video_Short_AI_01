@@ -89,7 +89,8 @@ function pageNeedsAuth() {
   if (b.roles || b.auth === "required") return true;
   if (b.auth === "self") {
     const p = new URLSearchParams(window.location.search);
-    return !(p.get("id") || p.get("user_id")); // feed dùng ?user_id=, nơi khác dùng ?id=
+    // feed dùng ?user_id=, nơi khác dùng ?id=, hồ sơ công khai theo tên dùng ?username=
+    return !(p.get("id") || p.get("user_id") || p.get("username"));
   }
   return false;
 }
@@ -149,5 +150,11 @@ const api = {
   get: (path, params) => http.get(path, { params }).then((res) => res.data),
   post: (path, body) => http.post(path, body).then((res) => res.data),
   put: (path, body) => http.put(path, body).then((res) => res.data),
+  patch: (path, body) => http.patch(path, body).then((res) => res.data),
   delete: (path) => http.delete(path).then((res) => res.data),
+  // Upload tệp (FormData): để trình duyệt tự gắn boundary cho multipart
+  upload: (path, formData) =>
+    http
+      .post(path, formData, { headers: { "Content-Type": "multipart/form-data" }, timeout: 30000 })
+      .then((res) => res.data),
 };

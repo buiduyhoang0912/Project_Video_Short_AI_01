@@ -5,6 +5,12 @@ let currentVideoIdForComments = null;
 let currentReplyingCommentId = null;
 let currentReplyingUsername = null;
 let observer = null;
+// Trạng thái phục vụ Task T3D2282: Âm thanh, Phân trang cuộn và Đếm view
+let isMuted = true; // Mặc định tắt tiếng để trình duyệt cho phép tự phát (Autoplay Policy)
+let currentSkip = 0;
+let isLoadingMore = false;
+let hasMoreVideos = true;
+const PAGE_SIZE = 5;
 
 document.addEventListener("DOMContentLoaded", () => {
   initFeedTabs();
@@ -48,6 +54,7 @@ function initFeedTabs() {
 }
 
 // ---------- 2. TẢI DANH SÁCH VIDEO FEED ----------
+// ---------- 2. TẢI DANH SÁCH VIDEO FEED ----------
 async function loadFeed(type) {
   const container = document.getElementById("feed-container");
   container.innerHTML = `
@@ -56,12 +63,17 @@ async function loadFeed(type) {
       <div>Đang tải video...</div>
     </div>`;
 
+  // Reset trạng thái phân trang khi chuyển tab hoặc tải lại
+  currentSkip = 0;
+  hasMoreVideos = true;
+  isLoadingMore = false;
+
   try {
     let videos = [];
     if (type === "following") {
-      videos = await api.get("/videos/feed/following");
+      videos = await api.get("/videos/feed/following", { skip: 0, limit: PAGE_SIZE });
     } else {
-      videos = await api.get("/videos/feed/for-you");
+      videos = await api.get("/videos/feed/for-you", { skip: 0, limit: PAGE_SIZE });
     }
 
     if (!videos || videos.length === 0) {
@@ -76,6 +88,11 @@ async function loadFeed(type) {
       return;
     }
 
+    if (videos.length < PAGE_SIZE) {
+      hasMoreVideos = false;
+    }
+    currentSkip = videos.length;
+
     container.innerHTML = "";
     videos.forEach((video) => {
       const card = createVideoCard(video);
@@ -83,6 +100,7 @@ async function loadFeed(type) {
     });
 
     initIntersectionObserver();
+    initFeedScrollListener(); // Lắng nghe cuộn gần cuối để tải thêm
 
     // Tự động cuộn đến video được chọn từ trang Tìm kiếm hoặc link chia sẻ (?v=id)
     const targetVideoId = new URLSearchParams(window.location.search).get("v");
@@ -117,11 +135,16 @@ function createVideoCard(video) {
   }
 
   card.innerHTML = `
-    <!-- Thẻ Video -->
-    <video class="feed-video-element" loop playsinline preload="metadata" src="${videoSrc}">
-      Trình duyệt của bạn không hỗ trợ thẻ video HTML5.
-    </video>
-    <div class="feed-video-overlay-play">▶</div>
+      <!-- Thẻ Video -->
+      <video class="feed-video-element" loop playsinline preload="metadata" ${isMuted ? "muted" : ""} src="${videoSrc}">
+        Trình duyệt của bạn không hỗ trợ thẻ video HTML5.
+      </video>
+      <div class="feed-video-overlay-play">▶</div>
+
+      <!-- Nút Bật/Tắt âm thanh (Task T3D2282) -->
+      <button class="feed-btn-volume" type="button" title="Bật/Tắt âm thanh">
+        <span class="volume-icon">${isMuted ? "🔇" : "🔊"}</span>
+      </button>
 
     <!-- Thông tin video (góc trái dưới) -->
     <div class="video-info-bottom">
@@ -185,7 +208,7 @@ function createVideoCard(video) {
     </div>
   `;
 
-  // Sự kiện phát / tạm dừng video
+    // Sự kiện phát / tạm dừng video
   const videoEl = card.querySelector(".feed-video-element");
   const playOverlay = card.querySelector(".feed-video-overlay-play");
   videoEl.addEventListener("click", () => {
@@ -197,6 +220,15 @@ function createVideoCard(video) {
       playOverlay.classList.add("visible");
     }
   });
+
+  // Sự kiện Nút Âm thanh (Bật/Tắt tiếng - Task T3D2282)
+  const volumeBtn = card.querySelector(".feed-btn-volume");
+  if (volumeBtn) {
+    volumeBtn.addEventListener("click", (e) => {
+      e.stopPropagation();
+      toggleMute();
+    });
+  }
 
   // Sự kiện Nút Theo dõi trên Avatar
   const followBtn = card.querySelector(".btn-follow-badge");
@@ -560,6 +592,7 @@ async function submitComment() {
 }
 
 // ---------- 8. TỰ ĐỘNG PHÁT KHI CUỘN ĐẾN (INTERSECTION OBSERVER) ----------
+// ---------- 8. TỰ ĐỘNG PHÁT KHI CUỘN ĐẾN & ĐẾM LƯỢT XEM (INTERSECTION OBSERVER) ----------
 function initIntersectionObserver() {
   if (observer) observer.disconnect();
 
@@ -572,14 +605,43 @@ function initIntersectionObserver() {
     entries.forEach((entry) => {
       const videoEl = entry.target.querySelector(".feed-video-element");
       const playOverlay = entry.target.querySelector(".feed-video-overlay-play");
+      const card = entry.target;
+      const videoId = card.dataset.videoId;
       if (!videoEl) return;
 
       if (entry.isIntersecting) {
-        videoEl.play().catch(() => {});
+        videoEl.muted = isMuted;
+        videoEl.play().catch(() => {
+          // Trình duyệt chặn autoplay có tiếng -> tự động fallback sang muted
+          if (!videoEl.muted) {
+            videoEl.muted = true;
+            isMuted = true;
+            document.querySelectorAll(".feed-btn-volume .volume-icon").forEach((ic) => (ic.innerText = "🔇"));
+            videoEl.play().catch(() => {});
+          }
+        });
         if (playOverlay) playOverlay.classList.remove("visible");
+
+        // Ghi nhận lượt xem khi xem quá 3 giây (Task T3D207C & T3D2282)
+        if (videoId && !card.dataset.viewRecorded) {
+          card.viewTimer = setTimeout(async () => {
+            try {
+              await api.post(`/videos/${videoId}/views`);
+              card.dataset.viewRecorded = "true";
+            } catch (e) {
+              // Bỏ qua lỗi tăng view nếu mạng gián đoạn
+            }
+          }, 3000);
+        }
       } else {
         videoEl.pause();
         if (playOverlay) playOverlay.classList.remove("visible");
+
+        // Hủy đếm 3 giây nếu người dùng cuộn đi trước 3s
+        if (card.viewTimer) {
+          clearTimeout(card.viewTimer);
+          card.viewTimer = null;
+        }
       }
     });
   }, options);
@@ -624,4 +686,105 @@ function showToast(message, type = "success") {
   setTimeout(() => {
     toast.remove();
   }, 3000);
+}
+
+// ---------- 10. HÀM HỖ TRỢ TASK T3D2282 (BẬT/TẮT TIẾNG & TẢI THÊM KHI GẦN CUỐI) ----------
+
+// Hàm bật / tắt tiếng cho tất cả video trên Feed
+function toggleMute() {
+  isMuted = !isMuted;
+  const allVideos = document.querySelectorAll(".feed-video-element");
+  allVideos.forEach((vid) => {
+    vid.muted = isMuted;
+  });
+  const allIcons = document.querySelectorAll(".feed-btn-volume .volume-icon");
+  allIcons.forEach((ic) => {
+    ic.innerText = isMuted ? "🔇" : "🔊";
+  });
+  showToast(isMuted ? "Đã tắt tiếng" : "Đã bật tiếng");
+}
+
+// Lắng nghe sự kiện cuộn của feed-container: cuộn gần chạm đáy thì tự tải thêm
+let scrollListenerAttached = false;
+function initFeedScrollListener() {
+  if (scrollListenerAttached) return;
+  const container = document.getElementById("feed-container");
+  if (!container) return;
+
+  container.addEventListener("scroll", () => {
+    // Khi cuộn xuống cách đáy dưới 500px -> tự động tải thêm
+    if (container.scrollTop + container.clientHeight >= container.scrollHeight - 500) {
+      loadMoreVideos();
+    }
+  });
+  scrollListenerAttached = true;
+}
+
+// Hàm tải thêm video cho trang tiếp theo
+async function loadMoreVideos() {
+  if (isLoadingMore || !hasMoreVideos) return;
+  isLoadingMore = true;
+
+  const container = document.getElementById("feed-container");
+  showLoadingMoreIndicator(container);
+
+  try {
+    const endpoint = currentFeedType === "following" ? "/videos/feed/following" : "/videos/feed/for-you";
+    const newVideos = await api.get(endpoint, { skip: currentSkip, limit: PAGE_SIZE });
+
+    removeLoadingMoreIndicator();
+
+    if (!newVideos || newVideos.length === 0) {
+      hasMoreVideos = false;
+      showEndOfFeedNotice(container);
+      return;
+    }
+
+    if (newVideos.length < PAGE_SIZE) {
+      hasMoreVideos = false;
+    }
+
+    currentSkip += newVideos.length;
+
+    newVideos.forEach((video) => {
+      const card = createVideoCard(video);
+      container.appendChild(card);
+      if (observer) observer.observe(card);
+    });
+
+    if (!hasMoreVideos) {
+      showEndOfFeedNotice(container);
+    }
+  } catch (err) {
+    console.error("Lỗi khi tải thêm video:", err);
+    removeLoadingMoreIndicator();
+  } finally {
+    isLoadingMore = false;
+  }
+}
+
+function showLoadingMoreIndicator(container) {
+  if (document.getElementById("feed-loading-more-bar")) return;
+  const el = document.createElement("div");
+  el.id = "feed-loading-more-bar";
+  el.className = "feed-loading-more";
+  el.innerHTML = `
+    <div class="feed-loading-spinner"></div>
+    <span>Đang tải thêm video...</span>
+  `;
+  container.appendChild(el);
+}
+
+function removeLoadingMoreIndicator() {
+  const el = document.getElementById("feed-loading-more-bar");
+  if (el) el.remove();
+}
+
+function showEndOfFeedNotice(container) {
+  if (document.getElementById("feed-end-notice-bar")) return;
+  const el = document.createElement("div");
+  el.id = "feed-end-notice-bar";
+  el.className = "feed-end-notice";
+  el.innerText = "✨ Bạn đã xem hết tất cả video hiện có.";
+  container.appendChild(el);
 }

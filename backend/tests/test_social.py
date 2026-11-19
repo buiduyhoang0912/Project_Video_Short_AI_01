@@ -557,3 +557,559 @@ def test_hidden_video_unavailable_and_visibility_toggle(
     assert not_found.status_code == 404
 
 
+def test_ai_shopping_chatbot_mysql_grounding_and_links(
+    client: TestClient, db_session
+):
+    from decimal import Decimal
+    from app.models.category import Category
+    from app.models.product import Product
+
+    db = db_session()
+    seller, _ = make_user(db, "seller_ai", "sellerai@test.com", role="SELLER")
+    buyer, buyer_token = make_user(db, "buyer_ai", "buyerai@test.com")
+    headers = {"Authorization": f"Bearer {buyer_token}"}
+
+    shop = Shop(
+        owner_id=seller.id,
+        name="ClipShop Audio",
+        description="Chuyên phụ kiện âm thanh",
+        address="Hà Nội",
+        status="ACTIVE",
+    )
+    cat = Category(name="Tai nghe", description="Tai nghe", status="ACTIVE")
+    db.add_all([shop, cat])
+    db.commit()
+    db.refresh(shop)
+    db.refresh(cat)
+
+    p_good = Product(
+        shop_id=shop.id,
+        category_id=cat.id,
+        name="JBL Tune 520BT",
+        description="Tai nghe không dây âm trầm mạnh mẽ",
+        price=Decimal("350000"),
+        stock=15,
+        sold_count=40,
+        status="ACTIVE",
+    )
+    p_expensive = Product(
+        shop_id=shop.id,
+        category_id=cat.id,
+        name="Sony WH-1000XM5",
+        description="Tai nghe chống ồn cao cấp",
+        price=Decimal("6500000"),
+        stock=5,
+        sold_count=10,
+        status="ACTIVE",
+    )
+    p_hidden = Product(
+        shop_id=shop.id,
+        category_id=cat.id,
+        name="Tai nghe ẩn không bán",
+        description="Sản phẩm ẩn",
+        price=Decimal("200000"),
+        stock=10,
+        status="INACTIVE",
+    )
+    db.add_all([p_good, p_expensive, p_hidden])
+    db.commit()
+    db.refresh(p_good)
+
+    # Hỏi AI tìm tai nghe dưới 500k
+    res = client.post(
+        "/api/ai/chat",
+        json={"message": "Tư vấn cho tôi tai nghe dưới 500k"},
+        headers=headers,
+    )
+    assert res.status_code == 200
+    body = res.json()
+    assert len(body["recommended_products"]) == 1
+    rec = body["recommended_products"][0]
+    assert rec["id"] == p_good.id
+    assert rec["name"] == "JBL Tune 520BT"
+    assert rec["link"] == f"pages/product.html?id={p_good.id}"
+    assert f"pages/product.html?id={p_good.id}" in body["reply"]
+    assert body["used_today"] == 1
+    assert body["remaining_today"] == body["daily_limit"] - 1
+
+
+def test_ai_shopping_chatbot_daily_limit_and_gemini_errors(
+    client: TestClient, db_session, monkeypatch
+):
+    import httpx
+    from app.core.config import settings
+
+    db = db_session()
+    user, token = make_user(db, "limit_user", "limit@test.com")
+    headers = {"Authorization": f"Bearer {token}"}
+
+    # 1. Test giới hạn số câu hỏi mỗi ngày = 2
+    monkeypatch.setattr(settings, "AI_DAILY_QUESTION_LIMIT", 2)
+    monkeypatch.setattr(settings, "GEMINI_API_KEY", "")
+    monkeypatch.setattr(settings, "OPENAI_API_KEY", "")
+
+    r1 = client.post(
+        "/api/ai/chat",
+        json={"message": "Câu hỏi số 1"},
+        headers=headers,
+    )
+    assert r1.status_code == 200
+    assert r1.json()["remaining_today"] == 1
+
+    r2 = client.post(
+        "/api/ai/chat",
+        json={"message": "Câu hỏi số 2"},
+        headers=headers,
+    )
+    assert r2.status_code == 200
+    assert r2.json()["remaining_today"] == 0
+
+    # Câu hỏi số 3 vượt quá giới hạn ngày -> 429
+    r3 = client.post(
+        "/api/ai/chat",
+        json={"message": "Câu hỏi số 3 vượt giới hạn"},
+        headers=headers,
+    )
+    assert r3.status_code == 429
+    assert "giới hạn 2 câu hỏi mỗi ngày" in r3.json()["detail"]
+
+    # 2. Test báo lỗi dễ hiểu khi Gemini Timeout (504) và Hết Quota (429)
+    user2, token2 = make_user(db, "gemini_user", "gem@test.com")
+    h2 = {"Authorization": f"Bearer {token2}"}
+    monkeypatch.setattr(settings, "AI_DAILY_QUESTION_LIMIT", 10)
+    monkeypatch.setattr(settings, "GEMINI_API_KEY", "fake-gemini-key")
+    monkeypatch.setattr(settings, "AI_PROVIDER", "gemini")
+
+    orig_post = httpx.Client.post
+
+    def mock_timeout_post(self, url, *args, **kwargs):
+        if "generativelanguage.googleapis.com" in str(url):
+            raise httpx.TimeoutException("Request timed out")
+        return orig_post(self, url, *args, **kwargs)
+
+    monkeypatch.setattr(httpx.Client, "post", mock_timeout_post)
+    res_timeout = client.post(
+        "/api/ai/chat",
+        json={"message": "Tìm điện thoại"},
+        headers=h2,
+    )
+    assert res_timeout.status_code == 504
+    assert "timeout" in res_timeout.json()["detail"].lower()
+
+    def mock_quota_post(self, url, *args, **kwargs):
+        if "generativelanguage.googleapis.com" in str(url):
+            return httpx.Response(
+                429,
+                json={"error": {"status": "RESOURCE_EXHAUSTED", "message": "Quota exceeded"}},
+                request=httpx.Request("POST", str(url)),
+            )
+        return orig_post(self, url, *args, **kwargs)
+
+    monkeypatch.setattr(httpx.Client, "post", mock_quota_post)
+    res_quota = client.post(
+        "/api/ai/chat",
+        json={"message": "Tìm điện thoại"},
+        headers=h2,
+    )
+    assert res_quota.status_code == 429
+    assert "quota" in res_quota.json()["detail"].lower()
+
+
+def test_unauthenticated_access_401_across_social_and_ai_endpoints(
+    client: TestClient, db_session
+):
+    """Kiểm thử trường hợp CHƯA ĐĂNG NHẬP (401 Unauthorized) trên toàn bộ API cần xác thực của module."""
+    db = db_session()
+    owner, _ = make_user(db, "unauth_owner", "unauth_owner@test.com")
+    video = make_video(db, owner.id)
+
+    assert client.post(f"/api/videos/{video.id}/likes").status_code == 401
+    assert client.delete(f"/api/videos/{video.id}/likes").status_code == 401
+    assert (
+        client.post(
+            f"/api/videos/{video.id}/comments",
+            json={"content": "Comment không token"},
+        ).status_code
+        == 401
+    )
+    assert client.delete("/api/comments/1").status_code == 401
+    assert client.post(f"/api/users/{owner.id}/follow").status_code == 401
+    assert client.delete(f"/api/users/{owner.id}/follow").status_code == 401
+    assert client.get("/api/videos/feed/following").status_code == 401
+    assert (
+        client.patch(
+            f"/api/videos/{video.id}/status",
+            json={"status": "HIDDEN"},
+        ).status_code
+        == 401
+    )
+    assert (
+        client.post(
+            "/api/ai/chat",
+            json={"message": "Tư vấn mua sắm"},
+        ).status_code
+        == 401
+    )
+    assert client.get("/api/ai/quota").status_code == 401
+    assert (
+        client.post(
+            "/api/ai/chat-logs",
+            json={"message": "Lưu log không token"},
+        ).status_code
+        == 401
+    )
+    assert client.get("/api/ai/chat-logs").status_code == 401
+
+
+def test_invalid_data_and_not_found_validation_across_modules(
+    client: TestClient, db_session
+):
+    """Kiểm thử trường hợp SAI DỮ LIỆU (400 / 422) và KHÔNG TỒN TẠI (404) trên toàn bộ module."""
+    db = db_session()
+    user, token = make_user(db, "val_user", "val@test.com")
+    headers = {"Authorization": f"Bearer {token}"}
+    v1 = make_video(db, user.id)
+    v2 = make_video(db, user.id)
+
+    # 1. Thao tác trên video/user/comment không tồn tại -> 404
+    assert client.post("/api/videos/999999/likes", headers=headers).status_code == 404
+    assert client.get("/api/videos/999999/stats").status_code == 404
+    assert client.post("/api/videos/999999/share").status_code == 404
+    assert client.post("/api/users/999999/follow", headers=headers).status_code == 404
+    assert client.get("/api/users/999999/profile").status_code == 404
+    assert client.delete("/api/comments/999999", headers=headers).status_code == 404
+
+    # 2. Nội dung bình luận hoặc chat AI chỉ chứa khoảng trắng / rỗng -> 422
+    assert (
+        client.post(
+            f"/api/videos/{v1.id}/comments",
+            json={"content": "   "},
+            headers=headers,
+        ).status_code
+        == 422
+    )
+    assert (
+        client.post(
+            "/api/ai/chat",
+            json={"message": "   "},
+            headers=headers,
+        ).status_code
+        == 422
+    )
+    assert (
+        client.post(
+            "/api/ai/chat-logs",
+            json={"message": "   "},
+            headers=headers,
+        ).status_code
+        == 422
+    )
+
+    # 3. Trả lời bình luận thuộc video khác -> 400
+    c_v1 = client.post(
+        f"/api/videos/{v1.id}/comments",
+        json={"content": "Bình luận ở video 1"},
+        headers=headers,
+    ).json()
+    cross_reply = client.post(
+        f"/api/videos/{v2.id}/comments",
+        json={"content": "Trả lời nhầm sang video 2", "parent_id": c_v1["id"]},
+        headers=headers,
+    )
+    assert cross_reply.status_code == 400
+
+    # 4. Sai tham số phân trang (skip < 0 hoặc limit > 100) -> 422
+    assert client.get(f"/api/videos/{v1.id}/comments?skip=-1").status_code == 422
+    assert client.get(f"/api/users/{user.id}/followers?limit=101").status_code == 422
+    assert client.get("/api/videos/feed/for-you?limit=0").status_code == 422
+    assert client.get("/api/search?skip=-5").status_code == 422
+    assert client.get("/api/search/hashtags/demo?limit=200").status_code == 422
+
+    # 5. Sai giá trị trạng thái video -> 422
+    assert (
+        client.patch(
+            f"/api/videos/{v1.id}/status",
+            json={"status": "INVALID_STATUS"},
+            headers=headers,
+        ).status_code
+        == 422
+    )
+
+
+def test_permission_matrix_comment_delete_and_video_status(
+    client: TestClient, db_session
+):
+    """Kiểm thử phân quyền (SAI QUYỀN 403 vs ĐÚNG QUYỀN 200 cho Chủ video & ADMIN)."""
+    db = db_session()
+    video_owner, token_owner = make_user(db, "vid_owner", "vo@test.com")
+    commenter, token_commenter = make_user(db, "commenter", "cm@test.com")
+    other_user, token_other = make_user(db, "other_u", "ou@test.com")
+    admin_user, token_admin = make_user(
+        db, "admin_u", "admin@test.com", role="ADMIN"
+    )
+
+    h_owner = {"Authorization": f"Bearer {token_owner}"}
+    h_commenter = {"Authorization": f"Bearer {token_commenter}"}
+    h_other = {"Authorization": f"Bearer {token_other}"}
+    h_admin = {"Authorization": f"Bearer {token_admin}"}
+
+    v = make_video(db, video_owner.id)
+
+    # Commenter tạo 2 bình luận trên video của video_owner
+    c1 = client.post(
+        f"/api/videos/{v.id}/comments",
+        json={"content": "Bình luận 1 của commenter"},
+        headers=h_commenter,
+    ).json()
+    c2 = client.post(
+        f"/api/videos/{v.id}/comments",
+        json={"content": "Bình luận 2 của commenter"},
+        headers=h_commenter,
+    ).json()
+
+    # 1. Người dùng khác (other_user) xóa bình luận của commenter -> 403 Forbidden
+    assert (
+        client.delete(f"/api/comments/{c1['id']}", headers=h_other).status_code
+        == 403
+    )
+
+    # 2. Chủ video (video_owner) xóa được bình luận trên video của mình -> 200 OK
+    assert (
+        client.delete(f"/api/comments/{c1['id']}", headers=h_owner).status_code
+        == 200
+    )
+
+    # 3. ADMIN xóa được bình luận bất kỳ -> 200 OK
+    assert (
+        client.delete(f"/api/comments/{c2['id']}", headers=h_admin).status_code
+        == 200
+    )
+
+    # 4. ADMIN có quyền ẩn/hiện video bất kỳ -> 200 OK
+    admin_hide = client.patch(
+        f"/api/videos/{v.id}/status",
+        json={"status": "HIDDEN"},
+        headers=h_admin,
+    )
+    assert admin_hide.status_code == 200
+    assert admin_hide.json()["status"] == "HIDDEN"
+
+
+def test_trending_hashtags_7_days_ranking(client: TestClient, db_session):
+    """Kiểm thử bảng xếp hạng hashtag thịnh hành trong 7 ngày (Task T3D2BE1)."""
+    from datetime import datetime, timedelta, timezone
+
+    db = db_session()
+    u1, t1 = make_user(db, "trend_u1", "tu1@test.com")
+    u2, t2 = make_user(db, "trend_u2", "tu2@test.com")
+    h1 = {"Authorization": f"Bearer {t1}"}
+    h2 = {"Authorization": f"Bearer {t2}"}
+
+    now_utc = datetime.now(timezone.utc).replace(tzinfo=None)
+    old_date = now_utc - timedelta(days=15)
+
+    # 1. Video cũ (> 7 ngày trước) không có tương tác mới -> không nằm trong top 7 ngày
+    v_old = Video(
+        user_id=u1.id,
+        title="Video cũ #oldtag",
+        description="Đã đăng 15 ngày trước",
+        hashtags=["oldtag"],
+        video_url="https://example.com/old.mp4",
+        duration_seconds=15,
+        created_at=old_date,
+    )
+
+    # 2. Hai video mới gắn #viral7d và có nhiều tương tác (like + comment + share)
+    v_hot1 = Video(
+        user_id=u1.id,
+        title="Xu hướng công nghệ #viral7d #tech7d",
+        description="Video hot 1",
+        hashtags=["viral7d", "tech7d"],
+        video_url="https://example.com/hot1.mp4",
+        duration_seconds=20,
+        created_at=now_utc - timedelta(days=1),
+    )
+    v_hot2 = Video(
+        user_id=u2.id,
+        title="Mẹo hay mỗi ngày #viral7d",
+        description="Video hot 2",
+        hashtags=["viral7d"],
+        video_url="https://example.com/hot2.mp4",
+        duration_seconds=25,
+        created_at=now_utc - timedelta(days=2),
+    )
+    db.add_all([v_old, v_hot1, v_hot2])
+    db.commit()
+    db.refresh(v_hot1)
+    db.refresh(v_hot2)
+
+    # Tạo tương tác cho v_hot1 và v_hot2 trong 7 ngày qua
+    client.post(f"/api/videos/{v_hot1.id}/likes", headers=h1)
+    client.post(f"/api/videos/{v_hot1.id}/likes", headers=h2)
+    client.post(
+        f"/api/videos/{v_hot1.id}/comments",
+        json={"content": "Hay quá!"},
+        headers=h1,
+    )
+    client.post(f"/api/videos/{v_hot1.id}/share", headers=h2)
+    client.post(f"/api/videos/{v_hot2.id}/likes", headers=h1)
+
+    res = client.get("/api/search/trending-hashtags?days=7&limit=10")
+    assert res.status_code == 200
+    ranking = res.json()
+    assert len(ranking) >= 2
+
+    # #viral7d phải đứng hạng 1 vì có 2 video và 5 lượt tương tác
+    top1 = ranking[0]
+    assert top1["rank"] == 1
+    assert top1["tag"] == "viral7d"
+    assert top1["video_count"] == 2
+    assert top1["interaction_count"] == 5
+
+    # #oldtag (15 ngày trước, 0 tương tác mới) không xuất hiện trong bảng 7 ngày
+    tags_in_ranking = {item["tag"] for item in ranking}
+    assert "oldtag" not in tags_in_ranking
+
+    # Kiểm tra tham số không hợp lệ -> 422
+    bad_res = client.get("/api/search/trending-hashtags?days=0")
+    assert bad_res.status_code == 422
+
+
+def test_end_to_end_system_integration_flow(client: TestClient, db_session):
+    """Kiểm thử luồng xuyên suốt toàn hệ thống (Task T3D1DB8):
+    Auth -> Shop/Product -> Video -> Feed -> Follow -> Like/Comment -> Search & Trending Hashtags -> Share Page (/video/{id}) -> AI Chatbot -> Product Detail.
+    """
+    from decimal import Decimal
+    from app.models.category import Category
+    from app.models.product import Product
+
+    db = db_session()
+
+    # 1. Đăng ký & Đăng nhập tài khoản người mua qua /auth/register & /auth/login
+    reg_res = client.post(
+        "/auth/register",
+        json={
+            "email": "e2e_buyer@example.com",
+            "username": "e2e_buyer",
+            "display_name": "Người Mua E2E",
+            "password": "Password123",
+        },
+    )
+    assert reg_res.status_code == 201
+
+    login_res = client.post(
+        "/auth/login",
+        json={"identifier": "e2e_buyer", "password": "Password123"},
+    )
+    assert login_res.status_code == 200
+    buyer_token = login_res.json()["access_token"]
+    buyer_headers = {"Authorization": f"Bearer {buyer_token}"}
+
+    # 2. Tạo Seller, Shop, Category, Product và Video gắn Hashtag
+    seller, _ = make_user(db, "e2e_seller", "e2eseller@test.com", role="SELLER")
+    shop = Shop(
+        owner_id=seller.id,
+        name="E2E Tech Store",
+        description="Cửa hàng công nghệ E2E",
+        address="Hà Nội",
+        status="ACTIVE",
+    )
+    cat = Category(name="Điện thoại", description="Smartphone", status="ACTIVE")
+    db.add_all([shop, cat])
+    db.commit()
+    db.refresh(shop)
+    db.refresh(cat)
+
+    product = Product(
+        shop_id=shop.id,
+        category_id=cat.id,
+        name="iPhone 15 Pro",
+        description="Điện thoại flagship quay video sắc nét",
+        price=Decimal("24000000"),
+        stock=10,
+        sold_count=25,
+        status="ACTIVE",
+    )
+    video = Video(
+        user_id=seller.id,
+        title="Đánh giá iPhone 15 Pro quay video #iphone15 #smartphone",
+        description="Review chi tiết camera #iphone15",
+        hashtags=["iphone15", "smartphone"],
+        video_url="https://example.com/iphone15.mp4",
+        thumbnail_url="https://example.com/iphone15.jpg",
+        duration_seconds=40,
+    )
+    db.add_all([product, video])
+    db.commit()
+    db.refresh(product)
+    db.refresh(video)
+
+    # 3. Xem Feed Dành cho bạn -> Follow Seller -> Xem Feed Đang theo dõi
+    for_you = client.get("/api/videos/feed/for-you", headers=buyer_headers)
+    assert for_you.status_code == 200
+    assert any(v["id"] == video.id for v in for_you.json())
+
+    assert (
+        client.post(
+            f"/api/users/{seller.id}/follow", headers=buyer_headers
+        ).status_code
+        == 200
+    )
+    following_feed = client.get(
+        "/api/videos/feed/following", headers=buyer_headers
+    )
+    assert following_feed.status_code == 200
+    assert any(v["id"] == video.id for v in following_feed.json())
+
+    # 4. Thích, Bình luận, Xem riêng video (/api/videos/{id}) & Chia sẻ
+    assert (
+        client.post(
+            f"/api/videos/{video.id}/likes", headers=buyer_headers
+        ).status_code
+        == 200
+    )
+    assert (
+        client.post(
+            f"/api/videos/{video.id}/comments",
+            json={"content": "Video review rất chi tiết!"},
+            headers=buyer_headers,
+        ).status_code
+        == 201
+    )
+    share_res = client.post(
+        f"/api/videos/{video.id}/share", headers=buyer_headers
+    )
+    assert share_res.status_code == 200
+    assert share_res.json()["share_count"] == 1
+
+    single_vid = client.get(f"/api/videos/{video.id}", headers=buyer_headers)
+    assert single_vid.status_code == 200
+    assert single_vid.json()["is_liked"] is True
+    assert single_vid.json()["share_count"] == 1
+
+    # 5. Tìm kiếm & Bảng xếp hạng Hashtag thịnh hành 7 ngày
+    trending = client.get("/api/search/trending-hashtags?days=7")
+    assert trending.status_code == 200
+    assert any(t["tag"] == "iphone15" for t in trending.json())
+
+    # 6. Chatbot AI tư vấn sản phẩm thật trong MySQL -> Mở chi tiết sản phẩm qua API /api/products/{id}
+    ai_res = client.post(
+        "/api/ai/chat",
+        json={"message": "Tư vấn cho tôi điện thoại iPhone 15 Pro"},
+        headers=buyer_headers,
+    )
+    assert ai_res.status_code == 200
+    rec_products = ai_res.json()["recommended_products"]
+    assert len(rec_products) >= 1
+    assert rec_products[0]["id"] == product.id
+    assert f"pages/product.html?id={product.id}" in ai_res.json()["reply"]
+
+    prod_detail = client.get(f"/api/products/{product.id}")
+    assert prod_detail.status_code == 200
+    assert prod_detail.json()["name"] == "iPhone 15 Pro"
+
+
+
+
+
+

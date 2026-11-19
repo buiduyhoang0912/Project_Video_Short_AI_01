@@ -153,8 +153,14 @@ const api = {
   patch: (path, body) => http.patch(path, body).then((res) => res.data),
   delete: (path) => http.delete(path).then((res) => res.data),
   // Upload tệp (FormData): để trình duyệt tự gắn boundary cho multipart
-  upload: (path, formData) =>
+    // Upload tệp (FormData): hỗ trợ config (như onUploadProgress) và timeout 60s cho video
+  upload: (path, formData, config = {}) =>
     http
-      .post(path, formData, { headers: { "Content-Type": "multipart/form-data" }, timeout: 30000 })
+      .post(path, formData, {
+        headers: { "Content-Type": "multipart/form-data" },
+        timeout: 60000,
+        ...config,
+      })
       .then((res) => res.data),
 };
+

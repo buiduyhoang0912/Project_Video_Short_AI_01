@@ -1,0 +1,219 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Đăng Video | ClipShop AI</title>
+  <link rel="icon" href="../assets/images/logo.svg">
+  <link rel="stylesheet" href="../css/style.css">
+</head>
+<body data-root="../" data-auth="required">
+  <header id="app-header"></header>
+
+  <main class="container upload-page-wrap">
+    <!-- Tiêu đề trang -->
+    <div class="upload-header-row">
+      <div>
+        <h1 class="upload-title">Đăng tải video mới</h1>
+        <p class="muted">Tải lên video ngắn (tối đa 60 giây, MP4/WebM, dung lượng tối đa 50MB)</p>
+      </div>
+      <a href="feed.html" class="btn btn-small">&larr; Quay lại Feed</a>
+    </div>
+
+    <!-- Layout 2 cột: Cột trái xem trước video, Cột phải nhập thông tin & đăng -->
+    <div class="upload-grid-container">
+      <!-- Cột trái: Vùng tải lên & Xem trước video -->
+      <div class="upload-col-preview">
+        <section class="card upload-card-left">
+          <h3 class="upload-section-title">1. Chọn & xem trước video</h3>
+
+          <!-- Dropzone kéo thả hoặc chọn file video -->
+          <div id="video-dropzone" class="upload-dropzone">
+            <input type="file" id="video-file-input" accept="video/mp4,video/webm" style="display:none">
+            <div class="dropzone-icon">📹</div>
+            <div class="dropzone-text">
+              <strong>Kéo thả video vào đây</strong> hoặc <span class="dropzone-link">chọn tệp từ máy</span>
+            </div>
+            <div class="dropzone-hints">
+              <span>Định dạng: <strong>MP4, WebM</strong></span>
+              <span>•</span>
+              <span>Dung lượng: <strong>&le; 50 MB</strong></span>
+              <span>•</span>
+              <span>Thời lượng: <strong>&le; 60 giây</strong></span>
+            </div>
+          </div>
+
+          <!-- Khung xem trước Video (hiện sau khi chọn file hợp lệ) -->
+          <div id="video-preview-wrapper" class="video-preview-box" style="display:none;">
+            <div class="preview-player-container">
+              <video id="video-preview-player" controls playsinline preload="metadata">
+                Trình duyệt không hỗ trợ phát video này.
+              </video>
+            </div>
+            
+            <div class="video-meta-summary">
+              <div class="video-meta-row">
+                <span class="muted">Tên tệp:</span>
+                <strong id="meta-file-name" class="meta-truncate">-</strong>
+              </div>
+              <div class="video-meta-row">
+                <span class="muted">Kích thước:</span>
+                <strong id="meta-file-size">-</strong>
+              </div>
+              <div class="video-meta-row">
+                <span class="muted">Thời lượng:</span>
+                <strong id="meta-file-duration">-</strong>
+              </div>
+            </div>
+
+            <button type="button" id="btn-reselect-video" class="btn btn-small btn-change-video">
+              🔄 Chọn video khác
+            </button>
+          </div>
+
+          <!-- Báo lỗi video tức thời (sai định dạng, quá dung lượng, quá thời lượng) -->
+          <div id="video-error-box" class="upload-error-banner" style="display:none;"></div>
+        </section>
+      </div>
+
+      <!-- Cột phải: Form nhập thông tin, chọn ảnh bìa, hashtag và nút Đăng -->
+      <div class="upload-col-form">
+        <section class="card upload-card-right">
+          <h3 class="upload-section-title">2. Thông tin chi tiết video</h3>
+
+          <form id="form-upload-video">
+            <!-- Tiêu đề -->
+            <div class="form-group">
+              <div class="label-row">
+                <label for="input-video-title">Tiêu đề video <span class="text-danger">*</span></label>
+                <span id="title-char-counter" class="char-counter">0 / 255</span>
+              </div>
+              <input
+                type="text"
+                id="input-video-title"
+                name="title"
+                required
+                maxlength="255"
+                placeholder="Nhập tiêu đề thu hút người xem..."
+                autocomplete="off"
+              >
+            </div>
+
+            <!-- Mô tả -->
+            <div class="form-group">
+              <div class="label-row">
+                <label for="input-video-desc">Mô tả video</label>
+                <span id="desc-char-counter" class="char-counter">0 / 1000</span>
+              </div>
+              <textarea
+                id="input-video-desc"
+                name="description"
+                rows="3"
+                maxlength="1000"
+                placeholder="Viết vài dòng chia sẻ về nội dung video của bạn..."
+              ></textarea>
+            </div>
+
+            <!-- Hashtag -->
+            <div class="form-group">
+              <label for="input-video-hashtag">Thêm Hashtags</label>
+              <div class="hashtag-input-group">
+                <input
+                  type="text"
+                  id="input-video-hashtag"
+                  placeholder="Nhập thẻ (vd: xuhuong, review...)"
+                  autocomplete="off"
+                >
+                <button type="button" id="btn-add-hashtag" class="btn btn-small">Thêm</button>
+              </div>
+
+              <!-- Gợi ý hashtag nhanh -->
+              <div class="hashtag-suggestions">
+                <span class="muted" style="font-size:12px;">Gợi ý:</span>
+                <button type="button" class="btn-tag-pill" data-tag="xuhuong">#xuhuong</button>
+                <button type="button" class="btn-tag-pill" data-tag="fyp">#fyp</button>
+                <button type="button" class="btn-tag-pill" data-tag="viral">#viral</button>
+                <button type="button" class="btn-tag-pill" data-tag="review">#review</button>
+                <button type="button" class="btn-tag-pill" data-tag="clipshop">#clipshop</button>
+              </div>
+
+              <!-- Danh sách hashtag đã chọn -->
+              <div id="selected-hashtags-container" class="selected-hashtags-wrap"></div>
+            </div>
+
+            <!-- Chọn ảnh bìa (Thumbnail) -->
+            <div class="form-group">
+              <label>Ảnh bìa video (Thumbnail) <span class="text-danger">*</span></label>
+              <p class="muted" style="font-size:12px;margin:2px 0 8px;">
+                Tự động trích xuất khung hình từ video hoặc chọn ảnh tùy chỉnh từ máy (.jpg, .png, .webp).
+              </p>
+
+              <div class="thumbnail-selection-row">
+                <!-- Preview ảnh bìa -->
+                <div class="thumbnail-preview-frame" id="thumb-preview-box">
+                  <img id="thumb-preview-image" src="../assets/images/logo.svg" alt="Xem trước ảnh bìa">
+                  <span id="thumb-source-badge" class="thumb-badge">Ảnh mặc định</span>
+                </div>
+
+                <div class="thumbnail-action-col">
+                  <!-- Nút chụp frame hiện tại của video -->
+                  <button type="button" id="btn-capture-frame" class="btn btn-small">
+                    📸 Chụp khung hình đang phát
+                  </button>
+
+                  <!-- Nút chọn file ảnh từ máy -->
+                  <label for="thumb-file-input" class="btn btn-small btn-outline-file">
+                    🖼️ Tải ảnh từ máy...
+                  </label>
+                  <input
+                    type="file"
+                    id="thumb-file-input"
+                    accept="image/jpeg,image/png,image/webp"
+                    style="display:none;"
+                  >
+                  <span id="thumb-file-name" class="muted" style="font-size:12px;">Chưa chọn ảnh riêng</span>
+                </div>
+              </div>
+
+              <!-- Báo lỗi ảnh bìa -->
+              <div id="thumb-error-box" class="upload-error-banner" style="display:none;"></div>
+            </div>
+
+            <!-- Thanh tiến trình tải lên (Progress Bar) -->
+            <div id="upload-progress-container" class="upload-progress-box" style="display:none;">
+              <div class="progress-info-row">
+                <span id="upload-status-text" class="progress-status-label">Đang tải lên...</span>
+                <span id="upload-percent-text" class="progress-percent">0%</span>
+              </div>
+              <div class="progress-track">
+                <div id="upload-progress-fill" class="progress-fill" style="width: 0%;"></div>
+              </div>
+            </div>
+
+            <!-- Cảnh báo lỗi tổng quát từ server -->
+            <div id="upload-server-error" class="upload-error-banner" style="display:none;"></div>
+
+            <!-- Nút hành động -->
+            <div class="upload-actions-bar">
+              <a href="feed.html" class="btn">Hủy</a>
+              <button type="submit" id="btn-submit-upload" class="btn btn-primary btn-submit-upload">
+                🚀 Đăng video ngay
+              </button>
+            </div>
+          </form>
+        </section>
+      </div>
+    </div>
+  </main>
+
+  <footer id="app-footer"></footer>
+
+  <!-- Scripts -->
+  <script src="https://cdn.jsdelivr.net/npm/axios@1.7.9/dist/axios.min.js"></script>
+  <script src="../js/config.js"></script>
+  <script src="../js/api.js"></script>
+  <script src="../js/utils.js"></script>
+  <script src="../js/layout.js"></script>
+  <script src="../js/pages/upload.js"></script>
+</body>
+</html>

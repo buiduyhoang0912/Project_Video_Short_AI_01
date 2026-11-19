@@ -2056,3 +2056,344 @@ body.auth-checking main { visibility: hidden; }
   color: rgba(255, 255, 255, 0.5);
   font-size: 13px;
 }
+
+/* ==========================================================
+   T3D2235: Giao diện trang Đăng Video (Upload Video UI)
+   ========================================================== */
+.upload-page-wrap {
+  padding-top: 24px;
+  padding-bottom: 48px;
+}
+
+.upload-header-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 16px;
+  margin-bottom: 24px;
+}
+
+.upload-title {
+  margin: 0 0 6px;
+  font-size: 26px;
+  font-weight: 700;
+}
+
+.upload-grid-container {
+  display: grid;
+  grid-template-columns: 380px 1fr;
+  gap: 24px;
+  align-items: start;
+}
+
+@media (max-width: 880px) {
+  .upload-grid-container {
+    grid-template-columns: 1fr;
+  }
+}
+
+.upload-card-left,
+.upload-card-right {
+  margin-bottom: 0;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.04);
+}
+
+.upload-section-title {
+  margin: 0 0 16px;
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--color-text);
+  border-bottom: 1px solid var(--color-border);
+  padding-bottom: 8px;
+}
+
+/* Vùng Dropzone kéo thả video */
+.upload-dropzone {
+  border: 2px dashed var(--color-border);
+  background: #f9fafb;
+  border-radius: 12px;
+  padding: 40px 16px;
+  text-align: center;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.upload-dropzone:hover,
+.upload-dropzone.drag-over {
+  border-color: var(--color-primary);
+  background: #eff6ff;
+}
+
+.dropzone-icon {
+  font-size: 48px;
+  margin-bottom: 12px;
+}
+
+.dropzone-text {
+  font-size: 15px;
+  color: var(--color-text);
+  margin-bottom: 10px;
+}
+
+.dropzone-link {
+  color: var(--color-primary);
+  text-decoration: underline;
+  font-weight: 600;
+}
+
+.dropzone-hints {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  font-size: 12px;
+  color: var(--color-muted);
+}
+
+/* Khung xem trước Video */
+.video-preview-box {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.preview-player-container {
+  width: 100%;
+  max-height: 480px;
+  aspect-ratio: 9 / 16;
+  background: #000;
+  border-radius: 10px;
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.preview-player-container video {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+
+.video-meta-summary {
+  background: #f3f4f6;
+  border-radius: 8px;
+  padding: 10px 14px;
+  font-size: 13px;
+}
+
+.video-meta-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 4px;
+}
+
+.video-meta-row:last-child {
+  margin-bottom: 0;
+}
+
+.meta-truncate {
+  max-width: 220px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.btn-change-video {
+  width: 100%;
+  text-align: center;
+}
+
+/* Báo lỗi trực quan */
+.upload-error-banner {
+  background: #fee2e2;
+  border: 1px solid #f87171;
+  color: #b91c1c;
+  padding: 10px 14px;
+  border-radius: 8px;
+  font-size: 13px;
+  font-weight: 500;
+  margin-top: 12px;
+  line-height: 1.4;
+}
+
+/* Form controls */
+.form-group {
+  margin-bottom: 18px;
+}
+
+.label-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 4px;
+}
+
+.label-row label {
+  margin: 0;
+}
+
+.char-counter {
+  font-size: 12px;
+  color: var(--color-muted);
+}
+
+.text-danger {
+  color: var(--color-danger);
+}
+
+/* Hashtags */
+.hashtag-input-group {
+  display: flex;
+  gap: 8px;
+}
+
+.hashtag-suggestions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+  margin-top: 8px;
+}
+
+.btn-tag-pill {
+  background: #eef2ff;
+  color: var(--color-primary);
+  border: 1px solid #c7d2fe;
+  border-radius: 16px;
+  padding: 2px 10px;
+  font-size: 12px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.btn-tag-pill:hover {
+  background: #dbeafe;
+}
+
+.selected-hashtags-wrap {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+  margin-top: 10px;
+}
+
+.selected-tag-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: var(--color-primary);
+  color: #fff;
+  border-radius: 14px;
+  padding: 3px 10px;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.btn-remove-tag {
+  background: none;
+  border: none;
+  color: #fff;
+  cursor: pointer;
+  font-size: 14px;
+  line-height: 1;
+  padding: 0;
+}
+
+/* Chọn ảnh bìa (Thumbnail) */
+.thumbnail-selection-row {
+  display: flex;
+  gap: 16px;
+  align-items: center;
+  margin-top: 8px;
+}
+
+.thumbnail-preview-frame {
+  width: 90px;
+  height: 120px;
+  border-radius: 8px;
+  overflow: hidden;
+  background: #000;
+  border: 1px solid var(--color-border);
+  position: relative;
+  flex-shrink: 0;
+}
+
+.thumbnail-preview-frame img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.thumb-badge {
+  position: absolute;
+  bottom: 4px;
+  left: 4px;
+  right: 4px;
+  background: rgba(0, 0, 0, 0.7);
+  color: #fff;
+  font-size: 10px;
+  text-align: center;
+  padding: 2px;
+  border-radius: 4px;
+}
+
+.thumbnail-action-col {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  flex: 1;
+}
+
+.btn-outline-file {
+  display: inline-block;
+  cursor: pointer;
+  text-align: center;
+}
+
+/* Thanh tiến trình upload */
+.upload-progress-box {
+  background: #f0fdf4;
+  border: 1px solid #86efac;
+  border-radius: 8px;
+  padding: 12px 14px;
+  margin-top: 16px;
+}
+
+.progress-info-row {
+  display: flex;
+  justify-content: space-between;
+  font-size: 13px;
+  font-weight: 600;
+  color: #15803d;
+  margin-bottom: 6px;
+}
+
+.progress-track {
+  height: 8px;
+  background: #dcfce7;
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+.progress-fill {
+  height: 100%;
+  background: #16a34a;
+  transition: width 0.2s ease;
+}
+
+/* Nút Submit */
+.upload-actions-bar {
+  display: flex;
+  justify-content: flex-end;
+  gap: 12px;
+  margin-top: 24px;
+}
+
+.btn-submit-upload {
+  min-width: 160px;
+  font-weight: 600;
+  font-size: 15px;
+}

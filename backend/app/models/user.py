@@ -5,6 +5,7 @@ from datetime import datetime, timezone
 from sqlalchemy import DateTime, Enum, String
 from sqlalchemy.dialects.mysql import BIGINT
 from sqlalchemy.orm import Mapped, mapped_column
+from sqlalchemy.orm import relationship
 
 from app.db.session import Base
 
@@ -85,3 +86,7 @@ class User(Base):
         default=utc_now,
         onupdate=utc_now,
     )
+
+    addresses = relationship("Address", back_populates="user")
+    cart = relationship("Cart", back_populates="user", uselist=False)
+    orders = relationship("Order", back_populates="buyer")

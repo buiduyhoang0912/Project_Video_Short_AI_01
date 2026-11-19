@@ -64,3 +64,42 @@ class VideoProductRead(VideoProductCreate):
 
 class VideoDescriptionUpdate(BaseModel):
     description: VideoDescription | None
+
+# --- Schemas phục vụ Feed, User Videos và Tăng View ---
+
+class VideoItemOut(BaseModel):
+    """Thông tin một video trả về trên Feed hoặc trang cá nhân."""
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    user_id: int
+    title: str
+    description: str | None = None
+    hashtags: list[str] | None = None
+    video_url: str
+    thumbnail_url: str | None = None
+    duration_seconds: int
+    view_count: int = 0
+    status: Literal["VISIBLE", "HIDDEN"] = "VISIBLE"
+    created_at: datetime
+
+
+class VideoFeedResponse(BaseModel):
+    """Phản hồi phân trang Feed theo kiểu cuộn (cursor)."""
+    items: list[VideoItemOut]
+    next_cursor: str | None = None
+    has_more: bool = False
+
+
+class UserVideoListResponse(BaseModel):
+    """Phản hồi danh sách video của một người dùng."""
+    items: list[VideoItemOut]
+    next_cursor: str | None = None
+    has_more: bool = False
+
+
+class VideoViewResponse(BaseModel):
+    """Phản hồi sau khi xem video quá 3 giây."""
+    id: int
+    view_count: int
+    message: str = "Ghi nhận lượt xem thành công"

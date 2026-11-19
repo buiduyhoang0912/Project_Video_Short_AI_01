@@ -1,10 +1,9 @@
-
 from datetime import datetime, timezone
 
 from sqlalchemy import DateTime, ForeignKey, String, Text
 from sqlalchemy.dialects.mysql import BIGINT
-from sqlalchemy.orm import Mapped, mapped_column
-from sqlalchemy.orm import relationship
+from sqlalchemy.orm import Mapped, mapped_column, relationship
+
 from app.db.session import Base
 
 
@@ -64,4 +63,11 @@ class Shop(Base):
         nullable=False,
         default=utc_now,
     )
-    orders = relationship("Order", back_populates="shop")
+
+    products: Mapped[list["Product"]] = relationship("Product", back_populates="shop")  # noqa: F821
+
+    @property
+    def logo_url(self) -> str | None:
+        return self.avatar_key
+
+    orders = relationship("Order", back_populates="shop")  # noqa: F821

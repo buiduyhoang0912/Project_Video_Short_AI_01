@@ -29,6 +29,10 @@ class Video(Base):
         ENUM("VISIBLE", "HIDDEN"), nullable=False, server_default="VISIBLE"
     )
     created_at = Column(DateTime, nullable=False, server_default=func.now())
+    # Kiểm duyệt (Admin ẩn video vi phạm): lý do, người ẩn, thời điểm. NULL = chưa bị Admin ẩn.
+    moderation_reason = Column(String(500), nullable=True)
+    moderated_by = Column(BIGINT(unsigned=True), ForeignKey("users.id"), nullable=True)
+    moderated_at = Column(DateTime, nullable=True)
 
 class VideoProduct(Base):
     __tablename__ = "video_products"

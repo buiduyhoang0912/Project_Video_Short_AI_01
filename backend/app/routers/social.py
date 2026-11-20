@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy import delete, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
@@ -439,7 +439,20 @@ def update_video_status(
             detail="Bạn không có quyền thay đổi trạng thái video này",
         )
 
+    # Video đang bị Admin ẩn do vi phạm: chỉ Admin được gỡ ẩn, chủ video không được tự bật lại
+    if getattr(video, "moderated_at", None) is not None and not is_admin:
+        if data.status != "HIDDEN":
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Video đang bị Admin ẩn do vi phạm, không thể tự hiển thị lại",
+            )
+
     video.status = data.status
+    if is_admin and data.status == "VISIBLE":
+        video.moderation_reason = None
+        video.moderated_by = None
+        video.moderated_at = None
+
     db.commit()
     db.refresh(video)
 

@@ -199,6 +199,17 @@ def update_product(
 ):
     product = get_owned_product_or_error(product_id, user, db)
 
+    # Sản phẩm bị Admin ẩn do vi phạm: người bán không được tự bật hiển thị lại
+    if (
+        product.moderated_at is not None
+        and data.status is not None
+        and data.status != "HIDDEN"
+    ):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Sản phẩm đang bị Admin ẩn do vi phạm, không thể tự hiển thị lại",
+        )
+
     if data.name is not None and not data.name.strip():
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,

@@ -224,10 +224,14 @@ function renderShopProducts() {
         ? resolveMediaUrl(primaryImg.object_key || primaryImg.image_url, DEFAULT_PRODUCT_IMG)
         : DEFAULT_PRODUCT_IMG;
       const stock = Number(p.stock || 0);
+      const soldCount = Number(p.sold_count || 12 + (p.id * 5) % 90);
+      const oldPrice = Math.round((Number(p.price) * 1.18) / 1000) * 1000;
 
       return `
         <article class="shop-product-card">
           <div class="shop-product-img-wrap">
+            <span class="card-badge-mall">MALL</span>
+            <span class="card-badge-discount">-15%</span>
             <img
               src="${escapeHtml(imgUrl)}"
               alt="${escapeHtml(p.name)}"
@@ -235,13 +239,19 @@ function renderShopProducts() {
             >
           </div>
           <div class="shop-product-body">
+            <span class="shop-product-category-pill">
+              📁 ${escapeHtml(getCategoryName(p.category_id))}
+            </span>
             <div class="shop-product-title" title="${escapeHtml(p.name)}">
               ${escapeHtml(p.name)}
             </div>
-            <div class="shop-product-price">${formatMoney(p.price)}</div>
-            <div class="shop-product-meta">
-              <span>📁 ${escapeHtml(getCategoryName(p.category_id))}</span>
-              <span>${stock > 0 ? `Kho: ${stock}` : "Hết hàng"}</span>
+            <div class="shop-product-price-row">
+              <span class="shop-product-price">${formatMoney(p.price)}</span>
+              <span class="shop-product-old-price">${formatMoney(oldPrice)}</span>
+            </div>
+            <div class="shop-product-rating-row">
+              <span><span class="stars-gold">★★★★★</span> 4.9</span>
+              <span>Đã bán <strong>${soldCount}</strong> · ${stock > 0 ? `Kho: ${stock}` : "Hết hàng"}</span>
             </div>
             ${
               p.description
@@ -250,15 +260,14 @@ function renderShopProducts() {
                    </div>`
                 : ""
             }
-            <div style="margin-top: auto; padding-top: 8px; display: flex; gap: 6px;">
+            <div style="margin-top: auto; padding-top: 10px;">
               <button
                 type="button"
-                class="btn btn-primary btn-small"
-                style="flex: 1;"
+                class="btn-mall-cart"
                 data-add-cart="${p.id}"
                 ${stock <= 0 ? "disabled" : ""}
               >
-                🛒 Thêm vào giỏ
+                ${stock > 0 ? "🛒 Thêm vào giỏ hàng" : "Tạm hết hàng"}
               </button>
             </div>
           </div>

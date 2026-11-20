@@ -34,7 +34,6 @@ const viewPublicShopBtn = document.getElementById("btn-view-my-public-shop");
 // Danh sách trạng thái đơn
 const applicationsListContainer = document.getElementById("applications-list-container");
 const refreshAppsBtn = document.getElementById("btn-refresh-applications");
-const quickApproveDemoBtn = document.getElementById("btn-quick-approve-demo");
 
 // State
 let currentUser = null;
@@ -315,23 +314,8 @@ shopProfileForm.addEventListener("submit", async (event) => {
   }
 });
 
-// ---------- Nút làm mới & Duyệt nhanh Demo ----------
+// ---------- Nút làm mới ----------
 refreshAppsBtn.addEventListener("click", loadMyApplicationsAndShop);
 
-quickApproveDemoBtn.addEventListener("click", async () => {
-  quickApproveDemoBtn.disabled = true;
-  try {
-    await api.post("/seller-applications/quick-setup");
-    currentUser = await api.get("/auth/me");
-    session.setUser(currentUser);
-    if (typeof renderLayout === "function") renderLayout();
-    showToast("Đã duyệt đơn đăng ký & khởi tạo cửa hàng thành công!");
-    await loadMyApplicationsAndShop();
-  } catch (error) {
-    showToast(error.message, "error");
-  } finally {
-    quickApproveDemoBtn.disabled = false;
-  }
-});
 
 initPage();

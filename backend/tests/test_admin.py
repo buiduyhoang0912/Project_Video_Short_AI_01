@@ -217,3 +217,11 @@ def test_admin_cannot_lock_self_and_missing_user(client, Session):
     admin = make_user(Session, "ADMIN")
     assert client.patch(f"/api/admin/users/{admin}/lock", headers=auth(admin)).status_code == 400
     assert client.patch("/api/admin/users/9999/lock", headers=auth(admin)).status_code == 404
+
+
+def test_quick_setup_self_approve_endpoint_removed(client, Session):
+    """Người dùng thường không còn cách tự nhận quyền SELLER bỏ qua Admin."""
+    user = make_user(Session, "USER")
+    r = client.post("/api/seller-applications/quick-setup", headers=auth(user))
+    assert r.status_code in (404, 405)
+    assert role_of(Session, user) == "USER"

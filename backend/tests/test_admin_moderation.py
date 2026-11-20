@@ -165,6 +165,12 @@ def test_video_visibility_endpoint(client, Session):
     h = auth(admin)
     url = f"/api/admin/videos/{vid}/visibility"
 
+    # Body rỗng {} -> 422
+    assert client.patch(url, json={}, headers=h).status_code == 422
+
+    # Mâu thuẫn status=VISIBLE nhưng is_visible=false -> 422
+    assert client.patch(url, json={"status": "VISIBLE", "is_visible": False}, headers=h).status_code == 422
+
     # Ẩn không có lý do -> 422
     r = client.patch(url, json={"status": "HIDDEN"}, headers=h)
     assert r.status_code == 422
@@ -176,6 +182,51 @@ def test_video_visibility_endpoint(client, Session):
     # Hiện lại qua visibility
     r = client.patch(url, json={"status": "VISIBLE"}, headers=h)
     assert r.status_code == 200 and r.json()["status"] == "VISIBLE"
+
+
+def test_video_owner_cannot_unhide_moderated_video(client, Session):
+    """Chủ video KHÔNG thể tự chuyển video sang VISIBLE khi đang bị Admin ẩn do vi phạm."""
+    admin = make_user(Session, "ADMIN")
+    owner = make_user(Session)
+    vid = make_video(Session, owner)
+
+    # 1. Admin ẩn video do vi phạm
+    r_hide = client.patch(
+        f"/api/admin/videos/{vid}/visibility",
+        json={"status": "HIDDEN", "reason": "Nội dung phản cảm"},
+        headers=auth(admin),
+    )
+    assert r_hide.status_code == 200
+
+    # 2. Chủ video cố gắng gọi PATCH /api/videos/{vid}/status để tự bật lại VISIBLE -> Bị chặn 403
+    r_owner = client.patch(
+        f"/api/videos/{vid}/status",
+        json={"status": "VISIBLE"},
+        headers=auth(owner),
+    )
+    assert r_owner.status_code == 403
+    assert "Admin ẩn" in r_owner.json()["detail"]
+
+    # Trạng thái trong DB vẫn phải là HIDDEN
+    with Session() as db:
+        v = db.get(Video, vid)
+        assert v.status == "HIDDEN"
+        assert v.moderated_at is not None
+
+    # 3. Chỉ Admin mới có quyền gỡ ẩn video này
+    r_admin_unhide = client.patch(
+        f"/api/videos/{vid}/status",
+        json={"status": "VISIBLE"},
+        headers=auth(admin),
+    )
+    assert r_admin_unhide.status_code == 200
+    assert r_admin_unhide.json()["status"] == "VISIBLE"
+
+    # Sau khi Admin gỡ ẩn, cờ moderated_at được reset và chủ video có thể quản lý lại bình thường
+    with Session() as db:
+        v = db.get(Video, vid)
+        assert v.status == "VISIBLE"
+        assert v.moderated_at is None
 
 
 def test_search_videos(client, Session):
@@ -224,6 +275,12 @@ def test_product_visibility_endpoint(client, Session):
     pid, _ = make_shop_product(Session, seller)
     h = auth(admin)
     url = f"/api/admin/products/{pid}/visibility"
+
+    # Body rỗng {} -> 422
+    assert client.patch(url, json={}, headers=h).status_code == 422
+
+    # Mâu thuẫn status=ACTIVE nhưng is_visible=false -> 422
+    assert client.patch(url, json={"status": "ACTIVE", "is_visible": False}, headers=h).status_code == 422
 
     # Ẩn không có lý do -> 422
     assert client.patch(url, json={"status": "HIDDEN"}, headers=h).status_code == 422

@@ -42,7 +42,7 @@ function renderVideoRow(v) {
   const action = v.status === "HIDDEN"
     ? `<button class="btn btn-primary btn-small" data-action="show" data-id="${v.id}">Hiện lại</button>`
     : `<button class="btn btn-danger btn-small" data-action="hide" data-id="${v.id}"
-               data-name="${escapeHtml(v.title)}">Ẩn vi phạm</button>`;
+               data-name="${escapeAttr(v.title)}">Ẩn vi phạm</button>`;
   return `<tr>
     <td><strong>${escapeHtml(v.title)}</strong><div class="muted">#${v.id} · Đăng lúc ${escapeHtml(formatDateTime(v.created_at))}</div></td>
     <td>${escapeHtml(v.owner.display_name)}<div class="muted">@${escapeHtml(v.owner.username)}</div></td>
@@ -74,7 +74,7 @@ function renderProductRow(p) {
   const action = p.status === "HIDDEN"
     ? `<button class="btn btn-primary btn-small" data-action="show" data-id="${p.id}">Hiện lại</button>`
     : `<button class="btn btn-danger btn-small" data-action="hide" data-id="${p.id}"
-               data-name="${escapeHtml(p.name)}">Ẩn vi phạm</button>`;
+               data-name="${escapeAttr(p.name)}">Ẩn vi phạm</button>`;
 
   const thumbHtml = p.thumbnail_url
     ? `<img src="${escapeHtml(p.thumbnail_url)}" alt="${escapeHtml(p.name)}" class="table-thumb" onerror="this.src='../assets/images/logo.svg'">`

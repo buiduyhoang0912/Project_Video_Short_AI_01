@@ -54,7 +54,7 @@ function renderApplication(a) {
     ? `<div class="admin-actions">
          <button class="btn btn-primary btn-small" data-action="approve" data-id="${a.id}">Duyệt</button>
          <button class="btn btn-danger btn-small" data-action="reject" data-id="${a.id}"
-                 data-name="${escapeHtml(a.applicant.username)}">Từ chối</button>
+                 data-name="${escapeAttr(a.applicant.username)}">Từ chối</button>
        </div>`
     : `<span class="muted">Đã xử lý</span>`;
   const reason = a.status === "REJECTED" && a.rejection_reason
@@ -146,10 +146,10 @@ function renderUser(u) {
     action = `<span class="muted">Tài khoản của bạn</span>`;
   } else if (u.status === "ACTIVE") {
     action = `<button class="btn btn-danger btn-small" data-action="lock" data-id="${u.id}"
-                      data-name="${escapeHtml(u.username)}">Khoá</button>`;
+                      data-name="${escapeAttr(u.username)}">Khoá</button>`;
   } else {
     action = `<button class="btn btn-primary btn-small" data-action="unlock" data-id="${u.id}"
-                      data-name="${escapeHtml(u.username)}">Mở khoá</button>`;
+                      data-name="${escapeAttr(u.username)}">Mở khoá</button>`;
   }
   return `<tr>
     <td>${escapeHtml(u.username)}</td>

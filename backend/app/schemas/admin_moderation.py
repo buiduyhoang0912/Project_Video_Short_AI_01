@@ -4,7 +4,7 @@ from datetime import datetime
 from decimal import Decimal
 from typing import Literal
 
-from pydantic import BaseModel, ConfigDict, Field, field_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 
 class HideRequest(BaseModel):
@@ -23,7 +23,7 @@ class HideRequest(BaseModel):
 class VideoVisibilityRequest(BaseModel):
     """Body cho endpoint /api/admin/videos/{id}/visibility."""
 
-    model_config = ConfigDict(extra="ignore")
+    model_config = ConfigDict(extra="forbid")
 
     status: Literal["VISIBLE", "HIDDEN"] | None = None
     is_visible: bool | None = None
@@ -34,11 +34,29 @@ class VideoVisibilityRequest(BaseModel):
     def trim_reason(cls, value):
         return value.strip() if isinstance(value, str) else value
 
+    @model_validator(mode="after")
+    def validate_visibility(self):
+        # Bắt buộc phải có ít nhất một lựa chọn trạng thái
+        if self.status is None and self.is_visible is None:
+            raise ValueError("Phải chỉ định trạng thái hiển thị (status hoặc is_visible)")
+
+        # Kiểm tra mâu thuẫn nếu truyền cả 2
+        if self.status is not None and self.is_visible is not None:
+            if (self.status == "VISIBLE" and not self.is_visible) or (
+                self.status == "HIDDEN" and self.is_visible
+            ):
+                raise ValueError("status và is_visible mâu thuẫn nhau")
+
+        is_hide = (self.status == "HIDDEN") or (self.is_visible is False)
+        if is_hide and not self.reason:
+            raise ValueError("Lý do ẩn video là bắt buộc")
+        return self
+
 
 class ProductVisibilityRequest(BaseModel):
     """Body cho endpoint /api/admin/products/{id}/visibility."""
 
-    model_config = ConfigDict(extra="ignore")
+    model_config = ConfigDict(extra="forbid")
 
     status: Literal["ACTIVE", "HIDDEN"] | None = None
     is_visible: bool | None = None
@@ -48,6 +66,24 @@ class ProductVisibilityRequest(BaseModel):
     @classmethod
     def trim_reason(cls, value):
         return value.strip() if isinstance(value, str) else value
+
+    @model_validator(mode="after")
+    def validate_visibility(self):
+        # Bắt buộc phải có ít nhất một lựa chọn trạng thái
+        if self.status is None and self.is_visible is None:
+            raise ValueError("Phải chỉ định trạng thái hiển thị (status hoặc is_visible)")
+
+        # Kiểm tra mâu thuẫn nếu truyền cả 2
+        if self.status is not None and self.is_visible is not None:
+            if (self.status == "ACTIVE" and not self.is_visible) or (
+                self.status == "HIDDEN" and self.is_visible
+            ):
+                raise ValueError("status và is_visible mâu thuẫn nhau")
+
+        is_hide = (self.status == "HIDDEN") or (self.is_visible is False)
+        if is_hide and not self.reason:
+            raise ValueError("Lý do ẩn sản phẩm là bắt buộc")
+        return self
 
 
 class OwnerInfo(BaseModel):

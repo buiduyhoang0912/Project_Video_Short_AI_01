@@ -1,4 +1,5 @@
 from app.routers import (
+    admin,
     auth,
     cart,
     categories,
@@ -14,6 +15,7 @@ from app.routers import (
 )
 
 __all__ = [
+    "admin",
     "auth",
     "cart",
     "categories",
@@ -27,3 +29,4 @@ __all__ = [
     "social",
     "videos",
 ]
+

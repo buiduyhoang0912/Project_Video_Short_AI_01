@@ -1,0 +1,31 @@
+/* Trang quản trị (T3D2003) */
+.admin-tabs { display: flex; gap: 8px; margin-top: 12px; border-bottom: 1px solid var(--color-border, #e5e5e5); }
+.admin-tab {
+  padding: 8px 16px; border: 0; background: none; cursor: pointer; font-size: 15px;
+  border-bottom: 3px solid transparent; color: var(--color-muted);
+}
+.admin-tab.active { color: var(--color-primary); border-bottom-color: var(--color-primary); font-weight: 600; }
+
+.admin-toolbar { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+.admin-toolbar input[type="search"] { flex: 1; min-width: 220px; padding: 8px 10px; }
+
+.admin-table { width: 100%; border-collapse: collapse; }
+.admin-table th, .admin-table td { padding: 8px 10px; text-align: left; vertical-align: top; border-bottom: 1px solid #eee; }
+.admin-table .app-desc { max-width: 380px; white-space: pre-wrap; word-break: break-word; }
+.admin-actions { display: flex; gap: 6px; flex-wrap: wrap; }
+
+.badge { display: inline-block; padding: 2px 10px; border-radius: 999px; font-size: 12px; font-weight: 600; white-space: nowrap; }
+.badge-pending { background: #fff4d6; color: #8a5a00; }
+.badge-approved, .badge-active { background: #dcf5e3; color: #1c6b36; }
+.badge-rejected, .badge-locked { background: #fde0e0; color: #a12020; }
+.badge-role { background: #e8eefc; color: #2a4a9a; }
+
+.admin-modal {
+  position: fixed; inset: 0; background: rgba(0, 0, 0, .45); display: flex;
+  align-items: center; justify-content: center; z-index: 1000;
+}
+.admin-modal[hidden] { display: none; }
+.admin-modal-box { background: #fff; border-radius: 10px; padding: 20px; width: min(480px, 92vw); }
+.admin-modal-box textarea { width: 100%; box-sizing: border-box; margin-top: 6px; padding: 8px; }
+.admin-modal-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 12px; }
+.admin-modal .required, .admin-modal .field-error { color: var(--color-danger, #d33); }

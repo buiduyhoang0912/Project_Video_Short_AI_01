@@ -6,12 +6,85 @@
   <title>Admin | ClipShop AI</title>
   <link rel="icon" href="../assets/images/logo.svg">
   <link rel="stylesheet" href="../css/style.css">
+  <link rel="stylesheet" href="../css/admin.css">
 </head>
 <body data-root="../" data-roles="ADMIN">
   <header id="app-header"></header>
 
   <main class="container">
-    <section class="card"><h1>Admin</h1><p class="muted">Khu vực quản trị: quản lý người dùng, duyệt người bán (chỉ ADMIN).</p></section>
+    <section class="card">
+      <h1>Quản trị</h1>
+      <p class="muted">Khu vực quản trị: duyệt người bán, quản lý tài khoản (chỉ ADMIN).</p>
+      <div class="admin-tabs" role="tablist">
+        <button type="button" class="admin-tab active" data-tab="applications">Đơn đăng ký bán hàng</button>
+        <button type="button" class="admin-tab" data-tab="users">Tài khoản</button>
+      </div>
+    </section>
+
+    <!-- Mục 1: Đơn đăng ký bán hàng -->
+    <section class="card" id="tab-applications">
+      <div class="admin-toolbar">
+        <label for="app-status-filter">Trạng thái:</label>
+        <select id="app-status-filter">
+          <option value="">Tất cả</option>
+          <option value="PENDING" selected>Chờ duyệt</option>
+          <option value="APPROVED">Đã duyệt</option>
+          <option value="REJECTED">Từ chối</option>
+        </select>
+      </div>
+      <div class="table-wrap">
+        <table class="admin-table">
+          <thead>
+            <tr>
+              <th>Người đăng ký</th>
+              <th>Nội dung đơn</th>
+              <th>Trạng thái</th>
+              <th>Thao tác</th>
+            </tr>
+          </thead>
+          <tbody id="app-body"><tr><td colspan="4" class="muted">Đang tải...</td></tr></tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- Mục 2: Tài khoản -->
+    <section class="card" id="tab-users" hidden>
+      <form class="admin-toolbar" id="user-search-form">
+        <input type="search" id="user-search" placeholder="Tìm theo tên đăng nhập hoặc email..." maxlength="100">
+        <button type="submit" class="btn btn-primary">Tìm kiếm</button>
+        <button type="button" class="btn" id="user-search-clear">Xoá lọc</button>
+      </form>
+      <div class="table-wrap">
+        <table class="admin-table">
+          <thead>
+            <tr>
+              <th>Tên đăng nhập</th>
+              <th>Họ tên</th>
+              <th>Email</th>
+              <th>Vai trò</th>
+              <th>Trạng thái</th>
+              <th>Thao tác</th>
+            </tr>
+          </thead>
+          <tbody id="user-body"><tr><td colspan="6" class="muted">Đang tải...</td></tr></tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- Hộp thoại nhập lý do từ chối -->
+    <div class="admin-modal" id="reject-modal" hidden>
+      <form class="admin-modal-box" id="reject-form">
+        <h2>Từ chối đơn đăng ký</h2>
+        <p class="muted" id="reject-target"></p>
+        <label for="reject-reason">Lý do từ chối <span class="required">*</span></label>
+        <textarea id="reject-reason" rows="4" maxlength="500" placeholder="Nhập lý do (bắt buộc)"></textarea>
+        <p class="field-error" id="reject-error" hidden></p>
+        <div class="admin-modal-actions">
+          <button type="button" class="btn" id="reject-cancel">Huỷ</button>
+          <button type="submit" class="btn btn-danger" id="reject-submit">Xác nhận từ chối</button>
+        </div>
+      </form>
+    </div>
   </main>
 
   <footer id="app-footer"></footer>
@@ -21,5 +94,6 @@
   <script src="../js/api.js"></script>
   <script src="../js/utils.js"></script>
   <script src="../js/layout.js"></script>
+  <script src="../js/pages/admin.js"></script>
 </body>
 </html>

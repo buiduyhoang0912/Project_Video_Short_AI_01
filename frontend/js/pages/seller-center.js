@@ -11,7 +11,6 @@ const SERVER_BASE_URL = CONFIG.API_BASE_URL.replace(/\/api\/?$/, "");
 // DOM Elements - Auth & Shop Banner
 const authSection = document.getElementById("auth-section");
 const quickLoginForm = document.getElementById("quick-login-form");
-const demoSellerBtn = document.getElementById("btn-demo-seller");
 const logoutSellerBtn = document.getElementById("btn-logout-seller");
 const currentUserBadge = document.getElementById("current-user-badge");
 const currentShopBadge = document.getElementById("current-shop-badge");
@@ -110,13 +109,10 @@ async function checkSellerSession() {
     try {
       currentShop = await api.get("/shops/me");
     } catch (shopErr) {
-      // Nếu tài khoản chưa có shop, tự động gọi quick-setup để tạo shop cho Seller
-      await api.post("/seller-applications/quick-setup");
-      currentShop = await api.get("/shops/me");
-      currentUser = await callAuthApi("/auth/me", "GET");
-      if (typeof session !== "undefined") session.setUser(currentUser);
-      if (typeof renderLayout === "function") renderLayout();
-      currentUserBadge.textContent = `👤 ${currentUser.display_name} (${currentUser.role})`;
+      // Chưa có cửa hàng: không tự cấp quyền/tạo shop; hướng dẫn người dùng.
+      showToast(shopErr.response?.data?.detail || "Tài khoản chưa có cửa hàng. Hãy đăng ký bán hàng và chờ Admin duyệt.", "error");
+      showAuthPanel();
+      return false;
     }
 
     currentShopBadge.textContent = `🏪 ${currentShop.name}`;
@@ -162,41 +158,6 @@ quickLoginForm.addEventListener("submit", async (event) => {
   } catch (error) {
     const msg = error.response?.data?.detail || "Sai tài khoản hoặc mật khẩu";
     showToast(msg, "error");
-  }
-});
-
-demoSellerBtn.addEventListener("click", async () => {
-  demoSellerBtn.disabled = true;
-  const demoUsername = "seller_van_demo";
-  const demoPassword = "password123";
-
-  try {
-    try {
-      await callAuthApi("/auth/register", "POST", {
-        email: "seller_van_demo@clipshop.ai",
-        username: demoUsername,
-        password: demoPassword,
-        display_name: "Shop Hoàng Văn Official",
-      });
-    } catch (_) {
-      // Tài khoản demo đã tồn tại -> bỏ qua để đăng nhập luôn
-    }
-
-    const loginRes = await callAuthApi("/auth/login", "POST", {
-      identifier: demoUsername,
-      password: demoPassword,
-    });
-    localStorage.setItem("token", loginRes.access_token);
-    if (typeof session !== "undefined") session.save(loginRes.access_token, null);
-
-    await api.post("/seller-applications/quick-setup");
-    showToast("Đã khởi tạo tài khoản Seller mẫu & Cửa hàng!");
-    await initSellerCenter();
-    if (typeof renderLayout === "function") renderLayout();
-  } catch (error) {
-    showToast(error.message || "Không thể khởi tạo tài khoản mẫu", "error");
-  } finally {
-    demoSellerBtn.disabled = false;
   }
 });
 

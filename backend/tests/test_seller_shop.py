@@ -264,7 +264,12 @@ def test_shop_logo_upload_and_public_shop_videos(client, db_session):
     user_id, user_headers = register_and_login(
         client, "seller_video", "sv@example.com"
     )
-    client.post("/api/seller-applications/quick-setup", headers=user_headers)
+    # Cấp quyền SELLER + tạo shop trực tiếp trong DB (không còn API tự duyệt)
+    with db_session() as db:
+        owner = db.get(User, user_id)
+        owner.role = "SELLER"
+        db.add(Shop(owner_id=user_id, name="Shop Video"))
+        db.commit()
 
     r_me_shop = client.get("/api/shops/me", headers=user_headers)
     assert r_me_shop.status_code == 200

@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Seller Center - Quản lý sản phẩm | ClipShopAI</title>
+  <title>Seller Center - Quản lý sản phẩm, Đơn hàng &amp; Doanh thu | ClipShop AI</title>
   <link rel="icon" href="../assets/images/logo.svg">
   <link rel="stylesheet" href="../css/style.css">
   <link rel="stylesheet" href="../css/seller-center.css">
@@ -15,8 +15,8 @@
     <!-- Topbar Seller Center -->
     <section class="seller-topbar">
       <div>
-        <h1>Seller Center · Quản lý sản phẩm &amp; Tồn kho</h1>
-        <p id="shop-subtitle">Quản lý danh mục hàng hoá, tải lên nhiều ảnh sản phẩm và cập nhật tồn kho nhanh chóng.</p>
+        <h1>Seller Center · Quản lý Cửa hàng, Đơn hàng &amp; Doanh thu</h1>
+        <p id="shop-subtitle">Quản lý danh mục sản phẩm, tồn kho, xử lý đơn hàng của shop và thống kê doanh thu theo ngày.</p>
       </div>
       <div class="seller-shop-badge">
         <a href="seller-register.html" class="btn btn-small" style="text-decoration: none;">📝 Đơn đăng ký &amp; Hồ sơ Shop</a>
@@ -27,12 +27,11 @@
       </div>
     </section>
 
-    <!-- Khung Đăng nhập / Khởi tạo nhanh tài khoản Seller khi chưa đăng nhập -->
+    <!-- Khung Đăng nhập khi chưa đăng nhập -->
     <section id="auth-section" class="card auth-panel" hidden>
       <h2>Đăng nhập tài khoản Người bán (Seller)</h2>
       <p class="muted">
-        Để thêm/sửa/ẩn sản phẩm của shop, vui lòng đăng nhập hoặc bấm nút
-        <strong>Khởi tạo nhanh Seller mẫu</strong> để hệ thống tự tạo tài khoản &amp; cửa hàng thử nghiệm.
+        Vui lòng đăng nhập tài khoản Người bán đã được duyệt để quản lý sản phẩm, đơn hàng và xem báo cáo doanh thu của cửa hàng.
       </p>
       <form id="quick-login-form" class="auth-grid">
         <div>
@@ -49,204 +48,334 @@
       </form>
     </section>
 
-    <!-- 4 Thẻ thống kê tổng quan -->
-    <section class="stats-grid">
-      <div class="stat-card">
-        <span class="stat-label">Tổng sản phẩm</span>
-        <span id="stat-total" class="stat-value">0</span>
-      </div>
-      <div class="stat-card stat-active">
-        <span class="stat-label">Đang bán (ACTIVE)</span>
-        <span id="stat-active" class="stat-value">0</span>
-      </div>
-      <div class="stat-card stat-hidden">
-        <span class="stat-label">Đã ẩn (HIDDEN)</span>
-        <span id="stat-hidden" class="stat-value">0</span>
-      </div>
-      <div class="stat-card stat-warning">
-        <span class="stat-label">Cảnh báo sắp hết / Hết hàng</span>
-        <span id="stat-low-stock" class="stat-value">0</span>
-      </div>
-    </section>
+    <!-- Thanh Tabs Điều hướng chính của Seller Center -->
+    <nav class="seller-nav-tabs" aria-label="Chức năng Seller Center">
+      <button
+        id="seller-tab-btn-products"
+        type="button"
+        class="seller-nav-tab active"
+        data-seller-tab="products"
+      >
+        📦 Sản phẩm &amp; Tồn kho
+      </button>
+      <button
+        id="seller-tab-btn-orders"
+        type="button"
+        class="seller-nav-tab"
+        data-seller-tab="orders"
+      >
+        🧾 Đơn hàng của Shop <span id="nav-orders-count" class="tab-count-pill">0</span>
+      </button>
+      <button
+        id="seller-tab-btn-analytics"
+        type="button"
+        class="seller-nav-tab"
+        data-seller-tab="analytics"
+      >
+        📊 Doanh thu &amp; Bán chạy
+      </button>
+    </nav>
 
-    <!-- Banner Cảnh báo sắp hết hàng -->
-    <section id="low-stock-banner" class="low-stock-banner" hidden>
-      <div>
-        <div class="low-stock-banner-title">
-          <span>⚠️ Cảnh báo tồn kho:</span>
-          <span id="low-stock-summary">Có sản phẩm sắp hết hàng hoặc đã hết hàng!</span>
+    <!-- TAB 1: QUẢN LÝ SẢN PHẨM & TỒN KHO -->
+    <div id="seller-panel-products">
+      <section class="stats-grid">
+        <div class="stat-card">
+          <span class="stat-label">Tổng sản phẩm</span>
+          <span id="stat-total" class="stat-value">0</span>
         </div>
-        <div id="low-stock-items-list" class="low-stock-items-list"></div>
-      </div>
-      <div>
-        <button id="btn-filter-low-stock" type="button" class="btn btn-small">
-          Chỉ xem SP sắp hết hàng
-        </button>
-      </div>
-    </section>
-
-    <!-- Layout 2 cột: Form thêm/sửa bên trái + Bảng sản phẩm bên phải -->
-    <div class="seller-layout">
-      <!-- Cột trái: Form Thêm / Sửa sản phẩm -->
-      <section class="card">
-        <h2 id="form-title">Thêm sản phẩm mới</h2>
-        <form id="product-form">
-          <label for="product-name">Tên sản phẩm *</label>
-          <input
-            id="product-name"
-            name="name"
-            type="text"
-            required
-            maxlength="200"
-            placeholder="VD: Áo thun oversize Cotton"
-          >
-
-          <label for="product-category">Danh mục *</label>
-          <select id="product-category" name="category_id" required>
-            <option value="">-- Chọn danh mục --</option>
-          </select>
-
-          <div class="form-row-2">
-            <div>
-              <label for="product-price">Giá bán (VNĐ, &gt; 0) *</label>
-              <input
-                id="product-price"
-                name="price"
-                type="number"
-                min="1"
-                step="any"
-                required
-                placeholder="150000"
-              >
-            </div>
-            <div>
-              <label for="product-stock">Tồn kho (&ge; 0) *</label>
-              <input
-                id="product-stock"
-                name="stock"
-                type="number"
-                min="0"
-                step="1"
-                required
-                value="10"
-              >
-            </div>
-          </div>
-
-          <div id="status-field-wrap" hidden>
-            <label for="product-status">Trạng thái hiển thị</label>
-            <select id="product-status" name="status">
-              <option value="ACTIVE">Đang bán (ACTIVE)</option>
-              <option value="HIDDEN">Tạm ẩn (HIDDEN)</option>
-            </select>
-          </div>
-
-          <label for="product-description">Mô tả sản phẩm</label>
-          <textarea
-            id="product-description"
-            name="description"
-            rows="3"
-            placeholder="Chất liệu, kích thước, hướng dẫn bảo quản..."
-          ></textarea>
-
-          <label>Hình ảnh sản phẩm (Chọn nhiều ảnh, có xem trước)</label>
-          <label for="product-images-input" class="upload-dropzone">
-            <div><strong>📷 Bấm để chọn nhiều ảnh</strong> (.jpg, .png, .webp)</div>
-            <div class="muted">Ảnh đầu tiên sẽ được đặt làm ảnh chính của sản phẩm</div>
-            <input
-              id="product-images-input"
-              type="file"
-              multiple
-              accept=".jpg,.jpeg,.png,.webp"
-            >
-          </label>
-
-          <!-- Ảnh đã có trên server (khi sửa sản phẩm) -->
-          <div id="existing-images-wrap" hidden>
-            <div class="preview-section-label">Ảnh hiện có của sản phẩm:</div>
-            <div id="existing-images-grid" class="image-preview-grid"></div>
-          </div>
-
-          <!-- Xem trước ảnh mới chọn từ máy tính -->
-          <div id="new-images-wrap" hidden>
-            <div class="preview-section-label">Xem trước ảnh mới chuẩn bị tải lên:</div>
-            <div id="new-images-grid" class="image-preview-grid"></div>
-          </div>
-
-          <div class="form-actions">
-            <button id="btn-submit" type="submit" class="btn btn-primary">Thêm sản phẩm</button>
-            <button id="btn-cancel" type="button" class="btn" hidden>Huỷ sửa</button>
-          </div>
-        </form>
+        <div class="stat-card stat-active">
+          <span class="stat-label">Đang bán (ACTIVE)</span>
+          <span id="stat-active" class="stat-value">0</span>
+        </div>
+        <div class="stat-card stat-hidden">
+          <span class="stat-label">Đã ẩn (HIDDEN)</span>
+          <span id="stat-hidden" class="stat-value">0</span>
+        </div>
+        <div class="stat-card stat-warning">
+          <span class="stat-label">Cảnh báo sắp hết / Hết hàng</span>
+          <span id="stat-low-stock" class="stat-value">0</span>
+        </div>
       </section>
 
-      <!-- Cột phải: Bảng danh sách sản phẩm của Shop -->
+      <section id="low-stock-banner" class="low-stock-banner" hidden>
+        <div>
+          <div class="low-stock-banner-title">
+            <span>⚠️ Cảnh báo tồn kho:</span>
+            <span id="low-stock-summary">Có sản phẩm sắp hết hàng hoặc đã hết hàng!</span>
+          </div>
+          <div id="low-stock-items-list" class="low-stock-items-list"></div>
+        </div>
+        <div>
+          <button id="btn-filter-low-stock" type="button" class="btn btn-small">
+            Chỉ xem SP sắp hết hàng
+          </button>
+        </div>
+      </section>
+
+      <div class="seller-layout">
+        <section class="card">
+          <h2 id="form-title">Thêm sản phẩm mới</h2>
+          <form id="product-form">
+            <label for="product-name">Tên sản phẩm *</label>
+            <input
+              id="product-name"
+              name="name"
+              type="text"
+              required
+              maxlength="200"
+              placeholder="VD: Áo thun oversize Cotton"
+            >
+
+            <label for="product-category">Danh mục *</label>
+            <select id="product-category" name="category_id" required>
+              <option value="">-- Chọn danh mục --</option>
+            </select>
+
+            <div class="form-row-2">
+              <div>
+                <label for="product-price">Giá bán (VNĐ, &gt; 0) *</label>
+                <input
+                  id="product-price"
+                  name="price"
+                  type="number"
+                  min="1"
+                  step="any"
+                  required
+                  placeholder="150000"
+                >
+              </div>
+              <div>
+                <label for="product-stock">Tồn kho (&ge; 0) *</label>
+                <input
+                  id="product-stock"
+                  name="stock"
+                  type="number"
+                  min="0"
+                  step="1"
+                  required
+                  value="10"
+                >
+              </div>
+            </div>
+
+            <div id="status-field-wrap" hidden>
+              <label for="product-status">Trạng thái hiển thị</label>
+              <select id="product-status" name="status">
+                <option value="ACTIVE">Đang bán (ACTIVE)</option>
+                <option value="HIDDEN">Tạm ẩn (HIDDEN)</option>
+              </select>
+            </div>
+
+            <label for="product-description">Mô tả sản phẩm</label>
+            <textarea
+              id="product-description"
+              name="description"
+              rows="3"
+              placeholder="Chất liệu, kích thước, hướng dẫn bảo quản..."
+            ></textarea>
+
+            <label>Hình ảnh sản phẩm (Chọn nhiều ảnh, có xem trước)</label>
+            <label for="product-images-input" class="upload-dropzone">
+              <div><strong>📷 Bấm để chọn nhiều ảnh</strong> (.jpg, .png, .webp)</div>
+              <div class="muted">Ảnh đầu tiên sẽ được đặt làm ảnh chính của sản phẩm</div>
+              <input
+                id="product-images-input"
+                type="file"
+                multiple
+                accept=".jpg,.jpeg,.png,.webp"
+              >
+            </label>
+
+            <div id="existing-images-wrap" hidden>
+              <div class="preview-section-label">Ảnh hiện có của sản phẩm:</div>
+              <div id="existing-images-grid" class="image-preview-grid"></div>
+            </div>
+
+            <div id="new-images-wrap" hidden>
+              <div class="preview-section-label">Xem trước ảnh mới chuẩn bị tải lên:</div>
+              <div id="new-images-grid" class="image-preview-grid"></div>
+            </div>
+
+            <div class="form-actions">
+              <button id="btn-submit" type="submit" class="btn btn-primary">Thêm sản phẩm</button>
+              <button id="btn-cancel" type="button" class="btn" hidden>Huỷ sửa</button>
+            </div>
+          </form>
+        </section>
+
+        <section class="card">
+          <div class="list-header">
+            <h2>Danh sách sản phẩm của Shop</h2>
+            <div class="threshold-control">
+              <label for="low-stock-threshold" style="margin: 0;">Ngưỡng báo sắp hết:</label>
+              <input id="low-stock-threshold" type="number" min="1" max="100" value="5">
+            </div>
+          </div>
+
+          <div class="filter-toolbar">
+            <div class="filter-group">
+              <input
+                id="search-input"
+                type="search"
+                placeholder="🔍 Tìm theo tên sản phẩm..."
+              >
+              <select id="status-filter" title="Lọc theo trạng thái">
+                <option value="ALL">Tất cả trạng thái</option>
+                <option value="ACTIVE">Đang bán (ACTIVE)</option>
+                <option value="HIDDEN">Đã ẩn (HIDDEN)</option>
+                <option value="LOW_STOCK">⚠️ Sắp hết / Hết hàng</option>
+                <option value="OUT_OF_STOCK">🚨 Đã hết hàng (Tồn = 0)</option>
+              </select>
+              <select id="category-filter" title="Lọc theo danh mục">
+                <option value="ALL">Tất cả danh mục</option>
+              </select>
+            </div>
+
+            <div class="threshold-control">
+              <label for="page-size-select" style="margin: 0;">Hiển thị:</label>
+              <select id="page-size-select" style="min-width: 90px; width: auto;">
+                <option value="5">5 / trang</option>
+                <option value="10" selected>10 / trang</option>
+                <option value="20">20 / trang</option>
+              </select>
+            </div>
+          </div>
+
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>ID</th>
+                  <th>Sản phẩm</th>
+                  <th class="text-right">Giá bán</th>
+                  <th>Tồn kho (Sửa nhanh)</th>
+                  <th>Trạng thái</th>
+                  <th class="text-right">Thao tác</th>
+                </tr>
+              </thead>
+              <tbody id="product-table-body">
+                <tr>
+                  <td colspan="6" class="muted">Đang tải dữ liệu...</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+
+          <div class="pagination-bar">
+            <div id="pagination-info" class="muted">Hiển thị 0 - 0 / 0 sản phẩm</div>
+            <div id="pagination-controls" class="pagination-controls"></div>
+          </div>
+        </section>
+      </div>
+    </div>
+
+    <!-- TAB 2: QUẢN LÝ ĐƠN HÀNG CỦA SHOP -->
+    <div id="seller-panel-orders" hidden>
       <section class="card">
         <div class="list-header">
-          <h2>Danh sách sản phẩm của Shop</h2>
-          <div class="threshold-control">
-            <label for="low-stock-threshold" style="margin: 0;">Ngưỡng báo sắp hết:</label>
-            <input id="low-stock-threshold" type="number" min="1" max="100" value="5">
+          <div>
+            <h2 style="margin-bottom: 4px;">🧾 Quản lý Đơn hàng của Shop</h2>
+            <p class="muted" style="margin: 0;">
+              Xác nhận hoặc huỷ đơn; cập nhật tiến trình:
+              <strong>Chờ xác nhận &rarr; Đã xác nhận &rarr; Đang giao &rarr; Hoàn thành</strong>.
+            </p>
           </div>
-        </div>
-
-        <!-- Thanh công cụ Tìm kiếm & Lọc trạng thái -->
-        <div class="filter-toolbar">
-          <div class="filter-group">
+          <div style="display: flex; gap: 8px; align-items: center; flex-wrap: wrap;">
             <input
-              id="search-input"
+              id="order-search-input"
               type="search"
-              placeholder="🔍 Tìm theo tên sản phẩm..."
+              placeholder="🔍 Tìm mã đơn, người nhận, SĐT..."
+              style="width: 240px;"
             >
-            <select id="status-filter" title="Lọc theo trạng thái">
-              <option value="ALL">Tất cả trạng thái</option>
-              <option value="ACTIVE">Đang bán (ACTIVE)</option>
-              <option value="HIDDEN">Đã ẩn (HIDDEN)</option>
-              <option value="LOW_STOCK">⚠️ Sắp hết / Hết hàng</option>
-              <option value="OUT_OF_STOCK">🚨 Đã hết hàng (Tồn = 0)</option>
-            </select>
-            <select id="category-filter" title="Lọc theo danh mục">
-              <option value="ALL">Tất cả danh mục</option>
-            </select>
-          </div>
-
-          <div class="threshold-control">
-            <label for="page-size-select" style="margin: 0;">Hiển thị:</label>
-            <select id="page-size-select" style="min-width: 90px; width: auto;">
-              <option value="5">5 / trang</option>
-              <option value="10" selected>10 / trang</option>
-              <option value="20">20 / trang</option>
-            </select>
+            <button id="btn-refresh-orders" type="button" class="btn btn-small">↻ Làm mới</button>
           </div>
         </div>
 
-        <!-- Bảng sản phẩm -->
-        <div class="table-wrap">
-          <table>
-            <thead>
-              <tr>
-                <th>ID</th>
-                <th>Sản phẩm</th>
-                <th class="text-right">Giá bán</th>
-                <th>Tồn kho (Sửa nhanh)</th>
-                <th>Trạng thái</th>
-                <th class="text-right">Thao tác</th>
-              </tr>
-            </thead>
-            <tbody id="product-table-body">
-              <tr>
-                <td colspan="6" class="muted">Đang tải dữ liệu...</td>
-              </tr>
-            </tbody>
-          </table>
+        <div id="order-status-tabs" class="order-status-tabs" style="margin-top: 14px;">
+          <button type="button" class="order-filter-pill active" data-order-status="ALL">Tất cả</button>
+          <button type="button" class="order-filter-pill" data-order-status="pending">⏳ Chờ xác nhận</button>
+          <button type="button" class="order-filter-pill" data-order-status="confirmed">✅ Đã xác nhận</button>
+          <button type="button" class="order-filter-pill" data-order-status="shipping">🚚 Đang giao</button>
+          <button type="button" class="order-filter-pill" data-order-status="completed">🎉 Hoàn thành</button>
+          <button type="button" class="order-filter-pill" data-order-status="cancelled">❌ Đã huỷ</button>
         </div>
 
-        <!-- Thanh phân trang (Pagination) -->
-        <div class="pagination-bar">
-          <div id="pagination-info" class="muted">Hiển thị 0 - 0 / 0 sản phẩm</div>
-          <div id="pagination-controls" class="pagination-controls"></div>
+        <div id="shop-orders-container">
+          <div class="muted">Đang tải danh sách đơn hàng của shop...</div>
         </div>
       </section>
+    </div>
+
+    <!-- TAB 3: DOANH THU THEO NGÀY & SẢN PHẨM BÁN CHẠY -->
+    <div id="seller-panel-analytics" hidden>
+      <section class="stats-grid">
+        <div class="stat-card stat-active">
+          <span class="stat-label">Doanh thu thực thu (Đơn Hoàn thành)</span>
+          <span id="analytics-total-revenue" class="stat-value">0 ₫</span>
+        </div>
+        <div class="stat-card">
+          <span class="stat-label">Doanh thu ước tính (Đã xác nhận/Đang giao/Hoàn thành)</span>
+          <span id="analytics-estimated-revenue" class="stat-value">0 ₫</span>
+        </div>
+        <div class="stat-card stat-active">
+          <span class="stat-label">Số đơn Hoàn thành / Tổng số đơn</span>
+          <span id="analytics-completed-ratio" class="stat-value">0 / 0</span>
+        </div>
+        <div class="stat-card stat-hidden">
+          <span class="stat-label">Đang xử lý / Đã huỷ</span>
+          <span id="analytics-pending-cancelled" class="stat-value">0 / 0</span>
+        </div>
+      </section>
+
+      <div class="analytics-grid">
+        <section class="card">
+          <div class="list-header">
+            <h2>📅 Doanh thu theo ngày của Shop</h2>
+            <button id="btn-refresh-analytics" type="button" class="btn btn-small">↻ Cập nhật</button>
+          </div>
+          <p class="muted">Tổng hợp doanh thu các đơn hàng đã hoàn thành theo từng ngày.</p>
+
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>Ngày</th>
+                  <th>Đơn hoàn thành / Tổng đơn</th>
+                  <th class="text-right">Doanh thu ngày</th>
+                </tr>
+              </thead>
+              <tbody id="daily-revenue-tbody">
+                <tr>
+                  <td colspan="3" class="muted">Đang tải dữ liệu doanh thu...</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </section>
+
+        <section class="card">
+          <h2>🔥 Sản phẩm bán chạy của Shop</h2>
+          <p class="muted">Xếp hạng theo tổng số lượng đã bán từ các đơn hàng hợp lệ của shop.</p>
+
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>Hạng</th>
+                  <th>Sản phẩm</th>
+                  <th class="text-right">Đã bán</th>
+                  <th class="text-right">Doanh thu SP</th>
+                </tr>
+              </thead>
+              <tbody id="best-sellers-tbody">
+                <tr>
+                  <td colspan="4" class="muted">Đang tải danh sách sản phẩm bán chạy...</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </section>
+      </div>
     </div>
   </main>
 

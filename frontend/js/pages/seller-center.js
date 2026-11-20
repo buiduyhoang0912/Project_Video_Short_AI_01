@@ -790,11 +790,372 @@ pageSizeSelect.addEventListener("change", () => {
 });
 
 // ---------- Khởi chạy trang ----------
+const tabBtnProducts = document.getElementById("seller-tab-btn-products");
+const tabBtnOrders = document.getElementById("seller-tab-btn-orders");
+const tabBtnAnalytics = document.getElementById("seller-tab-btn-analytics");
+const panelProducts = document.getElementById("seller-panel-products");
+const panelOrders = document.getElementById("seller-panel-orders");
+const panelAnalytics = document.getElementById("seller-panel-analytics");
+const navOrdersCount = document.getElementById("nav-orders-count");
+
+// DOM Elements - Đơn hàng của Shop
+const orderSearchInput = document.getElementById("order-search-input");
+const refreshOrdersBtn = document.getElementById("btn-refresh-orders");
+const orderStatusTabs = document.getElementById("order-status-tabs");
+const shopOrdersContainer = document.getElementById("shop-orders-container");
+
+// DOM Elements - Thống kê Doanh thu & Bán chạy
+const analyticsTotalRevenue = document.getElementById("analytics-total-revenue");
+const analyticsEstimatedRevenue = document.getElementById("analytics-estimated-revenue");
+const analyticsCompletedRatio = document.getElementById("analytics-completed-ratio");
+const analyticsPendingCancelled = document.getElementById("analytics-pending-cancelled");
+const dailyRevenueTbody = document.getElementById("daily-revenue-tbody");
+const bestSellersTbody = document.getElementById("best-sellers-tbody");
+const refreshAnalyticsBtn = document.getElementById("btn-refresh-analytics");
+
+let shopOrders = [];
+let currentOrderStatusFilter = "ALL";
+
+const ORDER_STATUS_META = {
+  pending: { label: "⏳ Chờ xác nhận", cls: "pending" },
+  confirmed: { label: "✅ Đã xác nhận", cls: "confirmed" },
+  shipping: { label: "🚚 Đang giao", cls: "shipping" },
+  completed: { label: "🎉 Hoàn thành", cls: "completed" },
+  cancelled: { label: "❌ Đã huỷ", cls: "cancelled" },
+};
+
+function switchSellerTab(tabName) {
+  if (!panelProducts || !panelOrders || !panelAnalytics) return;
+
+  panelProducts.hidden = tabName !== "products";
+  panelOrders.hidden = tabName !== "orders";
+  panelAnalytics.hidden = tabName !== "analytics";
+
+  if (tabBtnProducts) tabBtnProducts.classList.toggle("active", tabName === "products");
+  if (tabBtnOrders) tabBtnOrders.classList.toggle("active", tabName === "orders");
+  if (tabBtnAnalytics) tabBtnAnalytics.classList.toggle("active", tabName === "analytics");
+
+  if (tabName === "orders" && currentShop) {
+    loadShopOrders();
+  } else if (tabName === "analytics" && currentShop) {
+    loadShopAnalytics();
+  }
+}
+
+document.querySelectorAll("[data-seller-tab]").forEach((btn) => {
+  btn.addEventListener("click", () => {
+    switchSellerTab(btn.dataset.sellerTab);
+  });
+});
+
+// ---------- Quản lý Đơn hàng của Shop ----------
+async function loadShopOrders() {
+  if (!currentShop || !shopOrdersContainer) return;
+  shopOrdersContainer.innerHTML = `<div class="muted">Đang tải danh sách đơn hàng của shop...</div>`;
+
+  try {
+    const params = {};
+    if (currentOrderStatusFilter && currentOrderStatusFilter !== "ALL") {
+      params.status_filter = currentOrderStatusFilter;
+    }
+    const kw = orderSearchInput ? orderSearchInput.value.trim() : "";
+    if (kw) params.q = kw;
+
+    shopOrders = await api.get("/shops/me/orders", params);
+    if (navOrdersCount && currentOrderStatusFilter === "ALL" && !kw) {
+      navOrdersCount.textContent = String(shopOrders.length);
+    }
+    renderShopOrders();
+  } catch (error) {
+    shopOrdersContainer.innerHTML = `<div class="text-error">${escapeHtml(error.message)}</div>`;
+  }
+}
+
+function renderOrderStepper(status) {
+  const st = (status || "pending").toLowerCase();
+  if (st === "cancelled") {
+    return `<div class="order-stepper"><span class="order-badge cancelled">❌ Đơn hàng đã bị huỷ (Tồn kho đã được hoàn lại)</span></div>`;
+  }
+
+  const steps = [
+    { key: "pending", label: "1. Chờ xác nhận" },
+    { key: "confirmed", label: "2. Đã xác nhận" },
+    { key: "shipping", label: "3. Đang giao" },
+    { key: "completed", label: "4. Hoàn thành" },
+  ];
+  const curIdx = steps.findIndex((s) => s.key === st);
+
+  return `
+    <div class="order-stepper">
+      ${steps
+        .map((step, idx) => {
+          let cls = "";
+          if (idx < curIdx || st === "completed") cls = "done";
+          else if (idx === curIdx) cls = "current";
+          const arrow = idx < steps.length - 1 ? `<span class="order-step-arrow">&rarr;</span>` : "";
+          return `<span class="order-step ${cls}">${step.label}</span>${arrow}`;
+        })
+        .join("")}
+    </div>`;
+}
+
+function renderOrderActionButtons(order) {
+  const st = (order.status || "pending").toLowerCase();
+  if (st === "pending") {
+    return `
+      <button type="button" class="btn btn-small btn-primary" data-order-action="confirmed" data-order-id="${order.id}">
+        ✅ Xác nhận đơn
+      </button>
+      <button type="button" class="btn btn-small btn-danger" data-order-action="cancelled" data-order-id="${order.id}">
+        ❌ Huỷ đơn
+      </button>`;
+  }
+  if (st === "confirmed") {
+    return `
+      <button type="button" class="btn btn-small btn-primary" data-order-action="shipping" data-order-id="${order.id}">
+        🚚 Bắt đầu giao hàng
+      </button>
+      <button type="button" class="btn btn-small btn-danger" data-order-action="cancelled" data-order-id="${order.id}">
+        ❌ Huỷ đơn
+      </button>`;
+  }
+  if (st === "shipping") {
+    return `
+      <button type="button" class="btn btn-small btn-primary" data-order-action="completed" data-order-id="${order.id}">
+        🎉 Xác nhận Hoàn thành
+      </button>`;
+  }
+  return `<span class="muted">Đơn hàng đã kết thúc</span>`;
+}
+
+function renderShopOrders() {
+  if (!shopOrdersContainer) return;
+  if (!Array.isArray(shopOrders) || shopOrders.length === 0) {
+    shopOrdersContainer.innerHTML = `
+      <div class="muted" style="text-align: center; padding: 28px;">
+        Không có đơn hàng nào khớp với bộ lọc hiện tại.
+      </div>`;
+    return;
+  }
+
+  shopOrdersContainer.innerHTML = shopOrders
+    .map((order) => {
+      const st = (order.status || "pending").toLowerCase();
+      const meta = ORDER_STATUS_META[st] || { label: st, cls: "pending" };
+      const items = Array.isArray(order.items) ? order.items : [];
+
+      return `
+        <article class="shop-order-card">
+          <div class="shop-order-header">
+            <div>
+              <strong>Đơn hàng #${order.id}</strong>
+              <span class="muted">· Đặt lúc: ${formatDateTime(order.created_at)} · Thanh toán: <strong>${escapeHtml(order.payment_method)}</strong></span>
+            </div>
+            <span class="order-badge ${meta.cls}">${meta.label}</span>
+          </div>
+
+          <div class="muted" style="font-size: 13px;">
+            👤 Người nhận: <strong>${escapeHtml(order.recipient_name)}</strong> ·
+            📞 SĐT: <strong>${escapeHtml(order.recipient_phone)}</strong> ·
+            📍 Địa chỉ: <strong>${escapeHtml(order.recipient_address)}</strong>
+          </div>
+
+          ${renderOrderStepper(st)}
+
+          <table class="order-items-table">
+            <thead>
+              <tr>
+                <th>Sản phẩm</th>
+                <th class="text-right">Đơn giá lúc đặt</th>
+                <th class="text-right">Số lượng</th>
+                <th class="text-right">Thành tiền</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${items
+                .map(
+                  (it) => `
+                  <tr>
+                    <td>${escapeHtml(it.product_name || `Sản phẩm #${it.product_id}`)}</td>
+                    <td class="text-right">${formatMoney(it.unit_price)}</td>
+                    <td class="text-right">x${it.quantity}</td>
+                    <td class="text-right"><strong>${formatMoney(it.line_total ?? it.unit_price * it.quantity)}</strong></td>
+                  </tr>`
+                )
+                .join("")}
+            </tbody>
+          </table>
+
+          <div class="shop-order-footer">
+            <div>
+              Tổng tiền đơn: <strong style="font-size: 18px; color: #dc2626;">${formatMoney(order.total_amount)}</strong>
+            </div>
+            <div style="display: flex; gap: 8px; flex-wrap: wrap;">
+              ${renderOrderActionButtons(order)}
+            </div>
+          </div>
+        </article>`;
+    })
+    .join("");
+}
+
+if (shopOrdersContainer) {
+  shopOrdersContainer.addEventListener("click", async (event) => {
+    const btn = event.target.closest("button[data-order-action]");
+    if (!btn) return;
+    const orderId = Number(btn.dataset.orderId);
+    const nextStatus = btn.dataset.orderAction;
+
+    if (
+      nextStatus === "cancelled" &&
+      !confirm(`Bạn có chắc chắn muốn HUỶ đơn hàng #${orderId} không? (Tồn kho sản phẩm sẽ được hoàn lại)`)
+    ) {
+      return;
+    }
+
+    btn.disabled = true;
+    try {
+      await api.patch(`/shops/me/orders/${orderId}/status`, { status: nextStatus });
+      const label = ORDER_STATUS_META[nextStatus]?.label || nextStatus;
+      showToast(`Đã cập nhật đơn #${orderId} sang trạng thái: ${label}`);
+      await Promise.all([loadShopOrders(), loadShopProducts(), loadShopAnalytics()]);
+    } catch (error) {
+      showToast(error.message, "error");
+      btn.disabled = false;
+    }
+  });
+}
+
+if (orderStatusTabs) {
+  orderStatusTabs.addEventListener("click", (event) => {
+    const btn = event.target.closest("button[data-order-status]");
+    if (!btn) return;
+    currentOrderStatusFilter = btn.dataset.orderStatus;
+    orderStatusTabs.querySelectorAll(".order-filter-pill").forEach((b) => {
+      b.classList.toggle("active", b === btn);
+    });
+    loadShopOrders();
+  });
+}
+
+if (orderSearchInput) {
+  let orderSearchTimer;
+  orderSearchInput.addEventListener("input", () => {
+    clearTimeout(orderSearchTimer);
+    orderSearchTimer = setTimeout(loadShopOrders, 250);
+  });
+}
+
+if (refreshOrdersBtn) {
+  refreshOrdersBtn.addEventListener("click", loadShopOrders);
+}
+
+// ---------- Thống kê Doanh thu theo ngày & Sản phẩm bán chạy ----------
+async function loadShopAnalytics() {
+  if (!currentShop || !dailyRevenueTbody || !bestSellersTbody) return;
+
+  try {
+    const data = await api.get("/shops/me/analytics");
+    if (navOrdersCount) navOrdersCount.textContent = String(data.total_orders || 0);
+
+    if (analyticsTotalRevenue) {
+      analyticsTotalRevenue.textContent = formatMoney(data.total_revenue || 0);
+    }
+    if (analyticsEstimatedRevenue) {
+      analyticsEstimatedRevenue.textContent = formatMoney(data.estimated_revenue || 0);
+    }
+    if (analyticsCompletedRatio) {
+      analyticsCompletedRatio.textContent = `${data.completed_orders || 0} / ${data.total_orders || 0}`;
+    }
+    if (analyticsPendingCancelled) {
+      const processing =
+        (data.pending_orders || 0) +
+        (data.confirmed_orders || 0) +
+        (data.shipping_orders || 0);
+      analyticsPendingCancelled.textContent = `${processing} / ${data.cancelled_orders || 0}`;
+    }
+
+    renderDailyRevenueTable(data.daily_revenue || []);
+    renderBestSellersTable(data.best_selling_products || []);
+  } catch (error) {
+    dailyRevenueTbody.innerHTML = `<tr><td colspan="3" class="text-error">${escapeHtml(error.message)}</td></tr>`;
+  }
+}
+
+function renderDailyRevenueTable(dailyList) {
+  if (!Array.isArray(dailyList) || dailyList.length === 0) {
+    dailyRevenueTbody.innerHTML = `
+      <tr>
+        <td colspan="3" class="muted" style="text-align: center; padding: 20px;">
+          Chưa có dữ liệu đơn hàng theo ngày.
+        </td>
+      </tr>`;
+    return;
+  }
+
+  const maxRev = Math.max(1, ...dailyList.map((d) => Number(d.revenue || 0)));
+
+  dailyRevenueTbody.innerHTML = dailyList
+    .map((item) => {
+      const rev = Number(item.revenue || 0);
+      const pct = Math.min(100, Math.round((rev / maxRev) * 100));
+      return `
+        <tr>
+          <td><strong>${escapeHtml(item.date)}</strong></td>
+          <td>
+            ${item.completed_orders} hoàn thành / ${item.total_orders} đơn
+            <div class="revenue-bar-wrap">
+              <div class="revenue-bar-fill" style="width: ${pct}%;"></div>
+            </div>
+          </td>
+          <td class="text-right"><strong>${formatMoney(rev)}</strong></td>
+        </tr>`;
+    })
+    .join("");
+}
+
+function renderBestSellersTable(bestList) {
+  if (!Array.isArray(bestList) || bestList.length === 0) {
+    bestSellersTbody.innerHTML = `
+      <tr>
+        <td colspan="4" class="muted" style="text-align: center; padding: 20px;">
+          Chưa có sản phẩm nào phát sinh doanh số.
+        </td>
+      </tr>`;
+    return;
+  }
+
+  bestSellersTbody.innerHTML = bestList
+    .map((prod, idx) => {
+      const rank = idx + 1;
+      const rankCls = rank <= 3 ? `rank-${rank}` : "";
+      return `
+        <tr>
+          <td><span class="rank-badge ${rankCls}">#${rank}</span></td>
+          <td>
+            <strong>${escapeHtml(prod.product_name)}</strong>
+            <div class="product-meta">Giá: ${formatMoney(prod.price)} · Tồn kho: ${prod.stock}</div>
+          </td>
+          <td class="text-right"><strong>${prod.total_quantity_sold}</strong></td>
+          <td class="text-right"><strong>${formatMoney(prod.total_revenue)}</strong></td>
+        </tr>`;
+    })
+    .join("");
+}
+
+if (refreshAnalyticsBtn) {
+  refreshAnalyticsBtn.addEventListener("click", loadShopAnalytics);
+}
+
 async function initSellerCenter() {
   await loadCategories();
   const loggedIn = await checkSellerSession();
   if (loggedIn) {
-    await loadShopProducts();
+    await Promise.all([loadShopProducts(), loadShopAnalytics()]);
+    const tabParam = new URLSearchParams(window.location.search).get("tab");
+    if (tabParam === "orders" || tabParam === "analytics") {
+      switchSellerTab(tabParam);
+    }
   }
 }
 

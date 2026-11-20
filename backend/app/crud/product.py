@@ -1,11 +1,15 @@
 """CRUD cho bảng products, shop, category, product_images và video_products."""
 
+import json
 import math
+import re
 from decimal import Decimal
 
+import httpx
 from sqlalchemy import delete, func, select
 from sqlalchemy.orm import Session, joinedload, selectinload
 
+from app.core.config import settings
 from app.models.cart import CartItem
 from app.models.category import Category
 from app.models.order import OrderItem
@@ -14,6 +18,8 @@ from app.models.product_image import ProductImage
 from app.models.shop import Shop
 from app.models.video import VideoProduct
 from app.schemas.product import (
+    ProductAiSuggestRequest,
+    ProductAiSuggestResponse,
     ProductCreate,
     ProductListItemOut,
     ProductListResponse,
@@ -347,3 +353,248 @@ def link_product_to_video(
     db.add(vp)
     db.commit()
     return vp
+
+
+# ---------- TASK T3D2805: TRỢ LÝ AI VIẾT NỘI DUNG CHO NGƯỜI BÁN ----------
+
+def _build_smart_local_seller_suggestion(
+    base_name: str,
+    cat_name: str,
+    price_val: float | None,
+    features_text: str | None,
+    duration_sec: int,
+) -> ProductAiSuggestResponse:
+    clean_name = base_name.strip()
+    cat_label = cat_name.strip() if cat_name else "Chính Hãng"
+    price_str = (
+        f"{int(price_val):,}đ".replace(",", ".")
+        if price_val and price_val > 0
+        else "giá cực kỳ ưu đãi"
+    )
+    feature_line = (
+        features_text.strip()
+        if features_text and features_text.strip()
+        else "Thiết kế hiện đại, độ bền cao, trải nghiệm vượt trội trong tầm giá"
+    )
+
+    suggested_name = f"{clean_name} [{cat_label}] - Hàng Tuyển Chọn Cao Cấp, Chuẩn Form"
+    if len(suggested_name) > 190:
+        suggested_name = suggested_name[:190]
+
+    alternative_names = [
+        f"[Chính Hãng] {clean_name} - Phiên Bản Mới Nhất, Bảo Hành Uy Tín",
+        f"{clean_name} Cao Cấp ({cat_label}) - Giá Tốt Nhất Hôm Nay",
+        f"Combo / Siêu Phẩm {clean_name} - Chuẩn Chất Lượng ClipShop Mall",
+    ]
+
+    suggested_description = (
+        f"✨ GIỚI THIỆU SẢN PHẨM: {clean_name.upper()}\n"
+        f"• Phân loại / Danh mục: {cat_label}\n"
+        f"• Điểm nổi bật: {feature_line}.\n\n"
+        f"🔥 ƯU ĐIỂM VƯỢT TRỘI:\n"
+        f"1. Chất lượng hoàn thiện tỉ mỉ, kiểm định kỹ lưỡng trước khi đóng gói giao tới tay khách hàng.\n"
+        f"2. Thiết kế tối ưu công năng sử dụng thực tế, phù hợp cho cả nhu cầu cá nhân lẫn làm quà tặng.\n"
+        f"3. Mức giá cạnh tranh trực tiếp tại gian hàng ({price_str}) đi kèm nhiều ưu đãi độc quyền trên video.\n\n"
+        f"🛡️ CAM KẾT TỪ CỬA HÀNG:\n"
+        f"• Hàng thật đúng mô tả và hình ảnh/video quay thực tế 100%.\n"
+        f"• Hỗ trợ đổi trả nhanh chóng nếu có lỗi từ nhà sản xuất.\n"
+        f"• Đóng gói chống sốc cẩn thận, giao hàng hỏa tốc toàn quốc."
+    )
+
+    mid_end = max(25, duration_sec - 12)
+    video_script = (
+        f"🎬 KỊCH BẢN VIDEO NGẮN ({duration_sec} GIÂY) - SẢN PHẨM: {clean_name}\n"
+        f"------------------------------------------------------------\n"
+        f"⏱ [00s - 05s] HOOK (Thu hút 3 giây đầu):\n"
+        f"• Hình ảnh: Cận cảnh {clean_name} dưới ánh sáng đẹp, mở hộp hoặc xoay 360 độ thật sắc nét.\n"
+        f"• Lời thoại: \"Đừng vội mua {clean_name} nếu bạn chưa xem hết 30 giây review thực tế này!\"\n\n"
+        f"⏱ [05s - 18s] TRẢI NGHIỆM & ĐIỂM ĐẮT GIÁ:\n"
+        f"• Hình ảnh: Quay trực tiếp chi tiết bề mặt, thao tác sử dụng thực tế sản phẩm trên tay.\n"
+        f"• Lời thoại: \"Điểm mình ưng nhất ở em {clean_name} dòng {cat_label} này là: {feature_line}. Cầm trên tay cực kỳ chắc chắn và xịn sò.\"\n\n"
+        f"⏱ [18s - {mid_end}s] BÁO GIÁ & CHỨNG MINH GIÁ TRỊ:\n"
+        f"• Hình ảnh: Hiển thị tem nhãn/phụ kiện đi kèm + chèn chữ nổi bật mức giá {price_str} trên màn hình.\n"
+        f"• Lời thoại: \"Chất lượng hoàn thiện đỉnh như thế này mà hiện tại trên giỏ hàng của shop chỉ có {price_str}, số lượng trong kho có hạn.\"\n\n"
+        f"⏱ [{mid_end}s - {duration_sec}s] CALL TO ACTION (Kêu gọi chốt đơn):\n"
+        f"• Hình ảnh: Chỉ tay xuống biểu tượng Giỏ hàng góc trái màn hình video.\n"
+        f"• Lời thoại: \"Mình đã gắn sẵn link sản phẩm chính hãng ở giỏ hàng góc trái bên dưới, bấm đặt ngay kẻo hết size/màu đẹp nhé!\""
+    )
+
+    slug_tag = re.sub(r"[^a-zA-Z0-9]", "", clean_name.title())[:24] or "SanPhamHot"
+    hashtags = [
+        "#ClipShopAI",
+        f"#{slug_tag}",
+        "#ReviewThucTe",
+        "#XuHuongMuaSam",
+        "#DealHotHomNay",
+    ]
+
+    return ProductAiSuggestResponse(
+        suggested_name=suggested_name,
+        alternative_names=alternative_names,
+        suggested_description=suggested_description,
+        video_script_30_60s=video_script,
+        suggested_hashtags=hashtags,
+        provider="clipshop-ai-writer",
+    )
+
+
+def _parse_ai_json_payload(raw_text: str) -> dict | None:
+    if not raw_text:
+        return None
+    cleaned = raw_text.strip()
+    if cleaned.startswith("```"):
+        cleaned = re.sub(r"^```[a-zA-Z]*\s*", "", cleaned)
+        cleaned = re.sub(r"\s*```$", "", cleaned)
+    start = cleaned.find("{")
+    end = cleaned.rfind("}")
+    if start != -1 and end != -1 and end > start:
+        cleaned = cleaned[start : end + 1]
+    try:
+        parsed = json.loads(cleaned)
+        return parsed if isinstance(parsed, dict) else None
+    except Exception:
+        return None
+
+
+def generate_seller_ai_content(
+    db: Session, data: ProductAiSuggestRequest
+) -> ProductAiSuggestResponse:
+    """Gọi Gemini hoặc OpenAI (key trong .env) để gợi ý tên, mô tả sản phẩm và kịch bản video 30-60s."""
+    raw_name = data.raw_name.strip()
+    cat_name = data.category_name or ""
+    if not cat_name and data.category_id:
+        cat_obj = db.get(Category, data.category_id)
+        if cat_obj:
+            cat_name = cat_obj.name
+
+    price_val = float(data.price) if data.price is not None else None
+    duration_sec = int(data.duration_seconds or 45)
+    fallback_res = _build_smart_local_seller_suggestion(
+        base_name=raw_name,
+        cat_name=cat_name,
+        price_val=price_val,
+        features_text=data.features,
+        duration_sec=duration_sec,
+    )
+
+    prompt = (
+        "Bạn là Trợ lý AI Copywriter chuyên nghiệp cho người bán trên nền tảng video thương mại điện tử ClipShop AI.\n"
+        f"Thông tin sản phẩm đầu vào:\n"
+        f"- Tên/ý tưởng ban đầu: {raw_name}\n"
+        f"- Danh mục: {cat_name or 'Chưa chỉ định'}\n"
+        f"- Giá dự kiến: {int(price_val) if price_val else 'Chưa chỉ định'} VNĐ\n"
+        f"- Đặc điểm nổi bật: {data.features or 'Tối ưu chất lượng và giá bán'}\n"
+        f"- Thời lượng kịch bản video ngắn yêu cầu: {duration_sec} giây (trong khoảng 30-60 giây).\n\n"
+        "Hãy trả về DUY NHẤT một chuỗi JSON hợp lệ (không bọc markdown) với các khóa sau:\n"
+        "{\n"
+        '  "suggested_name": "Tên sản phẩm chuẩn SEO hấp dẫn (dưới 180 ký tự)",\n'
+        '  "alternative_names": ["Phương án tên 1", "Phương án tên 2", "Phương án tên 3"],\n'
+        '  "suggested_description": "Mô tả sản phẩm chi tiết, trình bày đẹp bằng tiếng Việt",\n'
+        '  "video_script_30_60s": "Kịch bản quay video ngắn 30-60 giây chia theo từng mốc giây [00s-05s] Hook, [05s-20s] Nội dung, [20s-35s] Điểm nổi bật, [35s-45s] CTA kêu gọi bấm giỏ hàng",\n'
+        '  "suggested_hashtags": ["#hashtag1", "#hashtag2", "#hashtag3", "#hashtag4"]\n'
+        "}"
+    )
+
+    gemini_key = (settings.GEMINI_API_KEY or "").strip()
+    openai_key = (settings.OPENAI_API_KEY or "").strip()
+    timeout_sec = max(3.0, float(settings.AI_TIMEOUT_SECONDS or 15.0))
+
+    # 1. Thử gọi Google Gemini API nếu có GEMINI_API_KEY trong .env
+    if gemini_key:
+        model_name = settings.GEMINI_MODEL or "gemini-2.0-flash"
+        url = f"https://generativelanguage.googleapis.com/v1beta/models/{model_name}:generateContent?key={gemini_key}"
+        try:
+            with httpx.Client(timeout=timeout_sec) as client:
+                resp = client.post(
+                    url,
+                    json={
+                        "contents": [{"parts": [{"text": prompt}]}],
+                        "generationConfig": {"temperature": 0.6},
+                    },
+                )
+                if resp.status_code < 400:
+                    candidates = resp.json().get("candidates") or []
+                    if candidates:
+                        parts = (
+                            (candidates[0].get("content") or {}).get("parts")
+                            or []
+                        )
+                        text_out = "".join(
+                            p.get("text", "") for p in parts if isinstance(p, dict)
+                        )
+                        parsed = _parse_ai_json_payload(text_out)
+                        if parsed and parsed.get("suggested_name"):
+                            return ProductAiSuggestResponse(
+                                suggested_name=str(parsed["suggested_name"])[:200],
+                                alternative_names=list(
+                                    parsed.get("alternative_names")
+                                    or fallback_res.alternative_names
+                                )[:3],
+                                suggested_description=str(
+                                    parsed.get("suggested_description")
+                                    or fallback_res.suggested_description
+                                ),
+                                video_script_30_60s=str(
+                                    parsed.get("video_script_30_60s")
+                                    or fallback_res.video_script_30_60s
+                                ),
+                                suggested_hashtags=list(
+                                    parsed.get("suggested_hashtags")
+                                    or fallback_res.suggested_hashtags
+                                )[:6],
+                                provider="gemini",
+                            )
+        except Exception:
+            pass
+
+    # 2. Thử gọi OpenAI API nếu có OPENAI_API_KEY trong .env
+    if openai_key:
+        model_name = settings.OPENAI_MODEL or "gpt-4o-mini"
+        try:
+            with httpx.Client(timeout=timeout_sec) as client:
+                resp = client.post(
+                    "https://api.openai.com/v1/chat/completions",
+                    headers={
+                        "Authorization": f"Bearer {openai_key}",
+                        "Content-Type": "application/json",
+                    },
+                    json={
+                        "model": model_name,
+                        "messages": [{"role": "user", "content": prompt}],
+                        "temperature": 0.6,
+                    },
+                )
+                if resp.status_code < 400:
+                    choices = resp.json().get("choices") or []
+                    if choices:
+                        text_out = (
+                            (choices[0].get("message") or {}).get("content")
+                            or ""
+                        )
+                        parsed = _parse_ai_json_payload(text_out)
+                        if parsed and parsed.get("suggested_name"):
+                            return ProductAiSuggestResponse(
+                                suggested_name=str(parsed["suggested_name"])[:200],
+                                alternative_names=list(
+                                    parsed.get("alternative_names")
+                                    or fallback_res.alternative_names
+                                )[:3],
+                                suggested_description=str(
+                                    parsed.get("suggested_description")
+                                    or fallback_res.suggested_description
+                                ),
+                                video_script_30_60s=str(
+                                    parsed.get("video_script_30_60s")
+                                    or fallback_res.video_script_30_60s
+                                ),
+                                suggested_hashtags=list(
+                                    parsed.get("suggested_hashtags")
+                                    or fallback_res.suggested_hashtags
+                                )[:6],
+                                provider="openai",
+                            )
+        except Exception:
+            pass
+
+    return fallback_res
+

@@ -1147,6 +1147,111 @@ if (refreshAnalyticsBtn) {
   refreshAnalyticsBtn.addEventListener("click", loadShopAnalytics);
 }
 
+// ---------- TASK T3D2805: TRỢ LÝ AI VIẾT NỘI DUNG & KỊCH BẢN VIDEO 30-60S ----------
+const aiSuggestBtn = document.getElementById("btn-ai-suggest");
+const aiAssistantBox = document.getElementById("ai-assistant-box");
+const aiProviderBadge = document.getElementById("ai-provider-badge");
+const aiAltNamesList = document.getElementById("ai-alt-names-list");
+const aiVideoScriptInput = document.getElementById("ai-video-script");
+const aiHashtagsList = document.getElementById("ai-hashtags-list");
+const copyScriptBtn = document.getElementById("btn-copy-script");
+
+if (aiSuggestBtn) {
+  aiSuggestBtn.addEventListener("click", async () => {
+    const rawName = nameInput.value.trim();
+    if (!rawName) {
+      showToast("Vui lòng nhập tên hoặc ý tưởng sản phẩm vào ô Tên sản phẩm trước khi bấm Gợi ý bằng AI", "error");
+      nameInput.focus();
+      return;
+    }
+
+    const catId = Number(categorySelect.value) || null;
+    const catName = catId ? getCategoryName(catId) : null;
+    const priceVal = Number(priceInput.value) > 0 ? Number(priceInput.value) : null;
+    const currentDesc = descriptionInput.value.trim() || null;
+
+    const origText = aiSuggestBtn.innerHTML;
+    aiSuggestBtn.disabled = true;
+    aiSuggestBtn.innerHTML = "⏳ AI đang viết...";
+
+    try {
+      const res = await api.post("/products/ai-suggest", {
+        raw_name: rawName,
+        category_id: catId,
+        category_name: catName,
+        price: priceVal,
+        features: currentDesc,
+        duration_seconds: 45,
+      });
+
+      // Điền tên và mô tả gợi ý vào form để người bán có thể chỉnh sửa trước khi bấm Lưu
+      nameInput.value = res.suggested_name || rawName;
+      descriptionInput.value = res.suggested_description || "";
+
+      if (aiAssistantBox) {
+        aiAssistantBox.hidden = false;
+      }
+      if (aiProviderBadge) {
+        aiProviderBadge.textContent = `Nguồn: ${res.provider || "AI"}`;
+      }
+      if (aiVideoScriptInput) {
+        aiVideoScriptInput.value = res.video_script_30_60s || "";
+      }
+
+      if (aiAltNamesList) {
+        const alts = Array.isArray(res.alternative_names) ? res.alternative_names : [];
+        aiAltNamesList.innerHTML = alts
+          .map(
+            (alt) => `
+            <button type="button" class="ai-alt-name-chip" data-alt-name="${escapeHtml(alt)}">
+              💡 Chọn tên: ${escapeHtml(alt)}
+            </button>`
+          )
+          .join("");
+      }
+
+      if (aiHashtagsList) {
+        const tags = Array.isArray(res.suggested_hashtags) ? res.suggested_hashtags : [];
+        aiHashtagsList.innerHTML = tags
+          .map((t) => `<span class="ai-hashtag-pill">${escapeHtml(t)}</span>`)
+          .join("");
+      }
+
+      showToast("✨ AI đã gợi ý Tên, Mô tả và Kịch bản video 30–60s! Bạn có thể sửa lại trước khi lưu.");
+    } catch (error) {
+      showToast(error.message || "Không thể gọi Trợ lý AI lúc này", "error");
+    } finally {
+      aiSuggestBtn.disabled = false;
+      aiSuggestBtn.innerHTML = origText;
+    }
+  });
+}
+
+if (aiAltNamesList) {
+  aiAltNamesList.addEventListener("click", (event) => {
+    const chip = event.target.closest("button[data-alt-name]");
+    if (!chip) return;
+    nameInput.value = chip.dataset.altName;
+    nameInput.focus();
+    showToast("Đã áp dụng phương án tên sản phẩm vào form!");
+  });
+}
+
+if (copyScriptBtn && aiVideoScriptInput) {
+  copyScriptBtn.addEventListener("click", async () => {
+    const text = aiVideoScriptInput.value.trim();
+    if (!text) return;
+    try {
+      await navigator.clipboard.writeText(text);
+      showToast("📋 Đã sao chép kịch bản video vào bộ nhớ tạm!");
+    } catch (_) {
+      aiVideoScriptInput.select();
+      document.execCommand("copy");
+      showToast("📋 Đã sao chép kịch bản video!");
+    }
+  });
+}
+
 async function initSellerCenter() {
   await loadCategories();
   const loggedIn = await checkSellerSession();

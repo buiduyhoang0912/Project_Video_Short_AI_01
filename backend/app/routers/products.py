@@ -18,6 +18,8 @@ from app.models.product import Product
 from app.models.shop import Shop
 from app.models.user import User
 from app.schemas.product import (
+    ProductAiSuggestRequest,
+    ProductAiSuggestResponse,
     ProductCreate,
     ProductDetailOut,
     ProductListResponse,
@@ -139,6 +141,24 @@ def list_my_shop_products(
         keyword=q,
         category_id=category_id,
     )
+
+
+@router.post(
+    "/ai-suggest",
+    response_model=ProductAiSuggestResponse,
+    summary="[AI] Trợ lý gợi ý tên, mô tả sản phẩm và kịch bản video 30-60s cho người bán",
+)
+def suggest_product_content_by_ai(
+    data: ProductAiSuggestRequest,
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    if not data.raw_name or not data.raw_name.strip():
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="Vui lòng nhập tên hoặc ý tưởng sản phẩm để AI gợi ý",
+        )
+    return product_crud.generate_seller_ai_content(db, data)
 
 
 @router.get(

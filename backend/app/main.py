@@ -8,6 +8,7 @@ from pathlib import Path
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from sqlalchemy.exc import OperationalError
 
@@ -83,6 +84,15 @@ app.include_router(profile.router, prefix="/api")
 app.include_router(auth.router)
 
 
-@app.get("/")
-def root():
-    return {"message": f"{settings.APP_NAME} đang chạy. Xem tài liệu API tại /docs"}
+@app.get("/video/{video_id}", include_in_schema=False)
+def redirect_share_video_page(video_id: int):
+    return RedirectResponse(url=f"/pages/video.html?id={video_id}")
+
+
+frontend_dir = Path(__file__).resolve().parents[2] / "frontend"
+if frontend_dir.is_dir():
+    app.mount("/", StaticFiles(directory=frontend_dir, html=True), name="frontend")
+else:
+    @app.get("/")
+    def root():
+        return {"message": f"{settings.APP_NAME} đang chạy. Xem tài liệu API tại /docs"}

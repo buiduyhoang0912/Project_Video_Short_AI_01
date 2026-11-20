@@ -9,10 +9,14 @@
 - PUT  /api/shops/{shop_id}            Sửa thông tin cửa hàng của mình
 """
 
+from io import BytesIO
+from pathlib import Path
 from typing import Literal
+from uuid import uuid4
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, File, HTTPException, UploadFile, status
 from fastapi.security import HTTPAuthorizationCredentials
+from PIL import Image
 from sqlalchemy.orm import Session
 
 from app.core.security import decode_access_token
@@ -27,6 +31,16 @@ from app.schemas.product import ProductOut
 from app.schemas.shop import ShopCreate, ShopOut, ShopUpdate
 
 router = APIRouter(prefix="/shops", tags=["Shops"])
+
+UPLOADS_DIR = Path(__file__).resolve().parents[2] / "uploads"
+SHOP_UPLOADS_DIR = UPLOADS_DIR / "shops"
+MAX_LOGO_BYTES = 10 * 1024 * 1024
+ALLOWED_LOGO_EXTENSIONS = {
+    ".jpg": ("jpg", "JPEG"),
+    ".jpeg": ("jpg", "JPEG"),
+    ".png": ("png", "PNG"),
+    ".webp": ("webp", "WEBP"),
+}
 
 
 def _is_approved_seller(db: Session, user: User) -> bool:
@@ -132,6 +146,94 @@ def get_public_shop_detail(shop_id: int, db: Session = Depends(get_db)):
             status_code=status.HTTP_404_NOT_FOUND,
             detail=f"Không tìm thấy cửa hàng id={shop_id}",
         )
+    return shop
+
+
+@router.get("/{shop_id}/videos")
+def list_shop_videos(shop_id: int, db: Session = Depends(get_db)):
+    shop = shop_crud.get_public_shop(db, shop_id)
+    if shop is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Không tìm thấy cửa hàng id={shop_id}",
+        )
+    return shop_crud.get_shop_videos(db, shop)
+
+
+@router.post("/me/logo", response_model=ShopOut)
+def upload_my_shop_logo(
+    file: UploadFile = File(...),
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    shop = shop_crud.get_shop_by_owner(db, user.id)
+    if shop is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Bạn chưa có cửa hàng nào",
+        )
+    return _save_shop_logo_file(db, shop, file)
+
+
+@router.post("/{shop_id}/logo", response_model=ShopOut)
+def upload_shop_logo(
+    shop_id: int,
+    file: UploadFile = File(...),
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    shop = shop_crud.get_shop(db, shop_id)
+    if shop is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Không tìm thấy cửa hàng id={shop_id}",
+        )
+    if shop.owner_id != user.id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Bạn không có quyền cập nhật logo cho cửa hàng này",
+        )
+    return _save_shop_logo_file(db, shop, file)
+
+
+def _save_shop_logo_file(db: Session, shop, upload: UploadFile):
+    ext = Path(upload.filename or "").suffix.lower()
+    if ext not in ALLOWED_LOGO_EXTENSIONS:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="Logo cửa hàng phải là ảnh JPG, JPEG, PNG hoặc WebP",
+        )
+
+    norm_ext, pil_format = ALLOWED_LOGO_EXTENSIONS[ext]
+    raw_bytes = upload.file.read(MAX_LOGO_BYTES + 1)
+    if len(raw_bytes) == 0:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="Tệp ảnh tải lên không được rỗng",
+        )
+    if len(raw_bytes) > MAX_LOGO_BYTES:
+        raise HTTPException(
+            status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
+            detail="Dung lượng ảnh logo không được vượt quá 10MB",
+        )
+
+    try:
+        with Image.open(BytesIO(raw_bytes), formats=[pil_format]) as img:
+            img.load()
+    except Exception as error:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="Tệp tải lên bị hỏng hoặc không đúng định dạng ảnh",
+        ) from error
+
+    SHOP_UPLOADS_DIR.mkdir(parents=True, exist_ok=True)
+    filename = f"{uuid4().hex}.{norm_ext}"
+    dest_path = SHOP_UPLOADS_DIR / filename
+    dest_path.write_bytes(raw_bytes)
+
+    shop.avatar_key = f"/uploads/shops/{filename}"
+    db.commit()
+    db.refresh(shop)
     return shop
 
 

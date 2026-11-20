@@ -1,0 +1,471 @@
+/* ==========================================================
+   Style cho Trang Đăng ký bán hàng (seller-register.html)
+   và Trang Cửa hàng công khai (shop-public.html) - Task T3D27D1
+   ========================================================== */
+
+.container-shop {
+  max-width: 1200px;
+}
+
+/* ---------- Hero Banner ---------- */
+.page-hero {
+  background: linear-gradient(135deg, #0f172a 0%, #1d4ed8 100%);
+  color: #ffffff;
+  border-radius: 12px;
+  padding: 24px 28px;
+  margin-bottom: 22px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+.page-hero h1 {
+  margin: 0 0 6px;
+  font-size: 24px;
+}
+
+.page-hero p {
+  margin: 0;
+  opacity: 0.9;
+  font-size: 14px;
+}
+
+.hero-actions {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+/* ---------- Layout 2 cột cho Đăng ký bán hàng ---------- */
+.register-seller-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 20px;
+  align-items: start;
+}
+
+@media (max-width: 900px) {
+  .register-seller-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* ---------- Thẻ trạng thái đơn đăng ký ---------- */
+.app-status-card {
+  border: 1px solid var(--color-border);
+  border-radius: 10px;
+  padding: 16px;
+  margin-bottom: 14px;
+  background: #ffffff;
+  transition: box-shadow 0.15s ease;
+}
+
+.app-status-card:hover {
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.06);
+}
+
+.app-status-card.status-PENDING {
+  border-left: 5px solid #f59e0b;
+  background: #fffbeb;
+}
+
+.app-status-card.status-APPROVED {
+  border-left: 5px solid #16a34a;
+  background: #f0fdf4;
+}
+
+.app-status-card.status-REJECTED {
+  border-left: 5px solid #dc2626;
+  background: #fef2f2;
+}
+
+.app-status-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin-bottom: 8px;
+}
+
+.app-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 4px 12px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.app-badge.PENDING {
+  background: #fef3c7;
+  color: #b45309;
+  border: 1px solid #f59e0b;
+}
+
+.app-badge.APPROVED {
+  background: #dcfce7;
+  color: #15803d;
+  border: 1px solid #22c55e;
+}
+
+.app-badge.REJECTED {
+  background: #fee2e2;
+  color: #b91c1c;
+  border: 1px solid #ef4444;
+}
+
+.app-rejection-box {
+  margin-top: 10px;
+  padding: 10px 12px;
+  border-radius: 6px;
+  background: #fee2e2;
+  color: #991b1b;
+  font-size: 13px;
+}
+
+/* ---------- Xem trước Logo Cửa hàng ---------- */
+.logo-upload-row {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  margin: 10px 0;
+  flex-wrap: wrap;
+}
+
+.shop-logo-preview {
+  width: 76px;
+  height: 76px;
+  border-radius: 50%;
+  object-fit: cover;
+  border: 2px solid var(--color-primary);
+  background: #f3f4f6;
+  flex-shrink: 0;
+}
+
+/* ==========================================================
+   TRANG CỬA HÀNG CÔNG KHAI (shop-public.html)
+   ========================================================== */
+
+/* Thanh chọn nhanh cửa hàng */
+.shop-Directory-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-bottom: 18px;
+}
+
+.shop-pills-list {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.shop-pill-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 14px;
+  border-radius: 999px;
+  border: 1px solid var(--color-border);
+  background: #ffffff;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.shop-pill-btn:hover {
+  border-color: var(--color-primary);
+  color: var(--color-primary);
+}
+
+.shop-pill-btn.active {
+  background: var(--color-primary);
+  border-color: var(--color-primary);
+  color: #ffffff;
+}
+
+/* Header Hồ sơ Cửa hàng Công khai (Logo + Mô tả) */
+.shop-profile-header {
+  background: #ffffff;
+  border: 1px solid var(--color-border);
+  border-radius: 12px;
+  padding: 24px;
+  margin-bottom: 20px;
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  gap: 22px;
+  align-items: center;
+}
+
+@media (max-width: 768px) {
+  .shop-profile-header {
+    grid-template-columns: 1fr;
+    text-align: center;
+    justify-items: center;
+  }
+}
+
+.shop-public-logo {
+  width: 96px;
+  height: 96px;
+  border-radius: 50%;
+  object-fit: cover;
+  border: 3px solid #dbeafe;
+  background: #f8fafc;
+  box-shadow: 0 4px 10px rgba(37, 99, 235, 0.12);
+}
+
+.shop-public-title-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin-bottom: 6px;
+}
+
+.shop-public-title-row h1 {
+  margin: 0;
+  font-size: 24px;
+}
+
+.shop-public-meta {
+  display: flex;
+  gap: 16px;
+  flex-wrap: wrap;
+  font-size: 13px;
+  color: var(--color-muted);
+  margin-bottom: 10px;
+}
+
+.shop-public-description {
+  background: #f8fafc;
+  border-left: 3px solid var(--color-primary);
+  padding: 10px 14px;
+  border-radius: 6px;
+  font-size: 14px;
+  color: var(--color-text);
+  line-height: 1.6;
+  white-space: pre-line;
+}
+
+.shop-stats-box {
+  display: flex;
+  gap: 14px;
+  background: #f8fafc;
+  border: 1px solid var(--color-border);
+  padding: 14px 18px;
+  border-radius: 10px;
+}
+
+.shop-stat-item {
+  text-align: center;
+  min-width: 72px;
+}
+
+.shop-stat-item .num {
+  display: block;
+  font-size: 22px;
+  font-weight: 800;
+  color: var(--color-primary);
+}
+
+.shop-stat-item .lbl {
+  font-size: 12px;
+  color: var(--color-muted);
+}
+
+/* Tabs chuyển đổi Sản phẩm / Video của Shop */
+.shop-tabs-bar {
+  display: flex;
+  gap: 8px;
+  border-bottom: 2px solid var(--color-border);
+  margin-bottom: 20px;
+}
+
+.shop-tab-btn {
+  padding: 10px 20px;
+  border: none;
+  background: transparent;
+  font: inherit;
+  font-weight: 700;
+  color: var(--color-muted);
+  cursor: pointer;
+  border-bottom: 3px solid transparent;
+  margin-bottom: -2px;
+  transition: all 0.15s ease;
+}
+
+.shop-tab-btn:hover {
+  color: var(--color-primary);
+}
+
+.shop-tab-btn.active {
+  color: var(--color-primary);
+  border-bottom-color: var(--color-primary);
+}
+
+/* Lưới Sản phẩm của Shop */
+.shop-products-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(230px, 1fr));
+  gap: 18px;
+}
+
+.shop-product-card {
+  background: #ffffff;
+  border: 1px solid var(--color-border);
+  border-radius: 10px;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+
+.shop-product-card:hover {
+  transform: translateY(-3px);
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.08);
+}
+
+.shop-product-img-wrap {
+  width: 100%;
+  aspect-ratio: 1 / 1;
+  background: #f3f4f6;
+  overflow: hidden;
+  position: relative;
+}
+
+.shop-product-img-wrap img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.shop-product-body {
+  padding: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  flex: 1;
+}
+
+.shop-product-title {
+  font-weight: 700;
+  font-size: 15px;
+  color: var(--color-text);
+  line-height: 1.35;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.shop-product-price {
+  font-size: 17px;
+  font-weight: 800;
+  color: #dc2626;
+}
+
+.shop-product-meta {
+  font-size: 12px;
+  color: var(--color-muted);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+/* Lưới Video của Shop */
+.shop-videos-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  gap: 20px;
+}
+
+.shop-video-card {
+  background: #ffffff;
+  border: 1px solid var(--color-border);
+  border-radius: 12px;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
+}
+
+.shop-video-player-wrap {
+  width: 100%;
+  aspect-ratio: 9 / 14;
+  max-height: 360px;
+  background: #0f172a;
+  position: relative;
+  overflow: hidden;
+}
+
+.shop-video-player-wrap video {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.video-badge-overlay {
+  position: absolute;
+  top: 10px;
+  left: 10px;
+  background: rgba(15, 23, 42, 0.75);
+  color: #ffffff;
+  font-size: 12px;
+  font-weight: 600;
+  padding: 3px 9px;
+  border-radius: 999px;
+  pointer-events: none;
+}
+
+.shop-video-body {
+  padding: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  flex: 1;
+}
+
+.shop-video-title {
+  font-weight: 700;
+  font-size: 15px;
+  color: var(--color-text);
+  margin: 0;
+}
+
+.tagged-products-box {
+  margin-top: 4px;
+  padding-top: 8px;
+  border-top: 1px dashed var(--color-border);
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.tagged-product-pill {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 10px;
+  background: #eff6ff;
+  border: 1px solid #bfdbfe;
+  border-radius: 6px;
+  font-size: 12px;
+  text-decoration: none;
+  color: #1e40af;
+  font-weight: 600;
+}
+
+.tagged-product-pill:hover {
+  background: #dbeafe;
+}

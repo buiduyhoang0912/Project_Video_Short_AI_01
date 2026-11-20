@@ -1,9 +1,11 @@
 """Các hàm thao tác DB cho bảng shops (cửa hàng)."""
 
-from sqlalchemy import select
+from sqlalchemy import or_, select
 from sqlalchemy.orm import Session
 
+from app.models.product import Product
 from app.models.shop import Shop
+from app.models.video import Video, VideoProduct
 from app.schemas.shop import ShopCreate, ShopUpdate
 
 
@@ -55,3 +57,61 @@ def update_shop(db: Session, shop: Shop, data: ShopUpdate) -> Shop:
     db.refresh(shop)
     return shop
 
+
+def get_shop_videos(db: Session, shop: Shop) -> list[dict]:
+    """Lấy danh sách video công khai (VISIBLE) của chủ shop hoặc có gắn sản phẩm của shop."""
+    tagged_video_ids_subq = (
+        select(VideoProduct.video_id)
+        .join(Product, Product.id == VideoProduct.product_id)
+        .where(Product.shop_id == shop.id)
+    )
+
+    stmt = (
+        select(Video)
+        .where(
+            Video.status == "VISIBLE",
+            or_(
+                Video.user_id == shop.owner_id,
+                Video.id.in_(tagged_video_ids_subq),
+            ),
+        )
+        .order_by(Video.created_at.desc(), Video.id.desc())
+    )
+    videos = list(db.scalars(stmt).all())
+
+    results: list[dict] = []
+    for video in videos:
+        prod_stmt = (
+            select(Product)
+            .join(VideoProduct, VideoProduct.product_id == Product.id)
+            .where(
+                VideoProduct.video_id == video.id,
+                Product.shop_id == shop.id,
+                Product.status == "ACTIVE",
+            )
+        )
+        tagged_prods = list(db.scalars(prod_stmt).all())
+        results.append(
+            {
+                "id": video.id,
+                "user_id": video.user_id,
+                "title": video.title,
+                "description": video.description,
+                "video_url": video.video_url,
+                "thumbnail_url": video.thumbnail_url,
+                "duration_seconds": video.duration_seconds,
+                "view_count": int(video.view_count or 0),
+                "status": video.status,
+                "created_at": video.created_at,
+                "tagged_products": [
+                    {
+                        "id": p.id,
+                        "name": p.name,
+                        "price": float(p.price),
+                        "thumbnail_url": p.thumbnail_url,
+                    }
+                    for p in tagged_prods
+                ],
+            }
+        )
+    return results

@@ -1,0 +1,153 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Trang Cửa hàng công khai | ClipShop AI</title>
+  <link rel="icon" href="../assets/images/logo.svg">
+  <link rel="stylesheet" href="../css/style.css">
+  <link rel="stylesheet" href="../css/shop-public.css">
+</head>
+<body data-root="../">
+  <header id="app-header"></header>
+
+  <main class="container container-shop">
+    <!-- Thanh chọn / chuyển đổi Cửa hàng công khai -->
+    <section class="card">
+      <div class="shop-Directory-bar">
+        <div>
+          <strong style="font-size: 15px;">🏪 Khám phá các Cửa hàng trên ClipShop AI:</strong>
+          <span class="muted">Chọn một cửa hàng để xem Logo, mô tả, sản phẩm và video giới thiệu</span>
+        </div>
+        <div style="display: flex; gap: 8px; align-items: center; flex-wrap: wrap;">
+          <input
+            id="shop-search-input"
+            type="search"
+            placeholder="🔍 Tìm tên cửa hàng..."
+            style="width: 210px;"
+          >
+          <a href="seller-register.html" class="btn btn-small">📝 Đăng ký bán hàng</a>
+        </div>
+      </div>
+      <div id="shops-pills-list" class="shop-pills-list">
+        <span class="muted">Đang tải danh sách cửa hàng...</span>
+      </div>
+    </section>
+
+    <!-- Thông báo nếu chưa có cửa hàng nào -->
+    <section id="no-shop-card" class="card" hidden>
+      <h2>Chưa tìm thấy cửa hàng công khai nào</h2>
+      <p class="muted">
+        Hiện chưa có cửa hàng nào trong hệ thống hoặc từ khoá tìm kiếm không khớp. Bạn có thể đăng ký mở cửa hàng đầu tiên!
+      </p>
+      <a href="seller-register.html" class="btn btn-primary">📝 Đăng ký mở cửa hàng ngay</a>
+    </section>
+
+    <!-- Khung Hồ sơ Cửa hàng công khai (Logo, Mô tả, Thống kê) -->
+    <div id="shop-public-view" hidden>
+      <section class="shop-profile-header">
+        <img
+          id="public-shop-logo"
+          class="shop-public-logo"
+          src="../assets/images/logo.svg"
+          alt="Logo cửa hàng"
+        >
+
+        <div>
+          <div class="shop-public-title-row">
+            <h1 id="public-shop-name">Tên cửa hàng</h1>
+            <span id="public-shop-status" class="app-badge APPROVED">Đang hoạt động</span>
+          </div>
+
+          <div class="shop-public-meta">
+            <span>📍 Địa chỉ: <strong id="public-shop-address">Chưa cập nhật</strong></span>
+            <span>📅 Ngày mở: <strong id="public-shop-date">—</strong></span>
+            <span>🆔 Mã Shop: <strong id="public-shop-id">#1</strong></span>
+          </div>
+
+          <div id="public-shop-description" class="shop-public-description">
+            Mô tả giới thiệu cửa hàng...
+          </div>
+
+          <div id="owner-quick-actions" class="form-actions" style="margin-top: 12px;" hidden>
+            <a href="seller-register.html" class="btn btn-small">✏️ Sửa Logo &amp; Hồ sơ Shop</a>
+            <a href="seller.html" class="btn btn-small btn-primary">🧾 Quản lý sản phẩm (Seller Center)</a>
+          </div>
+        </div>
+
+        <div class="shop-stats-box">
+          <div class="shop-stat-item">
+            <span id="public-stat-products" class="num">0</span>
+            <span class="lbl">Sản phẩm</span>
+          </div>
+          <div class="shop-stat-item">
+            <span id="public-stat-videos" class="num">0</span>
+            <span class="lbl">Video Shop</span>
+          </div>
+        </div>
+      </section>
+
+      <!-- Thanh Tabs: Sản phẩm của Shop & Video của Shop -->
+      <div class="shop-tabs-bar">
+        <button
+          id="tab-btn-products"
+          type="button"
+          class="shop-tab-btn active"
+          data-tab="products"
+        >
+          🛍️ Danh sách sản phẩm (<span id="tab-count-products">0</span>)
+        </button>
+        <button
+          id="tab-btn-videos"
+          type="button"
+          class="shop-tab-btn"
+          data-tab="videos"
+        >
+          🎬 Video của Shop (<span id="tab-count-videos">0</span>)
+        </button>
+      </div>
+
+      <!-- TAB 1: Danh sách sản phẩm của Shop -->
+      <section id="tab-panel-products">
+        <div class="card" style="padding: 14px 18px; margin-bottom: 18px;">
+          <div class="list-header">
+            <div style="display: flex; gap: 10px; flex-wrap: wrap; align-items: center;">
+              <input
+                id="shop-product-search"
+                type="search"
+                placeholder="🔍 Tìm sản phẩm trong shop..."
+                style="width: 240px;"
+              >
+              <select id="shop-product-category" style="width: auto; min-width: 160px;">
+                <option value="ALL">Tất cả danh mục</option>
+              </select>
+              <select id="shop-product-sort" style="width: auto; min-width: 160px;">
+                <option value="newest">Mới nhất</option>
+                <option value="price_asc">Giá: Thấp đến Cao</option>
+                <option value="price_desc">Giá: Cao đến Thấp</option>
+              </select>
+            </div>
+            <div id="shop-products-summary" class="muted">0 sản phẩm</div>
+          </div>
+        </div>
+
+        <div id="shop-products-grid" class="shop-products-grid"></div>
+      </section>
+
+      <!-- TAB 2: Danh sách Video của Shop -->
+      <section id="tab-panel-videos" hidden>
+        <div id="shop-videos-grid" class="shop-videos-grid"></div>
+      </section>
+    </div>
+  </main>
+
+  <footer id="app-footer"></footer>
+
+  <script src="https://cdn.jsdelivr.net/npm/axios@1.7.9/dist/axios.min.js"></script>
+  <script src="../js/config.js"></script>
+  <script src="../js/api.js"></script>
+  <script src="../js/utils.js"></script>
+  <script src="../js/layout.js"></script>
+  <script src="../js/pages/shop-public.js"></script>
+</body>
+</html>

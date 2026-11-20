@@ -254,3 +254,61 @@ def test_reject_application_then_can_resubmit(client, db_session):
     assert r2.status_code == 201
     assert r2.json()["status"] == "PENDING"
 
+
+def test_shop_logo_upload_and_public_shop_videos(client, db_session):
+    from io import BytesIO
+    from PIL import Image
+    from app.models.video import Video
+    from app.routers.shops import SHOP_UPLOADS_DIR
+
+    user_id, user_headers = register_and_login(
+        client, "seller_video", "sv@example.com"
+    )
+    client.post("/api/seller-applications/quick-setup", headers=user_headers)
+
+    r_me_shop = client.get("/api/shops/me", headers=user_headers)
+    assert r_me_shop.status_code == 200
+    shop_id = r_me_shop.json()["id"]
+
+    # 1. Upload logo cửa hàng
+    buf = BytesIO()
+    Image.new("RGB", (48, 48), color=(0, 128, 255)).save(buf, format="PNG")
+    r_logo = client.post(
+        f"/api/shops/{shop_id}/logo",
+        files={"file": ("logo.png", buf.getvalue(), "image/png")},
+        headers=user_headers,
+    )
+    assert r_logo.status_code == 200
+    avatar_key = r_logo.json()["avatar_key"]
+    assert avatar_key.startswith("/uploads/shops/")
+
+    fname = avatar_key.removeprefix("/uploads/shops/")
+    fpath = SHOP_UPLOADS_DIR / fname
+    assert fpath.exists()
+    fpath.unlink(missing_ok=True)
+
+    # 2. Tạo video công khai của chủ shop và kiểm tra GET /api/shops/{shop_id}/videos
+    db = db_session()
+    db.add(
+        Video(
+            user_id=user_id,
+            title="Video giới thiệu sản phẩm của Shop",
+            description="Review thực tế tại cửa hàng",
+            video_url="/uploads/videos/demo.mp4",
+            thumbnail_url="/uploads/thumbnails/demo.jpg",
+            duration_seconds=25,
+            view_count=12,
+            status="VISIBLE",
+        )
+    )
+    db.commit()
+    db.close()
+
+    r_videos = client.get(f"/api/shops/{shop_id}/videos")
+    assert r_videos.status_code == 200
+    videos = r_videos.json()
+    assert len(videos) == 1
+    assert videos[0]["title"] == "Video giới thiệu sản phẩm của Shop"
+    assert videos[0]["view_count"] == 12
+
+

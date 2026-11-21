@@ -78,6 +78,13 @@ class Product(Base):
         default=utc_now,
     )
 
+    # Kiểm duyệt (Admin ẩn sản phẩm vi phạm): lý do, người ẩn, thời điểm. NULL = chưa bị Admin ẩn.
+    moderation_reason: Mapped[str | None] = mapped_column(String(500), nullable=True)
+    moderated_by: Mapped[int | None] = mapped_column(
+        BIGINT(unsigned=True), ForeignKey("users.id"), nullable=True
+    )
+    moderated_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+
     # Relationships
     shop: Mapped["Shop"] = relationship("Shop", back_populates="products")  # noqa: F821
     category: Mapped["Category"] = relationship("Category", back_populates="products")  # noqa: F821

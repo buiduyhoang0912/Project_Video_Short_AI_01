@@ -207,7 +207,11 @@ def get_shop_orders(
             )
         ]
 
-    return [_serialize_order(o, shop.name) for o in orders]
+    from app.crud import voucher as voucher_crud  # import muộn để tránh vòng lặp import
+
+    return voucher_crud.attach_voucher_info(
+        db, [_serialize_order(o, shop.name) for o in orders]
+    )
 
 
 def get_shop_order_or_error(
@@ -261,6 +265,10 @@ def update_shop_order_status(
                 product.sold_count = max(
                     0, int(product.sold_count or 0) - int(item.quantity)
                 )
+        # Trả lại lượt dùng mã giảm giá của shop cho người mua (T3D2BFB)
+        from app.crud import voucher as voucher_crud
+
+        voucher_crud.release_voucher_for_order(db, order.id)
 
     order.status = target_status
     db.commit()

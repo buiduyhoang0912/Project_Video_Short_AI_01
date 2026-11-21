@@ -793,10 +793,13 @@ pageSizeSelect.addEventListener("change", () => {
 const tabBtnProducts = document.getElementById("seller-tab-btn-products");
 const tabBtnOrders = document.getElementById("seller-tab-btn-orders");
 const tabBtnAnalytics = document.getElementById("seller-tab-btn-analytics");
+const tabBtnVouchers = document.getElementById("seller-tab-btn-vouchers");
 const panelProducts = document.getElementById("seller-panel-products");
 const panelOrders = document.getElementById("seller-panel-orders");
 const panelAnalytics = document.getElementById("seller-panel-analytics");
+const panelVouchers = document.getElementById("seller-panel-vouchers");
 const navOrdersCount = document.getElementById("nav-orders-count");
+const navVouchersCount = document.getElementById("nav-vouchers-count");
 
 // DOM Elements - Đơn hàng của Shop
 const orderSearchInput = document.getElementById("order-search-input");
@@ -830,15 +833,19 @@ function switchSellerTab(tabName) {
   panelProducts.hidden = tabName !== "products";
   panelOrders.hidden = tabName !== "orders";
   panelAnalytics.hidden = tabName !== "analytics";
+  if (panelVouchers) panelVouchers.hidden = tabName !== "vouchers";
 
   if (tabBtnProducts) tabBtnProducts.classList.toggle("active", tabName === "products");
   if (tabBtnOrders) tabBtnOrders.classList.toggle("active", tabName === "orders");
   if (tabBtnAnalytics) tabBtnAnalytics.classList.toggle("active", tabName === "analytics");
+  if (tabBtnVouchers) tabBtnVouchers.classList.toggle("active", tabName === "vouchers");
 
   if (tabName === "orders" && currentShop) {
     loadShopOrders();
   } else if (tabName === "analytics" && currentShop) {
     loadShopAnalytics();
+  } else if (tabName === "vouchers" && currentShop) {
+    loadShopVouchers();
   }
 }
 
@@ -988,6 +995,14 @@ function renderShopOrders() {
 
           <div class="shop-order-footer">
             <div>
+              ${
+                order.voucher_code && Number(order.discount_amount) > 0
+                  ? `<div class="muted" style="font-size: 13px; margin-bottom: 4px;">
+                       Tạm tính: ${formatMoney(order.subtotal_amount ?? order.total_amount + order.discount_amount)}
+                       · <span class="voucher-tag-inline">🎟️ Mã ${escapeHtml(order.voucher_code)}: -${formatMoney(order.discount_amount)}</span>
+                     </div>`
+                  : ""
+              }
               Tổng tiền đơn: <strong style="font-size: 18px; color: #dc2626;">${formatMoney(order.total_amount)}</strong>
             </div>
             <div style="display: flex; gap: 8px; flex-wrap: wrap;">
@@ -1256,9 +1271,9 @@ async function initSellerCenter() {
   await loadCategories();
   const loggedIn = await checkSellerSession();
   if (loggedIn) {
-    await Promise.all([loadShopProducts(), loadShopAnalytics()]);
+    await Promise.all([loadShopProducts(), loadShopAnalytics(), loadShopVouchers()]);
     const tabParam = new URLSearchParams(window.location.search).get("tab");
-    if (tabParam === "orders" || tabParam === "analytics") {
+    if (tabParam === "orders" || tabParam === "analytics" || tabParam === "vouchers") {
       switchSellerTab(tabParam);
     }
   }

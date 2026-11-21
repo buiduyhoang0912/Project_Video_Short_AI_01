@@ -90,6 +90,37 @@ class ProductStockUpdate(BaseModel):
     stock: int = Field(ge=0)
 
 
+class ProductAiSuggestRequest(BaseModel):
+    raw_name: str = Field(
+        min_length=1,
+        max_length=200,
+        description="Tên sản phẩm thô hoặc ý tưởng sản phẩm",
+    )
+    category_id: int | None = None
+    category_name: str | None = Field(default=None, max_length=100)
+    price: Decimal | float | None = Field(default=None, ge=0)
+    features: str | None = Field(
+        default=None,
+        max_length=1000,
+        description="Đặc điểm nổi bật hoặc ghi chú thêm của người bán",
+    )
+    duration_seconds: int = Field(
+        default=45,
+        ge=30,
+        le=60,
+        description="Thời lượng kịch bản video ngắn (30-60 giây)",
+    )
+
+
+class ProductAiSuggestResponse(BaseModel):
+    suggested_name: str
+    alternative_names: list[str] = Field(default_factory=list)
+    suggested_description: str
+    video_script_30_60s: str
+    suggested_hashtags: list[str] = Field(default_factory=list)
+    provider: str = "clipshop-ai"
+
+
 # --- Output Schemas ---
 class ProductListItemOut(BaseModel):
     """Item trả về trong danh sách sản phẩm (tìm kiếm / lọc / phân trang)."""

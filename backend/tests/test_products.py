@@ -389,3 +389,108 @@ def test_product_with_order_only_hidden_not_hard_deleted(client, db_session):
     db = db_session()
     assert db.get(Product, p2_id) is None
     db.close()
+
+
+def test_products_unauthenticated_invalid_and_buyer_forbidden(
+    client, db_session
+):
+    _, _, category_id, seller_headers = create_seller_with_shop(
+        client, db_session, "seller_sec", "sec@shop.com"
+    )
+
+    # Tạo 1 sản phẩm hợp lệ
+    r_prod = client.post(
+        "/api/products",
+        json={
+            "category_id": category_id,
+            "name": "Bàn phím cơ RGB",
+            "price": 750000,
+            "stock": 15,
+        },
+        headers=seller_headers,
+    )
+    assert r_prod.status_code == 201
+    prod_id = r_prod.json()["id"]
+
+    # 1. Chưa đăng nhập (401 Unauthorized)
+    assert (
+        client.post(
+            "/api/products",
+            json={
+                "category_id": category_id,
+                "name": "SP Lậu",
+                "price": 10000,
+                "stock": 1,
+            },
+        ).status_code
+        == 401
+    )
+    assert (
+        client.put(
+            f"/api/products/{prod_id}", json={"name": "Sửa Lậu"}
+        ).status_code
+        == 401
+    )
+    assert (
+        client.patch(
+            f"/api/products/{prod_id}/stock", json={"stock": 99}
+        ).status_code
+        == 401
+    )
+    assert client.delete(f"/api/products/{prod_id}").status_code == 401
+    assert client.get("/api/shops/me/products").status_code == 401
+
+    # 2. Sai dữ liệu (400 / 404 / 422)
+    # Danh mục không tồn tại -> 404
+    r_bad_cat = client.post(
+        "/api/products",
+        json={
+            "category_id": 99999,
+            "name": "SP Sai Danh Mục",
+            "price": 100000,
+            "stock": 5,
+        },
+        headers=seller_headers,
+    )
+    assert r_bad_cat.status_code == 404
+
+    # Upload file không phải định dạng ảnh cho sản phẩm -> 422
+    r_bad_img = client.post(
+        f"/api/products/{prod_id}/images",
+        files=[("files", ("malware.exe", b"MZ-fake", "application/octet-stream"))],
+        headers=seller_headers,
+    )
+    assert r_bad_img.status_code == 422
+
+    # Xem sản phẩm không tồn tại -> 404
+    assert client.get("/api/products/999999").status_code == 404
+
+    # 3. Sai quyền (403 Forbidden): Tài khoản USER thường (chưa phải SELLER) cố tạo sản phẩm
+    client.post(
+        "/auth/register",
+        json={
+            "email": "buyer_only@shop.com",
+            "username": "buyer_only",
+            "password": "password123",
+            "display_name": "Buyer Only",
+        },
+    )
+    r_buyer_login = client.post(
+        "/auth/login",
+        json={"identifier": "buyer_only", "password": "password123"},
+    )
+    buyer_headers = {
+        "Authorization": f"Bearer {r_buyer_login.json()['access_token']}"
+    }
+    r_buyer_create = client.post(
+        "/api/products",
+        json={
+            "category_id": category_id,
+            "name": "SP Của Buyer",
+            "price": 100000,
+            "stock": 1,
+        },
+        headers=buyer_headers,
+    )
+    assert r_buyer_create.status_code in (403, 404)
+

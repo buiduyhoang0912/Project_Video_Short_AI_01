@@ -51,18 +51,12 @@ const http = axios.create({
   headers: { "Content-Type": "application/json" },
 });
 
-<<<<<<< HEAD
-// Tự động đính kèm token đăng nhập cho mọi request nếu có trong localStorage
-http.interceptors.request.use((config) => {
-  const token = localStorage.getItem("token") || localStorage.getItem("access_token");
-=======
 const isAuthPath = (url) => typeof url === "string" && url.startsWith("/auth/");
 
 // Request: /auth/* gọi vào AUTH_BASE_URL; có token thì tự đính kèm Authorization: Bearer
 http.interceptors.request.use((config) => {
   if (isAuthPath(config.url)) config.baseURL = CONFIG.AUTH_BASE_URL;
   const token = session.getToken();
->>>>>>> feature/t3d24c4-product-crud
   if (token) config.headers.Authorization = `Bearer ${token}`;
   return config;
 });
@@ -95,7 +89,8 @@ function pageNeedsAuth() {
   if (b.roles || b.auth === "required") return true;
   if (b.auth === "self") {
     const p = new URLSearchParams(window.location.search);
-    return !(p.get("id") || p.get("user_id")); // feed dùng ?user_id=, nơi khác dùng ?id=
+    // feed dùng ?user_id=, nơi khác dùng ?id=, hồ sơ công khai theo tên dùng ?username=
+    return !(p.get("id") || p.get("user_id") || p.get("username"));
   }
   return false;
 }
@@ -157,14 +152,15 @@ const api = {
   put: (path, body) => http.put(path, body).then((res) => res.data),
   patch: (path, body) => http.patch(path, body).then((res) => res.data),
   delete: (path) => http.delete(path).then((res) => res.data),
-<<<<<<< HEAD
-  upload: (path, formData) =>
+  // Upload tệp (FormData): để trình duyệt tự gắn boundary cho multipart
+    // Upload tệp (FormData): hỗ trợ config (như onUploadProgress) và timeout 60s cho video
+  upload: (path, formData, config = {}) =>
     http
       .post(path, formData, {
         headers: { "Content-Type": "multipart/form-data" },
+        timeout: 60000,
+        ...config,
       })
       .then((res) => res.data),
 };
-=======
-};
->>>>>>> feature/t3d24c4-product-crud
+

@@ -18,6 +18,8 @@ from app.models.product import Product
 from app.models.shop import Shop
 from app.models.user import User
 from app.schemas.product import (
+    ProductAiSuggestRequest,
+    ProductAiSuggestResponse,
     ProductCreate,
     ProductDetailOut,
     ProductListResponse,
@@ -141,6 +143,24 @@ def list_my_shop_products(
     )
 
 
+@router.post(
+    "/ai-suggest",
+    response_model=ProductAiSuggestResponse,
+    summary="[AI] Trợ lý gợi ý tên, mô tả sản phẩm và kịch bản video 30-60s cho người bán",
+)
+def suggest_product_content_by_ai(
+    data: ProductAiSuggestRequest,
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    if not data.raw_name or not data.raw_name.strip():
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="Vui lòng nhập tên hoặc ý tưởng sản phẩm để AI gợi ý",
+        )
+    return product_crud.generate_seller_ai_content(db, data)
+
+
 @router.get(
     "/{product_id}",
     response_model=ProductDetailOut,
@@ -198,6 +218,17 @@ def update_product(
     db: Session = Depends(get_db),
 ):
     product = get_owned_product_or_error(product_id, user, db)
+
+    # Sản phẩm bị Admin ẩn do vi phạm: người bán không được tự bật hiển thị lại
+    if (
+        product.moderated_at is not None
+        and data.status is not None
+        and data.status != "HIDDEN"
+    ):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Sản phẩm đang bị Admin ẩn do vi phạm, không thể tự hiển thị lại",
+        )
 
     if data.name is not None and not data.name.strip():
         raise HTTPException(

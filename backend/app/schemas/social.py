@@ -167,9 +167,52 @@ class HashtagItem(BaseModel):
     video_count: int = 0
 
 
+class TrendingHashtagItem(BaseModel):
+    rank: int
+    tag: str
+    video_count: int = 0
+    like_count: int = 0
+    comment_count: int = 0
+    share_count: int = 0
+    view_count: int = 0
+    interaction_count: int = 0
+    score: int = 0
+
+
 class SearchResultOut(BaseModel):
     query: str
     type: str
     videos: list[SearchVideoItem] = []
     users: list[SearchUserItem] = []
     hashtags: list[HashtagItem] = []
+
+
+class AiProductRecommendation(BaseModel):
+    id: int
+    name: str
+    description: str | None = None
+    price: float
+    stock: int = 0
+    sold_count: int = 0
+    shop_id: int
+    shop_name: str | None = None
+    category_name: str | None = None
+    thumbnail_url: str | None = None
+    link: str
+
+
+class AiQuotaOut(BaseModel):
+    daily_limit: int
+    used_today: int
+    remaining_today: int
+
+
+class AiChatResponse(BaseModel):
+    reply: str
+    user_message: ChatLogOut
+    assistant_message: ChatLogOut
+    recommended_products: list[AiProductRecommendation] = []
+    provider: str = "mysql-advisor"
+    daily_limit: int
+    used_today: int
+    remaining_today: int

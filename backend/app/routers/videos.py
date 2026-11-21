@@ -4,7 +4,7 @@ import subprocess
 from pathlib import Path
 from tempfile import TemporaryDirectory
 
-from fastapi import APIRouter, Depends, File, Form, HTTPException, Response, UploadFile
+from fastapi import APIRouter, Depends, File, Form, HTTPException, Query, Response, UploadFile
 from sqlalchemy.orm import Session
 
 from app.core.video_auth import get_video_user
@@ -16,11 +16,20 @@ from app.core.video_media import (
 from app.db.session import get_db
 from app.models.user import User
 
-from app.schemas.video import VideoDescription, VideoDescriptionUpdate
+from app.schemas.video import (
+    UserVideoListResponse,
+    VideoDescription,
+    VideoDescriptionUpdate,
+    VideoFeedResponse,
+    VideoViewResponse,
+)
 
 from app.crud.video import (
     create_uploaded_video,
     delete_owned_video,
+    get_feed_videos,
+    get_user_videos,
+    increment_video_view,
     update_video_description,
 )
 
@@ -166,3 +175,71 @@ def delete_video(
     remove_uploaded_files(video_url, thumbnail_url)
 
     return Response(status_code=204)
+
+# --- APIs phục vụ Feed, Video người dùng và Tăng Lượt Xem ---
+
+@router.get("/feed", response_model=VideoFeedResponse)
+def get_for_you_feed(
+    limit: int = Query(10, ge=1, le=50, description="Số lượng video mỗi lần tải (1 - 50)"),
+    cursor: int | None = Query(None, description="ID video cuối cùng ở lần tải trước"),
+    db: Session = Depends(get_db),
+):
+    """
+    API Feed Dành cho bạn (For You):
+    - Phân trang dạng cuộn qua tham số `cursor`.
+    - Lọc bỏ video HIDDEN.
+    - Ưu tiên video mới nhất và nhiều tương tác nhất.
+    """
+    items, next_cursor, has_more = get_feed_videos(db=db, limit=limit, cursor=cursor)
+
+    return VideoFeedResponse(
+        items=items,
+        next_cursor=str(next_cursor) if next_cursor is not None else None,
+        has_more=has_more,
+    )
+
+
+@router.get("/users/{user_id}", response_model=UserVideoListResponse)
+def get_user_video_list(
+    user_id: int,
+    limit: int = Query(10, ge=1, le=50, description="Số lượng video mỗi lần tải (1 - 50)"),
+    cursor: int | None = Query(None, description="ID video cuối cùng ở lần tải trước"),
+    db: Session = Depends(get_db),
+):
+    """
+    API Danh sách video công khai của một người dùng:
+    - Lọc theo `user_id`.
+    - Bỏ qua video HIDDEN.
+    """
+    items, next_cursor, has_more = get_user_videos(
+        db=db, user_id=user_id, limit=limit, cursor=cursor
+    )
+
+    return UserVideoListResponse(
+        items=items,
+        next_cursor=str(next_cursor) if next_cursor is not None else None,
+        has_more=has_more,
+    )
+
+
+@router.post("/{video_id}/views", response_model=VideoViewResponse)
+def record_video_view(
+    video_id: int,
+    db: Session = Depends(get_db),
+):
+    """
+    API ghi nhận lượt xem khi người dùng xem video quá 3 giây.
+    Tăng `view_count` lên 1 trong cơ sở dữ liệu.
+    """
+    new_view_count = increment_video_view(db=db, video_id=video_id)
+
+    if new_view_count is None:
+        raise HTTPException(status_code=404, detail="Không tìm thấy video.")
+
+    db.commit()
+
+    return VideoViewResponse(
+        id=video_id,
+        view_count=new_view_count,
+        message="Ghi nhận lượt xem thành công",
+    )

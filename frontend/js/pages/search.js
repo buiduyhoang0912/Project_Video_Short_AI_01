@@ -23,6 +23,7 @@
     renderLayout();
     bindEvents();
     parseUrlParams();
+    loadTrendingHashtags();
     doSearch(true);
   }
 
@@ -452,6 +453,71 @@
         filterByHashtag(tag);
       });
     });
+  }
+
+  // 4. BẢNG XẾP HẠNG HASHTAG THỊNH HÀNH TRONG 7 NGÀY (TASK T3D2BE1)
+  async function loadTrendingHashtags() {
+    const listEl = document.getElementById("trending-hashtags-list");
+    if (!listEl) return;
+
+    try {
+      const items = await api.get("/search/trending-hashtags", {
+        days: 7,
+        limit: 10,
+      });
+
+      if (!Array.isArray(items) || items.length === 0) {
+        listEl.innerHTML = `<div class="muted" style="padding:8px 0;">Chưa có hashtag thịnh hành trong 7 ngày qua.</div>`;
+        return;
+      }
+
+      const rankMedal = (r) => {
+        if (r === 1) return "🥇 #1";
+        if (r === 2) return "🥈 #2";
+        if (r === 3) return "🥉 #3";
+        return `#${r}`;
+      };
+
+      listEl.innerHTML = items
+        .map((item) => {
+          const rankClass = item.rank <= 3 ? `rank-top-${item.rank}` : "rank-normal";
+          const isSelected =
+            state.tag &&
+            state.tag.replace(/^#/, "").toLowerCase() === item.tag.toLowerCase();
+          return `
+            <div class="trending-tag-card ${rankClass}${isSelected ? " active-trend" : ""}" data-tag="${escapeHtml(
+              item.tag
+            )}" title="Bấm để xem video có hashtag #${escapeHtml(item.tag)}">
+              <div class="trending-tag-top">
+                <span class="trending-rank-badge ${rankClass}">${rankMedal(item.rank)}</span>
+                <span class="trending-tag-name">#${escapeHtml(item.tag)}</span>
+              </div>
+              <div class="trending-tag-metrics">
+                <span>🎬 <strong>${formatNumber(item.video_count || 0)}</strong> video</span>
+                <span>⚡ <strong>${formatNumber(item.interaction_count || 0)}</strong> tương tác</span>
+              </div>
+              <div class="trending-tag-breakdown">
+                ❤️ ${formatNumber(item.like_count || 0)} · 💬 ${formatNumber(
+            item.comment_count || 0
+          )} · 🔗 ${formatNumber(item.share_count || 0)}
+              </div>
+            </div>
+          `;
+        })
+        .join("");
+
+      listEl.querySelectorAll(".trending-tag-card").forEach((card) => {
+        card.addEventListener("click", () => {
+          const tag = card.dataset.tag;
+          filterByHashtag(tag);
+          listEl.querySelectorAll(".trending-tag-card").forEach((c) => {
+            c.classList.toggle("active-trend", c.dataset.tag === tag);
+          });
+        });
+      });
+    } catch (_) {
+      listEl.innerHTML = `<div class="muted" style="padding:8px 0;">Không tải được bảng xếp hạng hashtag.</div>`;
+    }
   }
 
   // Chức năng: "Bấm hashtag mở danh sách video có hashtag đó"

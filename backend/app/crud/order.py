@@ -15,6 +15,7 @@ from fastapi import HTTPException, status
 from sqlalchemy import select
 from sqlalchemy.orm import Session, joinedload
 
+from app.crud import voucher as voucher_crud
 from app.models.cart import Cart, CartItem
 from app.models.order import Address, Order, OrderItem
 from app.models.product import Product
@@ -113,8 +114,16 @@ def create_orders_from_cart(
         for it in items_to_order:
             items_by_shop[it.product.shop_id].append(it)
 
+        # Mã giảm giá của shop (T3D2BFB): khoá dòng mã để không vượt số lượt khi nhiều người dùng cùng lúc
+        vouchers_by_shop = voucher_crud.resolve_vouchers_for_checkout(
+            db, checkout_data.voucher_codes, set(items_by_shop.keys()), lock=True
+        )
+        voucher_info: dict[int, dict] = {}  # id(order) -> thông tin giảm giá để trả về
+
         created_orders: list[Order] = []
         total_all_amount = Decimal("0")
+        total_before_discount = Decimal("0")
+        total_discount = Decimal("0")
 
         # Tách đơn theo từng Shop
         for shop_id, shop_cart_items in items_by_shop.items():
@@ -164,10 +173,19 @@ def create_orders_from_cart(
             payment_method_str = "SIMULATED" if is_simulated else "COD"
             order_status = "confirmed" if is_simulated else "pending"
 
+            # Kiểm tra mã giảm giá của shop và TÍNH LẠI TIỀN tại server
+            voucher = vouchers_by_shop.get(shop_id)
+            discount = Decimal("0")
+            if voucher is not None:
+                discount = voucher_crud.validate_voucher_for_order(
+                    db, voucher, user_id, shop_total
+                )
+            shop_pay_amount = shop_total - discount
+
             order = Order(
                 buyer_id=user_id,
                 shop_id=shop_id,
-                total_amount=shop_total,
+                total_amount=shop_pay_amount,
                 payment_method=payment_method_str,
                 status=order_status,
                 recipient_name=rec_name,
@@ -176,8 +194,19 @@ def create_orders_from_cart(
                 items=order_items,
             )
             db.add(order)
+            if voucher is not None:
+                voucher_crud.record_voucher_usage(
+                    db, voucher, order, user_id, shop_total, discount
+                )
+            voucher_info[id(order)] = {
+                "subtotal_amount": float(shop_total),
+                "discount_amount": float(discount),
+                "voucher_code": voucher.code if voucher is not None else None,
+            }
             created_orders.append(order)
-            total_all_amount += shop_total
+            total_all_amount += shop_pay_amount
+            total_before_discount += shop_total
+            total_discount += discount
 
         # Xóa các dòng đã đặt khỏi giỏ hàng trong cùng transaction
         for it in items_to_order:
@@ -229,6 +258,7 @@ def create_orders_from_cart(
                 recipient_address=o.recipient_address,
                 created_at=o.created_at,
                 items=item_resps,
+                **voucher_info.get(id(o), {}),
             )
         )
 
@@ -237,6 +267,8 @@ def create_orders_from_cart(
         total_orders_created=len(created_orders),
         total_amount=round(float(total_all_amount), 2),
         orders=order_responses,
+        total_before_discount=round(float(total_before_discount), 2),
+        total_discount=round(float(total_discount), 2),
     )
 
 
@@ -283,7 +315,7 @@ def get_user_orders(db: Session, user_id: int) -> list[OrderResponse]:
                 items=item_resps,
             )
         )
-    return res
+    return voucher_crud.attach_voucher_info(db, res)
 
 
 def get_order_detail(db: Session, user_id: int, order_id: int) -> OrderResponse:
@@ -315,7 +347,7 @@ def get_order_detail(db: Session, user_id: int, order_id: int) -> OrderResponse:
         )
         for it in o.items
     ]
-    return OrderResponse(
+    resp = OrderResponse(
         id=o.id,
         buyer_id=o.buyer_id,
         shop_id=o.shop_id,
@@ -329,3 +361,4 @@ def get_order_detail(db: Session, user_id: int, order_id: int) -> OrderResponse:
         created_at=o.created_at,
         items=item_resps,
     )
+    return voucher_crud.attach_voucher_info(db, [resp])[0]

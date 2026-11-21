@@ -122,7 +122,15 @@
 
       <div class="seller-layout">
         <section class="card">
-          <h2 id="form-title">Thêm sản phẩm mới</h2>
+          <div class="form-header-with-ai">
+            <h2 id="form-title">Thêm sản phẩm mới</h2>
+            <button id="btn-ai-suggest" type="button" class="btn-ai-magic" title="Dùng AI gợi ý tên, mô tả và kịch bản video 30-60s">
+              ✨ Gợi ý bằng AI
+            </button>
+          </div>
+          <p class="muted" style="margin-top: 0; font-size: 13px;">
+            Nhập tên/ý tưởng sản phẩm rồi bấm <strong>"✨ Gợi ý bằng AI"</strong> để AI tự viết tên chuẩn SEO, mô tả và kịch bản video 30–60s (bạn có thể sửa lại trước khi lưu).
+          </p>
           <form id="product-form">
             <label for="product-name">Tên sản phẩm *</label>
             <input
@@ -131,7 +139,7 @@
               type="text"
               required
               maxlength="200"
-              placeholder="VD: Áo thun oversize Cotton"
+              placeholder="VD: Áo thun oversize Cotton hoặc Tai nghe Bluetooth"
             >
 
             <label for="product-category">Danh mục *</label>
@@ -174,13 +182,40 @@
               </select>
             </div>
 
-            <label for="product-description">Mô tả sản phẩm</label>
+            <label for="product-description">Mô tả sản phẩm (Có thể sửa sau khi AI gợi ý)</label>
             <textarea
               id="product-description"
               name="description"
-              rows="3"
+              rows="5"
               placeholder="Chất liệu, kích thước, hướng dẫn bảo quản..."
             ></textarea>
+
+            <!-- Khung Trợ lý AI gợi ý phương án tên & Kịch bản Video 30-60 giây -->
+            <div id="ai-assistant-box" class="ai-assistant-panel" hidden>
+              <div class="ai-assistant-header">
+                <span class="ai-assistant-title">🤖 Trợ lý AI gợi ý Nội dung &amp; Kịch bản Video</span>
+                <span id="ai-provider-badge" class="ai-provider-tag">AI</span>
+              </div>
+              <div class="muted" style="font-size: 12px;">
+                Tên và mô tả đã được điền vào form ở trên để bạn tự do chỉnh sửa trước khi bấm Lưu. Bạn cũng có thể chọn nhanh phương án tên khác dưới đây:
+              </div>
+              <div id="ai-alt-names-list" class="ai-alt-names-wrap"></div>
+
+              <label for="ai-video-script" style="margin-top: 8px; color: #4c1d95;">
+                🎬 Kịch bản Video ngắn (30–60 giây) — Có thể chỉnh sửa:
+              </label>
+              <textarea
+                id="ai-video-script"
+                rows="7"
+                placeholder="Kịch bản quay và lời thoại video 30-60 giây sẽ hiển thị tại đây..."
+              ></textarea>
+              <div id="ai-hashtags-list" class="ai-hashtags-row"></div>
+              <div class="form-actions" style="margin-top: 10px;">
+                <button id="btn-copy-script" type="button" class="btn btn-small">
+                  📋 Sao chép kịch bản Video
+                </button>
+              </div>
+            </div>
 
             <label>Hình ảnh sản phẩm (Chọn nhiều ảnh, có xem trước)</label>
             <label for="product-images-input" class="upload-dropzone">

@@ -1,10 +1,25 @@
 // Các hàm tiện ích dùng chung cho nhiều trang.
 
-// Chống XSS: luôn dùng hàm này khi chèn dữ liệu người dùng nhập vào innerHTML
+// Chống XSS: luôn dùng hàm này khi chèn dữ liệu người dùng nhập vào innerHTML hoặc thuộc tính
 function escapeHtml(value) {
-  const div = document.createElement("div");
-  div.textContent = value ?? "";
-  return div.innerHTML;
+  if (value == null) return "";
+  return String(value)
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
+}
+
+// Chống XSS chuyên biệt khi chèn giá trị vào thuộc tính HTML (data-*, title, value...)
+function escapeAttr(value) {
+  if (value == null) return "";
+  return String(value)
+    .replace(/&/g, "&amp;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;");
 }
 
 // 45000 -> "45.000 ₫"

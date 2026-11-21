@@ -1,5 +1,5 @@
-// Trang quản trị (T3D2003): Đơn đăng ký bán hàng + Tài khoản.
-// Backend kiểm tra quyền ADMIN; data-roles="ADMIN" ở <body> chỉ để ẩn/chuyển hướng trên giao diện.
+// Trang quản trị: Đơn đăng ký bán hàng + Tài khoản + Điều hướng Tab.
+// Backend kiểm tra quyền ADMIN; data-roles="ADMIN" ở <body> để kiểm tra ở layout frontend.
 
 const APP_STATUS = {
   PENDING: { label: "Chờ duyệt", cls: "badge-pending" },
@@ -16,12 +16,20 @@ let rejectingId = null;
 let currentAdminId = null;
 
 // ---------- Chuyển mục ----------
+const ADMIN_TABS = ["dashboard", "applications", "users", "videos", "products"];
+// Mỗi mục đăng ký hàm tải dữ liệu; admin-moderation.js và admin-dashboard.js bổ sung thêm.
+const adminTabLoaders = {
+  applications: () => loadApplications(),
+  users: () => loadUsers(),
+};
+
 function showTab(name) {
   document.querySelectorAll(".admin-tab").forEach((b) => b.classList.toggle("active", b.dataset.tab === name));
-  $("tab-applications").hidden = name !== "applications";
-  $("tab-users").hidden = name !== "users";
-  if (name === "applications") loadApplications();
-  else loadUsers();
+  ADMIN_TABS.forEach((t) => {
+    const el = $(`tab-${t}`);
+    if (el) el.hidden = t !== name;
+  });
+  if (adminTabLoaders[name]) adminTabLoaders[name]();
 }
 
 // ---------- Đơn đăng ký ----------
@@ -46,7 +54,7 @@ function renderApplication(a) {
     ? `<div class="admin-actions">
          <button class="btn btn-primary btn-small" data-action="approve" data-id="${a.id}">Duyệt</button>
          <button class="btn btn-danger btn-small" data-action="reject" data-id="${a.id}"
-                 data-name="${escapeHtml(a.applicant.username)}">Từ chối</button>
+                 data-name="${escapeAttr(a.applicant.username)}">Từ chối</button>
        </div>`
     : `<span class="muted">Đã xử lý</span>`;
   const reason = a.status === "REJECTED" && a.rejection_reason
@@ -138,10 +146,10 @@ function renderUser(u) {
     action = `<span class="muted">Tài khoản của bạn</span>`;
   } else if (u.status === "ACTIVE") {
     action = `<button class="btn btn-danger btn-small" data-action="lock" data-id="${u.id}"
-                      data-name="${escapeHtml(u.username)}">Khoá</button>`;
+                      data-name="${escapeAttr(u.username)}">Khoá</button>`;
   } else {
     action = `<button class="btn btn-primary btn-small" data-action="unlock" data-id="${u.id}"
-                      data-name="${escapeHtml(u.username)}">Mở khoá</button>`;
+                      data-name="${escapeAttr(u.username)}">Mở khoá</button>`;
   }
   return `<tr>
     <td>${escapeHtml(u.username)}</td>
@@ -191,5 +199,8 @@ document.addEventListener("DOMContentLoaded", () => {
     if (btn) changeUserStatus(btn.dataset.id, btn.dataset.name, btn.dataset.action, btn);
   });
 
-  loadApplications();
+  // Tải tab đang active (mặc định Dashboard)
+  const activeBtn = document.querySelector(".admin-tab.active");
+  const tabName = activeBtn ? activeBtn.dataset.tab : "dashboard";
+  showTab(tabName);
 });

@@ -1,5 +1,6 @@
 from app.routers import (
     admin,
+    admin_moderation,
     auth,
     cart,
     categories,
@@ -16,6 +17,7 @@ from app.routers import (
 
 __all__ = [
     "admin",
+    "admin_moderation",
     "auth",
     "cart",
     "categories",

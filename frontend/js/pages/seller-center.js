@@ -793,10 +793,13 @@ pageSizeSelect.addEventListener("change", () => {
 const tabBtnProducts = document.getElementById("seller-tab-btn-products");
 const tabBtnOrders = document.getElementById("seller-tab-btn-orders");
 const tabBtnAnalytics = document.getElementById("seller-tab-btn-analytics");
+const tabBtnVouchers = document.getElementById("seller-tab-btn-vouchers");
 const panelProducts = document.getElementById("seller-panel-products");
 const panelOrders = document.getElementById("seller-panel-orders");
 const panelAnalytics = document.getElementById("seller-panel-analytics");
+const panelVouchers = document.getElementById("seller-panel-vouchers");
 const navOrdersCount = document.getElementById("nav-orders-count");
+const navVouchersCount = document.getElementById("nav-vouchers-count");
 
 // DOM Elements - Đơn hàng của Shop
 const orderSearchInput = document.getElementById("order-search-input");
@@ -830,15 +833,19 @@ function switchSellerTab(tabName) {
   panelProducts.hidden = tabName !== "products";
   panelOrders.hidden = tabName !== "orders";
   panelAnalytics.hidden = tabName !== "analytics";
+  if (panelVouchers) panelVouchers.hidden = tabName !== "vouchers";
 
   if (tabBtnProducts) tabBtnProducts.classList.toggle("active", tabName === "products");
   if (tabBtnOrders) tabBtnOrders.classList.toggle("active", tabName === "orders");
   if (tabBtnAnalytics) tabBtnAnalytics.classList.toggle("active", tabName === "analytics");
+  if (tabBtnVouchers) tabBtnVouchers.classList.toggle("active", tabName === "vouchers");
 
   if (tabName === "orders" && currentShop) {
     loadShopOrders();
   } else if (tabName === "analytics" && currentShop) {
     loadShopAnalytics();
+  } else if (tabName === "vouchers" && currentShop) {
+    loadShopVouchers();
   }
 }
 
@@ -988,6 +995,14 @@ function renderShopOrders() {
 
           <div class="shop-order-footer">
             <div>
+              ${
+                order.voucher_code && Number(order.discount_amount) > 0
+                  ? `<div class="muted" style="font-size: 13px; margin-bottom: 4px;">
+                       Tạm tính: ${formatMoney(order.subtotal_amount ?? order.total_amount + order.discount_amount)}
+                       · <span class="voucher-tag-inline">🎟️ Mã ${escapeHtml(order.voucher_code)}: -${formatMoney(order.discount_amount)}</span>
+                     </div>`
+                  : ""
+              }
               Tổng tiền đơn: <strong style="font-size: 18px; color: #dc2626;">${formatMoney(order.total_amount)}</strong>
             </div>
             <div style="display: flex; gap: 8px; flex-wrap: wrap;">
@@ -1147,13 +1162,252 @@ if (refreshAnalyticsBtn) {
   refreshAnalyticsBtn.addEventListener("click", loadShopAnalytics);
 }
 
+// ---------- Quản lý Mã giảm giá của Shop (Task T3D2BFB) ----------
+const voucherForm = document.getElementById("voucher-form");
+const voucherCodeInput = document.getElementById("voucher-code");
+const voucherDescInput = document.getElementById("voucher-description");
+const voucherTypeSelect = document.getElementById("voucher-type");
+const voucherValueLabel = document.getElementById("voucher-value-label");
+const voucherValueInput = document.getElementById("voucher-value");
+const voucherMaxWrap = document.getElementById("voucher-max-wrap");
+const voucherMaxInput = document.getElementById("voucher-max-discount");
+const voucherMinOrderInput = document.getElementById("voucher-min-order");
+const voucherUsageLimitInput = document.getElementById("voucher-usage-limit");
+const voucherPerUserInput = document.getElementById("voucher-per-user-limit");
+const voucherExpiresInput = document.getElementById("voucher-expires-at");
+const voucherSubmitBtn = document.getElementById("voucher-submit-btn");
+const vouchersTbody = document.getElementById("vouchers-tbody");
+const refreshVouchersBtn = document.getElementById("btn-refresh-vouchers");
+
+let shopVouchers = [];
+
+function setDefaultVoucherExpiry() {
+  if (!voucherExpiresInput || voucherExpiresInput.value) return;
+  const d = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
+  const pad = (n) => String(n).padStart(2, "0");
+  voucherExpiresInput.value = `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T23:59`;
+}
+
+if (voucherTypeSelect) {
+  voucherTypeSelect.addEventListener("change", () => {
+    const isPercent = voucherTypeSelect.value === "PERCENT";
+    if (voucherValueLabel) {
+      voucherValueLabel.textContent = isPercent ? "Mức giảm (%) *" : "Số tiền giảm (VNĐ) *";
+    }
+    if (voucherValueInput) {
+      if (isPercent) {
+        voucherValueInput.max = "100";
+        voucherValueInput.placeholder = "VD: 10";
+      } else {
+        voucherValueInput.removeAttribute("max");
+        voucherValueInput.placeholder = "VD: 30000";
+      }
+    }
+    if (voucherMaxWrap) {
+      voucherMaxWrap.style.opacity = isPercent ? "1" : "0.45";
+    }
+    if (voucherMaxInput) {
+      voucherMaxInput.disabled = !isPercent;
+      if (!isPercent) voucherMaxInput.value = "";
+    }
+  });
+}
+
+const VOUCHER_STATE_META = {
+  ACTIVE: { label: "🟢 Đang hoạt động", cls: "confirmed" },
+  UPCOMING: { label: "⏳ Sắp diễn ra", cls: "pending" },
+  USED_UP: { label: "🟠 Hết lượt", cls: "shipping" },
+  EXPIRED: { label: "⚪ Đã hết hạn", cls: "cancelled" },
+  INACTIVE: { label: "🔴 Đã tạm ngừng", cls: "cancelled" },
+};
+
+async function loadShopVouchers() {
+  if (!currentShop || !vouchersTbody) return;
+  setDefaultVoucherExpiry();
+  try {
+    shopVouchers = await api.get("/shops/me/vouchers");
+    if (navVouchersCount) navVouchersCount.textContent = String(shopVouchers.length || 0);
+    renderShopVouchers();
+  } catch (error) {
+    vouchersTbody.innerHTML = `<tr><td colspan="6" class="text-error">${escapeHtml(error.message)}</td></tr>`;
+  }
+}
+
+function renderShopVouchers() {
+  if (!vouchersTbody) return;
+  if (!Array.isArray(shopVouchers) || shopVouchers.length === 0) {
+    vouchersTbody.innerHTML = `
+      <tr>
+        <td colspan="6" class="muted" style="text-align: center; padding: 24px;">
+          Shop chưa có mã giảm giá nào. Hãy tạo mã đầu tiên ở khung bên trái!
+        </td>
+      </tr>`;
+    return;
+  }
+
+  vouchersTbody.innerHTML = shopVouchers
+    .map((v) => {
+      const isPercent = v.discount_type === "PERCENT";
+      const discountText = isPercent
+        ? `Giảm <strong>${v.discount_value}%</strong>${
+            v.max_discount_amount ? ` (tối đa ${formatMoney(v.max_discount_amount)})` : ""
+          }`
+        : `Giảm <strong>${formatMoney(v.discount_value)}</strong>`;
+      const stateMeta = VOUCHER_STATE_META[v.state] || { label: v.state, cls: "pending" };
+      const isActiveStatus = (v.status || "").toUpperCase() === "ACTIVE";
+
+      return `
+        <tr>
+          <td>
+            <span class="voucher-code-pill">🎟️ ${escapeHtml(v.code)}</span>
+            ${v.description ? `<div class="product-meta" style="margin-top: 4px;">${escapeHtml(v.description)}</div>` : ""}
+          </td>
+          <td>
+            <div>${discountText}</div>
+            <div class="product-meta">Đơn tối thiểu: <strong>${formatMoney(v.min_order_amount || 0)}</strong></div>
+          </td>
+          <td>
+            <strong>${v.used_count} / ${v.usage_limit}</strong> lượt
+            <div class="product-meta">Còn ${v.remaining_uses} · Tối đa ${v.per_user_limit}/người</div>
+          </td>
+          <td>
+            <div>${formatDateTime(v.expires_at)}</div>
+          </td>
+          <td>
+            <span class="order-badge ${stateMeta.cls}">${stateMeta.label}</span>
+          </td>
+          <td class="text-right">
+            <div style="display: inline-flex; gap: 6px; flex-wrap: wrap; justify-content: flex-end;">
+              <button
+                type="button"
+                class="btn btn-small"
+                data-voucher-toggle="${v.id}"
+                data-next-status="${isActiveStatus ? "INACTIVE" : "ACTIVE"}"
+              >
+                ${isActiveStatus ? "⏸ Tạm ngừng" : "▶ Kích hoạt"}
+              </button>
+              <button
+                type="button"
+                class="btn btn-small btn-danger"
+                data-voucher-delete="${v.id}"
+                data-voucher-code="${escapeAttr(v.code)}"
+              >
+                🗑 Xoá
+              </button>
+            </div>
+          </td>
+        </tr>`;
+    })
+    .join("");
+}
+
+if (voucherForm) {
+  voucherForm.addEventListener("submit", async (event) => {
+    event.preventDefault();
+    if (!currentShop) {
+      showToast("Vui lòng đăng nhập tài khoản Người bán trước.", "error");
+      return;
+    }
+
+    const code = (voucherCodeInput.value || "").trim().toUpperCase();
+    const discountType = voucherTypeSelect.value;
+    const discountValue = Number(voucherValueInput.value);
+    const maxDiscount =
+      discountType === "PERCENT" && voucherMaxInput.value
+        ? Number(voucherMaxInput.value)
+        : null;
+    const minOrder = Number(voucherMinOrderInput.value || 0);
+    const usageLimit = Number(voucherUsageLimitInput.value || 1);
+    const perUserLimit = Number(voucherPerUserInput.value || 1);
+    const expiresAt = voucherExpiresInput.value;
+
+    if (!code || code.length < 3) {
+      showToast("Mã giảm giá phải có từ 3 ký tự trở lên.", "error");
+      return;
+    }
+    if (!expiresAt) {
+      showToast("Vui lòng chọn hạn dùng cho mã giảm giá.", "error");
+      return;
+    }
+
+    voucherSubmitBtn.disabled = true;
+    try {
+      const created = await api.post("/shops/me/vouchers", {
+        code,
+        description: (voucherDescInput.value || "").trim() || null,
+        discount_type: discountType,
+        discount_value: discountValue,
+        max_discount_amount: maxDiscount,
+        min_order_amount: minOrder,
+        usage_limit: usageLimit,
+        per_user_limit: perUserLimit,
+        expires_at: expiresAt,
+      });
+      showToast(`Đã tạo mã giảm giá ${created.code} thành công!`);
+      voucherCodeInput.value = "";
+      voucherDescInput.value = "";
+      voucherValueInput.value = "";
+      if (voucherMaxInput) voucherMaxInput.value = "";
+      await loadShopVouchers();
+    } catch (error) {
+      showToast(error.message, "error");
+    } finally {
+      voucherSubmitBtn.disabled = false;
+    }
+  });
+}
+
+if (vouchersTbody) {
+  vouchersTbody.addEventListener("click", async (event) => {
+    const toggleBtn = event.target.closest("button[data-voucher-toggle]");
+    if (toggleBtn) {
+      const vid = Number(toggleBtn.dataset.voucherToggle);
+      const nextStatus = toggleBtn.dataset.nextStatus;
+      toggleBtn.disabled = true;
+      try {
+        await api.put(`/shops/me/vouchers/${vid}`, { status: nextStatus });
+        showToast(
+          nextStatus === "ACTIVE"
+            ? "Đã kích hoạt lại mã giảm giá."
+            : "Đã tạm ngừng mã giảm giá."
+        );
+        await loadShopVouchers();
+      } catch (error) {
+        showToast(error.message, "error");
+        toggleBtn.disabled = false;
+      }
+      return;
+    }
+
+    const delBtn = event.target.closest("button[data-voucher-delete]");
+    if (delBtn) {
+      const vid = Number(delBtn.dataset.voucherDelete);
+      const vcode = delBtn.dataset.voucherCode || `#${vid}`;
+      if (!confirm(`Bạn có chắc muốn xoá mã giảm giá '${vcode}' không?`)) return;
+      delBtn.disabled = true;
+      try {
+        const res = await api.delete(`/shops/me/vouchers/${vid}`);
+        showToast(res.message || `Đã xoá mã ${vcode}`);
+        await loadShopVouchers();
+      } catch (error) {
+        showToast(error.message, "error");
+        delBtn.disabled = false;
+      }
+    }
+  });
+}
+
+if (refreshVouchersBtn) {
+  refreshVouchersBtn.addEventListener("click", loadShopVouchers);
+}
+
 async function initSellerCenter() {
   await loadCategories();
   const loggedIn = await checkSellerSession();
   if (loggedIn) {
-    await Promise.all([loadShopProducts(), loadShopAnalytics()]);
+    await Promise.all([loadShopProducts(), loadShopAnalytics(), loadShopVouchers()]);
     const tabParam = new URLSearchParams(window.location.search).get("tab");
-    if (tabParam === "orders" || tabParam === "analytics") {
+    if (tabParam === "orders" || tabParam === "analytics" || tabParam === "vouchers") {
       switchSellerTab(tabParam);
     }
   }

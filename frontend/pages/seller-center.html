@@ -74,6 +74,14 @@
       >
         📊 Doanh thu &amp; Bán chạy
       </button>
+      <button
+        id="seller-tab-btn-vouchers"
+        type="button"
+        class="seller-nav-tab"
+        data-seller-tab="vouchers"
+      >
+        🎟️ Mã giảm giá của Shop <span id="nav-vouchers-count" class="tab-count-pill">0</span>
+      </button>
     </nav>
 
     <!-- TAB 1: QUẢN LÝ SẢN PHẨM & TỒN KHO -->
@@ -370,6 +378,151 @@
               <tbody id="best-sellers-tbody">
                 <tr>
                   <td colspan="4" class="muted">Đang tải danh sách sản phẩm bán chạy...</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </section>
+      </div>
+    </div>
+
+    <!-- ============================================================
+         TAB 4: MÃ GIẢM GIÁ CỦA SHOP (Task T3D2BFB)
+         ============================================================ -->
+    <div id="seller-panel-vouchers" hidden>
+      <div class="seller-layout">
+        <section class="card">
+          <h2>🎟️ Tạo Mã giảm giá mới</h2>
+          <p class="muted" style="margin-top: -4px; margin-bottom: 14px;">
+            Tạo voucher giảm theo phần trăm (%) hoặc số tiền cố định (VNĐ), giới hạn đơn tối thiểu, hạn dùng và số lượt.
+          </p>
+          <form id="voucher-form">
+            <label for="voucher-code">Mã giảm giá (3–30 ký tự, chữ/số không dấu) *</label>
+            <input
+              id="voucher-code"
+              type="text"
+              maxlength="30"
+              placeholder="VD: GIAM10, SALE50K, FREESHIP"
+              style="text-transform: uppercase; font-weight: 700;"
+              required
+            >
+
+            <label for="voucher-description">Mô tả ưu đãi</label>
+            <input
+              id="voucher-description"
+              type="text"
+              maxlength="255"
+              placeholder="VD: Giảm 10% tối đa 30k cho đơn từ 200k"
+            >
+
+            <div class="form-row-2">
+              <div>
+                <label for="voucher-type">Hình thức giảm *</label>
+                <select id="voucher-type" required>
+                  <option value="PERCENT">Theo phần trăm (%)</option>
+                  <option value="FIXED">Theo số tiền (VNĐ)</option>
+                </select>
+              </div>
+              <div>
+                <label id="voucher-value-label" for="voucher-value">Mức giảm (%) *</label>
+                <input
+                  id="voucher-value"
+                  type="number"
+                  min="1"
+                  max="100"
+                  step="any"
+                  placeholder="VD: 10"
+                  required
+                >
+              </div>
+            </div>
+
+            <div class="form-row-2">
+              <div id="voucher-max-wrap">
+                <label for="voucher-max-discount">Giảm tối đa (VNĐ, tuỳ chọn)</label>
+                <input
+                  id="voucher-max-discount"
+                  type="number"
+                  min="1000"
+                  step="1000"
+                  placeholder="VD: 30000"
+                >
+              </div>
+              <div>
+                <label for="voucher-min-order">Đơn hàng tối thiểu (VNĐ) *</label>
+                <input
+                  id="voucher-min-order"
+                  type="number"
+                  min="0"
+                  step="1000"
+                  value="0"
+                  required
+                >
+              </div>
+            </div>
+
+            <div class="form-row-2">
+              <div>
+                <label for="voucher-usage-limit">Tổng số lượt sử dụng *</label>
+                <input
+                  id="voucher-usage-limit"
+                  type="number"
+                  min="1"
+                  max="100000"
+                  value="50"
+                  required
+                >
+              </div>
+              <div>
+                <label for="voucher-per-user-limit">Số lượt / 1 người mua *</label>
+                <input
+                  id="voucher-per-user-limit"
+                  type="number"
+                  min="1"
+                  max="100"
+                  value="1"
+                  required
+                >
+              </div>
+            </div>
+
+            <label for="voucher-expires-at">Hạn dùng *</label>
+            <input id="voucher-expires-at" type="datetime-local" required>
+
+            <div class="form-actions">
+              <button id="voucher-submit-btn" type="submit" class="btn btn-primary">
+                + Tạo mã giảm giá
+              </button>
+            </div>
+          </form>
+        </section>
+
+        <section class="card">
+          <div class="list-header">
+            <div>
+              <h2 style="margin-bottom: 4px;">📋 Danh sách Mã giảm giá của Shop</h2>
+              <p class="muted" style="margin: 0;">
+                Người mua nhập mã khi thanh toán, hệ thống tự động kiểm tra điều kiện và tính lại tổng tiền đơn hàng.
+              </p>
+            </div>
+            <button id="btn-refresh-vouchers" type="button" class="btn btn-small">↻ Làm mới</button>
+          </div>
+
+          <div class="table-wrap" style="margin-top: 14px;">
+            <table>
+              <thead>
+                <tr>
+                  <th>Mã Voucher</th>
+                  <th>Mức giảm &amp; Đơn tối thiểu</th>
+                  <th>Lượt dùng</th>
+                  <th>Hạn dùng</th>
+                  <th>Trạng thái</th>
+                  <th class="text-right">Thao tác</th>
+                </tr>
+              </thead>
+              <tbody id="vouchers-tbody">
+                <tr>
+                  <td colspan="6" class="muted">Đang tải danh sách mã giảm giá...</td>
                 </tr>
               </tbody>
             </table>

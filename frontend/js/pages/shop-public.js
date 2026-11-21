@@ -152,8 +152,57 @@ async function selectPublicShop(shopId) {
   await Promise.all([
     loadShopProducts(selectedShop.id),
     loadShopVideos(selectedShop.id, selectedShop.owner_id),
+    loadPublicShopVouchers(selectedShop.id),
   ]);
 }
+
+async function loadPublicShopVouchers(shopId) {
+  const card = document.getElementById("public-shop-vouchers-card");
+  const listEl = document.getElementById("public-shop-vouchers-list");
+  if (!card || !listEl) return;
+  try {
+    const vouchers = await api.get(`/shops/${shopId}/vouchers`);
+    if (!Array.isArray(vouchers) || vouchers.length === 0) {
+      card.hidden = true;
+      return;
+    }
+    card.hidden = false;
+    listEl.innerHTML = vouchers
+      .map((v) => {
+        const discountLabel =
+          v.discount_type === "PERCENT"
+            ? `Giảm ${v.discount_value}%${
+                v.max_discount_amount ? ` (tối đa ${formatMoney(v.max_discount_amount)})` : ""
+              }`
+            : `Giảm ${formatMoney(v.discount_value)}`;
+        return `
+          <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;padding:10px 14px;border-radius:10px;background:#fff1f2;border:1.5px dashed #f43f5e;min-width:260px;">
+            <div>
+              <div style="font-weight:800;color:#be123c;font-size:14px;">🎟️ ${escapeHtml(v.code)} · ${discountLabel}</div>
+              <div class="muted" style="font-size:12px;">
+                Đơn tối thiểu: ${formatMoney(v.min_order_amount || 0)} · Còn ${v.remaining_uses} lượt
+              </div>
+            </div>
+            <button type="button" class="btn btn-small btn-primary" data-copy-voucher="${escapeAttr(v.code)}">
+              Sao chép
+            </button>
+          </div>`;
+      })
+      .join("");
+  } catch (_) {
+    card.hidden = true;
+  }
+}
+
+document.addEventListener("click", (event) => {
+  const btn = event.target.closest("button[data-copy-voucher]");
+  if (!btn) return;
+  const code = btn.dataset.copyVoucher;
+  if (navigator.clipboard && navigator.clipboard.writeText) {
+    navigator.clipboard.writeText(code);
+  }
+  showToast(`Đã sao chép mã giảm giá: ${code}`);
+});
 
 function renderShopHeader(shop) {
   document.title = `${shop.name} - Cửa hàng công khai | ClipShop AI`;

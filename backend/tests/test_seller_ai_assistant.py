@@ -129,3 +129,44 @@ def test_ai_suggest_product_content_and_seller_edit_before_save(
     saved = r_save.json()
     assert saved["name"] == edited_name
     assert "Tặng kèm bao da bảo vệ" in saved["description"]
+
+
+def test_ai_suggest_unauthenticated_and_invalid_payload(client, db_session):
+    db = db_session()
+    seller = User(
+        id=10,
+        email="seller_ai2@shop.com",
+        username="seller_ai2",
+        password_hash=hash_password("password123"),
+        display_name="Seller AI 2",
+        role="SELLER",
+        status="ACTIVE",
+    )
+    db.add(seller)
+    db.commit()
+    token, _ = create_access_token(seller.id)
+    db.close()
+    headers = {"Authorization": f"Bearer {token}"}
+
+    # 1. Chưa đăng nhập -> 401 Unauthorized
+    r_unauth = client.post(
+        "/api/products/ai-suggest",
+        json={"raw_name": "Áo khoác bomber"},
+    )
+    assert r_unauth.status_code == 401
+
+    # 2. Sai dữ liệu: raw_name rỗng ("") hoặc duration_seconds ngoài khoảng 30-60s -> 422
+    r_empty_name = client.post(
+        "/api/products/ai-suggest",
+        json={"raw_name": ""},
+        headers=headers,
+    )
+    assert r_empty_name.status_code == 422
+
+    r_bad_duration = client.post(
+        "/api/products/ai-suggest",
+        json={"raw_name": "Áo khoác bomber", "duration_seconds": 120},
+        headers=headers,
+    )
+    assert r_bad_duration.status_code == 422
+

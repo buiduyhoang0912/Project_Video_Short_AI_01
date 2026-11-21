@@ -317,3 +317,75 @@ def test_shop_logo_upload_and_public_shop_videos(client, db_session):
     assert videos[0]["view_count"] == 12
 
 
+def test_seller_shop_unauthenticated_invalid_and_forbidden_cases(
+    client, db_session
+):
+    # 1. Chưa đăng nhập (401 Unauthorized)
+    assert (
+        client.post(
+            "/api/seller-applications",
+            json={"proposed_shop_name": "Shop X", "phone": "0912345678"},
+        ).status_code
+        == 401
+    )
+    assert client.get("/api/seller-applications/me").status_code == 401
+    assert (
+        client.post("/api/shops", json={"name": "Shop X"}).status_code == 401
+    )
+
+    # 2. Sai dữ liệu (422 / 404 / 400)
+    u1_id, u1_headers = register_and_login(
+        client, "seller_val1", "val1@example.com"
+    )
+    u2_id, u2_headers = register_and_login(
+        client, "seller_val2", "val2@example.com"
+    )
+
+    # Tên shop đề xuất quá ngắn / rỗng -> 422
+    r_bad_app = client.post(
+        "/api/seller-applications",
+        json={"proposed_shop_name": "", "phone": "123"},
+        headers=u1_headers,
+    )
+    assert r_bad_app.status_code == 422
+
+    # Xem cửa hàng không tồn tại -> 404
+    assert client.get("/api/shops/999999").status_code == 404
+
+    # Cấp quyền SELLER cho u1 và u2, tạo shop cho u1
+    with db_session() as db:
+        user1 = db.get(User, u1_id)
+        user2 = db.get(User, u2_id)
+        user1.role = "SELLER"
+        user2.role = "SELLER"
+        shop1 = Shop(owner_id=u1_id, name="Shop Chủ 1", status="ACTIVE")
+        db.add(shop1)
+        db.commit()
+        db.refresh(shop1)
+        shop1_id = shop1.id
+
+    # Upload file không phải ảnh làm logo -> 422
+    r_bad_logo = client.post(
+        f"/api/shops/{shop1_id}/logo",
+        files={"file": ("hack.txt", b"not-an-image", "text/plain")},
+        headers=u1_headers,
+    )
+    assert r_bad_logo.status_code == 422
+
+    # 3. Sai quyền (403 Forbidden): Seller 2 cố sửa thông tin hoặc đổi logo của Shop 1
+    r_forbid_edit = client.put(
+        f"/api/shops/{shop1_id}",
+        json={"name": "Shop Bị Chiếm"},
+        headers=u2_headers,
+    )
+    assert r_forbid_edit.status_code == 403
+
+    r_forbid_logo = client.post(
+        f"/api/shops/{shop1_id}/logo",
+        files={"file": ("logo.png", b"\x89PNG\r\n\x1a\n", "image/png")},
+        headers=u2_headers,
+    )
+    assert r_forbid_logo.status_code == 403
+
+
+

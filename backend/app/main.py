@@ -29,6 +29,7 @@ from app.routers import (
     shops,
     social,
     videos,
+    vouchers,
 )
 
 
@@ -73,6 +74,7 @@ app.include_router(admin_moderation.router, prefix="/api")
 app.include_router(items.router, prefix="/api")
 app.include_router(videos.router, prefix="/api")
 app.include_router(seller_applications.router, prefix="/api")
+app.include_router(vouchers.router, prefix="/api")  # T3D2BFB: đặt trước shops để /shops/me/vouchers khớp đúng
 app.include_router(shops.router, prefix="/api")
 app.include_router(categories.router, prefix="/api")
 app.include_router(products.router, prefix="/api")

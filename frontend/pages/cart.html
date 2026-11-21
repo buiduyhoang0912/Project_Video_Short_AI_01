@@ -3,15 +3,194 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Giỏ hàng | ClipShop AI</title>
+  <title>Giỏ hàng &amp; Thanh toán áp Mã giảm giá | ClipShop AI</title>
   <link rel="icon" href="../assets/images/logo.svg">
   <link rel="stylesheet" href="../css/style.css">
+  <link rel="stylesheet" href="../css/seller-center.css">
+  <style>
+    .cart-layout {
+      display: grid;
+      grid-template-columns: 1.45fr 1fr;
+      gap: 20px;
+      align-items: start;
+    }
+    @media (max-width: 960px) {
+      .cart-layout {
+        grid-template-columns: 1fr;
+      }
+    }
+    .cart-shop-card {
+      border: 1px solid #e2e8f0;
+      border-radius: 14px;
+      background: #ffffff;
+      padding: 18px;
+      margin-bottom: 16px;
+      box-shadow: 0 2px 10px rgba(15, 23, 42, 0.04);
+    }
+    .cart-shop-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding-bottom: 12px;
+      margin-bottom: 12px;
+      border-bottom: 1px solid #f1f5f9;
+      flex-wrap: wrap;
+      gap: 8px;
+    }
+    .cart-item-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      padding: 10px 0;
+      border-bottom: 1px dashed #f1f5f9;
+      flex-wrap: wrap;
+    }
+    .cart-qty-box {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .cart-qty-box button {
+      width: 28px;
+      height: 28px;
+      border-radius: 6px;
+      border: 1px solid #cbd5e1;
+      background: #f8fafc;
+      cursor: pointer;
+      font-weight: 700;
+    }
+    .shop-voucher-box {
+      margin-top: 14px;
+      padding: 12px 14px;
+      border-radius: 10px;
+      background: #fff1f2;
+      border: 1px dashed #fb7185;
+    }
+    .voucher-input-row {
+      display: flex;
+      gap: 8px;
+      margin-top: 8px;
+      align-items: center;
+    }
+    .voucher-input-row input {
+      margin-bottom: 0;
+      text-transform: uppercase;
+      font-weight: 700;
+    }
+    .available-vouchers-chips {
+      display: flex;
+      gap: 6px;
+      flex-wrap: wrap;
+      margin-top: 8px;
+    }
+    .voucher-chip-btn {
+      padding: 4px 10px;
+      border-radius: 999px;
+      border: 1px solid #f43f5e;
+      background: #ffffff;
+      color: #be123c;
+      font-size: 12px;
+      font-weight: 700;
+      cursor: pointer;
+    }
+    .voucher-chip-btn:hover {
+      background: #ffe4e6;
+    }
+    .summary-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 7px 0;
+      font-size: 14px;
+    }
+    .summary-row.total {
+      border-top: 2px solid #e2e8f0;
+      margin-top: 8px;
+      padding-top: 12px;
+      font-size: 18px;
+      font-weight: 800;
+      color: #dc2626;
+    }
+  </style>
 </head>
 <body data-root="../" data-auth="required">
   <header id="app-header"></header>
 
-  <main class="container">
-    <section class="card"><h1>Giỏ hàng</h1><p class="muted">Trang giỏ hàng (chỉ người đã đăng nhập) đang được nhóm phát triển.</p></section>
+  <main class="container container-wide">
+    <section class="seller-topbar">
+      <div>
+        <h1>🛒 Giỏ hàng &amp; Thanh toán áp Mã giảm giá của Shop</h1>
+        <p class="muted" style="margin: 0;">
+          Nhập hoặc chọn Mã giảm giá của từng Shop khi thanh toán — Server tự động kiểm tra điều kiện và tính lại tổng tiền.
+        </p>
+      </div>
+      <div style="display: flex; gap: 8px; flex-wrap: wrap;">
+        <a href="shop-public.html" class="btn btn-small" style="text-decoration: none;">🏪 Tiếp tục mua sắm</a>
+        <a href="seller.html?tab=vouchers" class="btn btn-small" style="text-decoration: none;">🎟️ Quản lý Voucher (Seller)</a>
+      </div>
+    </section>
+
+    <div class="cart-layout">
+      <!-- Cột trái: Danh sách sản phẩm trong giỏ theo từng Shop + Ô nhập mã giảm giá -->
+      <div>
+        <div id="cart-shops-container">
+          <div class="card muted">Đang tải giỏ hàng của bạn...</div>
+        </div>
+
+        <!-- Lịch sử đơn hàng vừa đặt -->
+        <section class="card" style="margin-top: 20px;">
+          <div class="list-header">
+            <h2 style="margin: 0;">📦 Đơn hàng đã đặt của tôi</h2>
+            <button id="btn-refresh-my-orders" type="button" class="btn btn-small">↻ Làm mới</button>
+          </div>
+          <div id="my-orders-container" style="margin-top: 12px;">
+            <div class="muted">Đang tải lịch sử đơn hàng...</div>
+          </div>
+        </section>
+      </div>
+
+      <!-- Cột phải: Thông tin nhận hàng & Tổng tiền sau khi Server tính lại giảm giá -->
+      <section class="card">
+        <h2>🧾 Thanh toán &amp; Tính lại tiền</h2>
+        <form id="checkout-form">
+          <label for="rec-name">Họ tên người nhận *</label>
+          <input id="rec-name" type="text" placeholder="VD: Nguyễn Hoàng Văn" required>
+
+          <label for="rec-phone">Số điện thoại nhận hàng *</label>
+          <input id="rec-phone" type="text" placeholder="VD: 0912345678" required>
+
+          <label for="rec-address">Địa chỉ giao hàng chi tiết *</label>
+          <input id="rec-address" type="text" placeholder="VD: Số 10 Nguyễn Trãi, Hà Đông, Hà Nội" required>
+
+          <label for="pay-method">Phương thức thanh toán *</label>
+          <select id="pay-method">
+            <option value="COD">Thanh toán khi nhận hàng (COD)</option>
+            <option value="SIMULATED">Thanh toán mô phỏng (Tự động xác nhận)</option>
+          </select>
+
+          <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 12px; padding: 14px; margin: 14px 0;">
+            <div class="summary-row">
+              <span class="muted">Tạm tính tiền hàng:</span>
+              <strong id="summary-subtotal">0 ₫</strong>
+            </div>
+            <div class="summary-row" style="color: #16a34a;">
+              <span>🎟️ Giảm giá Voucher (Server tính):</span>
+              <strong id="summary-discount">-0 ₫</strong>
+            </div>
+            <div id="applied-vouchers-summary" class="muted" style="font-size: 12px;"></div>
+            <div class="summary-row total">
+              <span>Tổng thanh toán:</span>
+              <span id="summary-final-total">0 ₫</span>
+            </div>
+          </div>
+
+          <button id="btn-submit-checkout" type="submit" class="btn btn-primary" style="width: 100%; padding: 12px;">
+            ✅ Đặt hàng ngay
+          </button>
+        </form>
+      </section>
+    </div>
   </main>
 
   <footer id="app-footer"></footer>
@@ -21,5 +200,6 @@
   <script src="../js/api.js"></script>
   <script src="../js/utils.js"></script>
   <script src="../js/layout.js"></script>
+  <script src="../js/pages/cart.js"></script>
 </body>
 </html>

@@ -12,6 +12,11 @@ class OrderCheckout(BaseModel):
     recipient_address: str | None = Field(default=None, max_length=255)
     payment_method: str = Field(default="COD", description="Phương thức thanh toán: COD hoặc SIMULATED (Mô phỏng)")
     cart_item_ids: list[int] | None = Field(default=None, description="Danh sách id trong giỏ cần đặt (None = đặt tất cả)")
+    voucher_codes: list[str] | None = Field(
+        default=None,
+        max_length=20,
+        description="Mã giảm giá của shop (mỗi shop tối đa 1 mã). Server tự kiểm tra và tính lại tiền.",
+    )
 
 
 class OrderCreate(BaseModel):
@@ -50,6 +55,10 @@ class OrderResponse(BaseModel):
     recipient_address: str
     created_at: datetime
     items: list[OrderItemResponse] = []
+    # Mã giảm giá của shop (T3D2BFB): total_amount = subtotal_amount - discount_amount
+    subtotal_amount: float | None = None
+    discount_amount: float = 0.0
+    voucher_code: str | None = None
 
 
 class OrderCheckoutResponse(BaseModel):
@@ -57,3 +66,5 @@ class OrderCheckoutResponse(BaseModel):
     total_orders_created: int
     total_amount: float
     orders: list[OrderResponse] = []
+    total_before_discount: float | None = None
+    total_discount: float = 0.0

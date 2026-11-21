@@ -301,3 +301,56 @@ def test_daily_revenue_and_best_selling_products(client, seed_shop_orders):
     assert best[0]["product_name"] == "Áo Hoodie Nỉ"
     assert best[0]["total_quantity_sold"] == 2
     assert best[0]["total_revenue"] == 500000.0
+
+
+def test_seller_orders_unauthenticated_invalid_and_forbidden(
+    client, seed_shop_orders
+):
+    h1 = seed_shop_orders["seller1_headers"]
+    h2 = seed_shop_orders["seller2_headers"]
+
+    # 1. Chưa đăng nhập (401 Unauthorized)
+    assert client.get("/api/shops/me/orders").status_code == 401
+    assert (
+        client.patch(
+            "/api/shops/me/orders/1/status", json={"status": "confirmed"}
+        ).status_code
+        == 401
+    )
+    assert client.get("/api/shops/me/analytics").status_code == 401
+    assert client.get("/api/shops/me/revenue-daily").status_code == 401
+    assert client.get("/api/shops/me/best-sellers").status_code == 401
+
+    # 2. Sai dữ liệu (422 / 404)
+    r_invalid_status = client.patch(
+        "/api/shops/me/orders/1/status",
+        json={"status": "invalid_state"},
+        headers=h1,
+    )
+    assert r_invalid_status.status_code == 422
+
+    r_not_found = client.patch(
+        "/api/shops/me/orders/999999/status",
+        json={"status": "confirmed"},
+        headers=h1,
+    )
+    assert r_not_found.status_code == 404
+
+    # 3. Sai quyền (403 Forbidden): Seller 2 gọi các endpoint xác nhận/giao/hoàn thành trên đơn của Shop 1
+    assert (
+        client.post("/api/shops/me/orders/1/confirm", headers=h2).status_code
+        == 403
+    )
+    assert (
+        client.post("/api/shops/me/orders/1/ship", headers=h2).status_code
+        == 403
+    )
+    assert (
+        client.post("/api/shops/me/orders/1/complete", headers=h2).status_code
+        == 403
+    )
+    assert (
+        client.post("/api/shops/me/orders/1/cancel", headers=h2).status_code
+        == 403
+    )
+

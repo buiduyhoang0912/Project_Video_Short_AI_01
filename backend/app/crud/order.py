@@ -21,10 +21,12 @@ from app.models.order import Address, Order, OrderItem
 from app.models.product import Product
 from app.models.shop import Shop
 from app.schemas.order import (
+    OrderCancelResponse,
     OrderCheckout,
     OrderCheckoutResponse,
     OrderItemResponse,
     OrderResponse,
+    OrderStatusTimeline,
 )
 
 
@@ -272,8 +274,79 @@ def create_orders_from_cart(
     )
 
 
-def get_user_orders(db: Session, user_id: int) -> list[OrderResponse]:
-    """Lấy danh sách các đơn hàng của user."""
+def build_order_timeline(order: Order) -> list[OrderStatusTimeline]:
+    """Tạo danh sách các mốc trên dòng thời gian trạng thái đơn hàng (Timeline)."""
+    current_status = (order.status or "PENDING").upper()
+    created_at = order.created_at
+
+    if current_status == "CANCELLED":
+        return [
+            OrderStatusTimeline(
+                status_code="CREATED",
+                title="Đặt hàng thành công",
+                description="Đơn hàng đã được tạo trên hệ thống",
+                timestamp=created_at,
+                is_current=False,
+                is_completed=True,
+            ),
+            OrderStatusTimeline(
+                status_code="PENDING",
+                title="Chờ xác nhận",
+                description="Đơn hàng ở trạng thái chờ người bán xử lý",
+                timestamp=created_at,
+                is_current=False,
+                is_completed=True,
+            ),
+            OrderStatusTimeline(
+                status_code="CANCELLED",
+                title="Đã huỷ đơn",
+                description="Đơn hàng đã được huỷ và số lượng sản phẩm đã hoàn lại vào kho",
+                timestamp=None,
+                is_current=True,
+                is_completed=True,
+            ),
+        ]
+
+    stages = [
+        ("CREATED", "Đặt hàng thành công", "Đơn hàng đã được ghi nhận vào hệ thống"),
+        ("PENDING", "Chờ xác nhận", "Đơn hàng đang chờ người bán kiểm tra & đóng gói"),
+        ("CONFIRMED", "Đã xác nhận", "Người bán đã chuẩn bị xong kiện hàng"),
+        ("SHIPPED", "Đang vận chuyển", "Kiện hàng đang trên đường giao tới bạn"),
+        ("DELIVERED", "Giao hàng thành công", "Đơn hàng đã giao thành công tới người nhận"),
+    ]
+
+    status_weights = {
+        "CREATED": 0,
+        "PENDING": 1,
+        "CONFIRMED": 2,
+        "SHIPPED": 3,
+        "DELIVERED": 4,
+    }
+    cur_weight = status_weights.get(current_status, 1)
+
+    timeline = []
+    for code, title, desc in stages:
+        weight = status_weights[code]
+        completed = weight <= cur_weight
+        is_cur = weight == cur_weight
+        ts = created_at if weight == 0 else None
+        timeline.append(
+            OrderStatusTimeline(
+                status_code=code,
+                title=title,
+                description=desc,
+                timestamp=ts,
+                is_current=is_cur,
+                is_completed=completed,
+            )
+        )
+    return timeline
+
+
+def get_user_orders(
+    db: Session, user_id: int, status_filter: str | None = None
+) -> list[OrderResponse]:
+    """Lấy danh sách các đơn hàng của user, hỗ trợ lọc theo trạng thái."""
     stmt = (
         select(Order)
         .options(
@@ -283,6 +356,10 @@ def get_user_orders(db: Session, user_id: int) -> list[OrderResponse]:
         .where(Order.buyer_id == user_id)
         .order_by(Order.created_at.desc())
     )
+    if status_filter and status_filter.strip():
+        st = status_filter.strip().upper()
+        stmt = stmt.where(Order.status.ilike(st))
+
     orders = list(db.scalars(stmt).unique())
 
     res: list[OrderResponse] = []
@@ -313,6 +390,7 @@ def get_user_orders(db: Session, user_id: int) -> list[OrderResponse]:
                 recipient_address=o.recipient_address,
                 created_at=o.created_at,
                 items=item_resps,
+                timeline=build_order_timeline(o),
             )
         )
     return voucher_crud.attach_voucher_info(db, res)
@@ -360,5 +438,63 @@ def get_order_detail(db: Session, user_id: int, order_id: int) -> OrderResponse:
         recipient_address=o.recipient_address,
         created_at=o.created_at,
         items=item_resps,
+        timeline=build_order_timeline(o),
     )
     return voucher_crud.attach_voucher_info(db, [resp])[0]
+
+
+def cancel_order(db: Session, user_id: int, order_id: int) -> OrderCancelResponse:
+    """Huỷ đơn hàng khi còn ở trạng thái Chờ xác nhận (PENDING) và hoàn tồn kho đúng một lần."""
+    stmt = (
+        select(Order)
+        .where(Order.id == order_id, Order.buyer_id == user_id)
+        .with_for_update()
+    )
+    order = db.scalar(stmt)
+
+    if order is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Không tìm thấy đơn hàng #{order_id} hoặc bạn không có quyền huỷ đơn này.",
+        )
+
+    order_status_upper = (order.status or "").upper()
+
+    if order_status_upper == "CANCELLED":
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Đơn hàng #{order_id} đã bị huỷ trước đó. Không thể huỷ lại.",
+        )
+
+    if order_status_upper != "PENDING":
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Chỉ có thể huỷ đơn khi đơn đang ở trạng thái 'Chờ xác nhận' (PENDING). Trạng thái hiện tại: '{order.status}'.",
+        )
+
+    # Lấy danh sách item của đơn hàng và hoàn lại tồn kho đúng 1 lần
+    item_stmt = select(OrderItem).where(OrderItem.order_id == order_id)
+    items = db.scalars(item_stmt).all()
+
+    for it in items:
+        prod_stmt = select(Product).where(Product.id == it.product_id).with_for_update()
+        product = db.scalar(prod_stmt)
+        if product:
+            product.stock += it.quantity
+            if hasattr(product, "sold_count") and product.sold_count is not None:
+                if product.sold_count >= it.quantity:
+                    product.sold_count -= it.quantity
+                else:
+                    product.sold_count = 0
+
+    order.status = "CANCELLED"
+    db.commit()
+    db.refresh(order)
+
+    return OrderCancelResponse(
+        message=f"Đơn hàng #{order_id} đã được huỷ thành công và số lượng sản phẩm đã được hoàn lại vào kho.",
+        order_id=order.id,
+        status=order.status,
+        restocked_items_count=len(items),
+    )
+

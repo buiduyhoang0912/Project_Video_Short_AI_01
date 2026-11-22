@@ -13,6 +13,7 @@ from app.routers import (
     shops,
     social,
     videos,
+    vouchers,
 )
 
 __all__ = [
@@ -30,5 +31,6 @@ __all__ = [
     "shops",
     "social",
     "videos",
+    "vouchers",
 ]
 

@@ -1,5 +1,6 @@
 from datetime import datetime
 from typing import Annotated, Literal
+from app.schemas.product import ProductListItemOut
 
 from pydantic import AfterValidator, BaseModel, ConfigDict, Field, field_validator
 
@@ -54,6 +55,9 @@ class VideoRead(BaseModel):
     created_at: datetime
     product_ids: list[int]
 
+class VideoProductsUpdate(BaseModel):
+    product_ids: list[int] = Field(default_factory=list, max_length=3)
+
 class VideoProductCreate(BaseModel):
     video_id: int = Field(gt=0)
     product_id: int = Field(gt=0)
@@ -82,6 +86,7 @@ class VideoItemOut(BaseModel):
     view_count: int = 0
     status: Literal["VISIBLE", "HIDDEN"] = "VISIBLE"
     created_at: datetime
+    products: list[ProductListItemOut] = []
 
 
 class VideoFeedResponse(BaseModel):

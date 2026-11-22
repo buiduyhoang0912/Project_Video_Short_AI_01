@@ -17,6 +17,11 @@ let selectedHashtags = new Set();
 let isUploading = false;
 let videoObjectUrl = null;
 
+// State gắn sản phẩm (Task T3D2296)
+let myShopProducts = [];
+let selectedProductIds = new Set();
+let tempSelectedProductIds = new Set();
+
 // DOM Elements
 const dropzone = document.getElementById("video-dropzone");
 const videoFileInput = document.getElementById("video-file-input");
@@ -36,7 +41,9 @@ const descCharCounter = document.getElementById("desc-char-counter");
 
 const inputHashtag = document.getElementById("input-video-hashtag");
 const btnAddHashtag = document.getElementById("btn-add-hashtag");
-const hashtagsContainer = document.getElementById("selected-hashtags-container");
+const hashtagsContainer = document.getElementById(
+  "selected-hashtags-container",
+);
 const tagPills = document.querySelectorAll(".btn-tag-pill");
 
 const thumbPreviewImage = document.getElementById("thumb-preview-image");
@@ -96,7 +103,9 @@ function isVideoFileValid(file) {
 
   const name = file.name.toLowerCase();
   const hasValidExt = ALLOWED_VIDEO_EXTS.some((ext) => name.endsWith(ext));
-  const hasValidType = file.type ? ALLOWED_VIDEO_TYPES.includes(file.type) : hasValidExt;
+  const hasValidType = file.type
+    ? ALLOWED_VIDEO_TYPES.includes(file.type)
+    : hasValidExt;
 
   if (!hasValidExt && !hasValidType) {
     return {
@@ -150,7 +159,7 @@ function handleVideoSelection(file) {
 
     if (duration > MAX_VIDEO_DURATION_SECONDS) {
       showVideoError(
-        `Thời lượng video tối đa là 60 giây (Video của bạn dài ${Math.ceil(duration)} giây). Vui lòng cắt ngắn trước khi tải lên.`
+        `Thời lượng video tối đa là 60 giây (Video của bạn dài ${Math.ceil(duration)} giây). Vui lòng cắt ngắn trước khi tải lên.`,
       );
       resetVideoSelection();
       return;
@@ -172,7 +181,9 @@ function handleVideoSelection(file) {
   };
 
   videoPlayer.onerror = () => {
-    showVideoError("Không thể phát video này. Tệp bị hỏng hoặc mã hóa không được hỗ trợ.");
+    showVideoError(
+      "Không thể phát video này. Tệp bị hỏng hoặc mã hóa không được hỗ trợ.",
+    );
     resetVideoSelection();
   };
 }
@@ -206,15 +217,19 @@ function captureFrameToThumbnail(isAuto = false) {
     canvas.toBlob(
       (blob) => {
         if (!blob) return;
-        selectedThumbnailFile = new File([blob], "thumbnail.jpg", { type: "image/jpeg" });
+        selectedThumbnailFile = new File([blob], "thumbnail.jpg", {
+          type: "image/jpeg",
+        });
         thumbPreviewImage.src = URL.createObjectURL(blob);
-        thumbSourceBadge.textContent = isAuto ? "Tự động từ video" : `Khung hình (${Math.round(videoPlayer.currentTime)}s)`;
+        thumbSourceBadge.textContent = isAuto
+          ? "Tự động từ video"
+          : `Khung hình (${Math.round(videoPlayer.currentTime)}s)`;
         thumbFileName.textContent = "Đã trích xuất từ khung hình video";
         hideThumbError();
         if (!isAuto) showToast("Đã chụp khung hình làm ảnh bìa!", "success");
       },
       "image/jpeg",
-      0.9
+      0.9,
     );
   } catch (e) {
     console.error("Lỗi trích xuất khung hình:", e);
@@ -228,7 +243,9 @@ function handleThumbnailSelection(file) {
 
   const name = file.name.toLowerCase();
   const hasValidExt = ALLOWED_IMAGE_EXTS.some((ext) => name.endsWith(ext));
-  const hasValidType = file.type ? ALLOWED_IMAGE_TYPES.includes(file.type) : hasValidExt;
+  const hasValidType = file.type
+    ? ALLOWED_IMAGE_TYPES.includes(file.type)
+    : hasValidExt;
 
   if (!hasValidExt && !hasValidType) {
     showThumbError("Ảnh bìa phải có định dạng JPG, PNG hoặc WebP.");
@@ -237,7 +254,9 @@ function handleThumbnailSelection(file) {
   }
 
   if (file.size > MAX_IMAGE_BYTES) {
-    showThumbError(`Dung lượng ảnh bìa vượt quá 50MB (${formatBytes(file.size)}).`);
+    showThumbError(
+      `Dung lượng ảnh bìa vượt quá 50MB (${formatBytes(file.size)}).`,
+    );
     thumbFileInput.value = "";
     return;
   }
@@ -339,7 +358,9 @@ async function handleSubmitUpload(e) {
     const tagsString = Array.from(selectedHashtags)
       .map((t) => `#${t}`)
       .join(" ");
-    finalDescription = finalDescription ? `${finalDescription}\n\n${tagsString}` : tagsString;
+    finalDescription = finalDescription
+      ? `${finalDescription}\n\n${tagsString}`
+      : tagsString;
   }
 
   // 5. Chuẩn bị FormData
@@ -349,6 +370,10 @@ async function handleSubmitUpload(e) {
   formData.append("thumbnail", selectedThumbnailFile);
   if (finalDescription) {
     formData.append("description", finalDescription);
+  }
+  // Gắn sản phẩm của Shop (Task T3D2296: Tối đa 3 sản phẩm)
+  if (selectedProductIds.size > 0) {
+    formData.append("product_ids", JSON.stringify(Array.from(selectedProductIds)));
   }
 
   // 6. Bắt đầu tải lên
@@ -361,11 +386,16 @@ async function handleSubmitUpload(e) {
     const res = await api.upload("/videos", formData, {
       onUploadProgress: (progressEvent) => {
         if (progressEvent.total) {
-          const percent = Math.round((progressEvent.loaded * 100) / progressEvent.total);
+          const percent = Math.round(
+            (progressEvent.loaded * 100) / progressEvent.total,
+          );
           if (percent < 100) {
             setUploadProgress(percent, `Đang tải lên dữ liệu... ${percent}%`);
           } else {
-            setUploadProgress(100, "Đang xử lý định dạng video trên máy chủ...");
+            setUploadProgress(
+              100,
+              "Đang xử lý định dạng video trên máy chủ...",
+            );
           }
         }
       },
@@ -391,15 +421,187 @@ async function handleSubmitUpload(e) {
 
     // Phân tích lỗi cụ thể
     if (err.status === 413) {
-      showServerError("Dung lượng tệp quá lớn vượt giới hạn cho phép của máy chủ (tối đa 50MB).");
+      showServerError(
+        "Dung lượng tệp quá lớn vượt giới hạn cho phép của máy chủ (tối đa 50MB).",
+      );
     } else if (err.status === 422) {
       showServerError(`Dữ liệu không hợp lệ: ${err.message}`);
     } else if (err.status === 401) {
-      showServerError("Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại để đăng video.");
+      showServerError(
+        "Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại để đăng video.",
+      );
     } else {
-      showServerError(err.message || "Có lỗi xảy ra khi tải video lên. Vui lòng thử lại.");
+      showServerError(
+        err.message || "Có lỗi xảy ra khi tải video lên. Vui lòng thử lại.",
+      );
     }
   }
+}
+
+// ---------- QUẢN LÝ GẮN SẢN PHẨM CỦA SHOP (TASK T3D2296) ----------
+async function checkSellerAndLoadProducts() {
+  try {
+    const user = session.getUser();
+    if (!user) return;
+
+    // Dùng API sản phẩm của module Người bán (Task T3D2296)
+    const prods = await api.get("/shops/me/products");
+    if (Array.isArray(prods) && prods.length > 0) {
+      myShopProducts = prods.filter((p) => p.status === "ACTIVE");
+      const section = document.getElementById("video-products-section");
+      if (section && myShopProducts.length > 0) {
+        section.style.display = "block";
+      }
+    }
+  } catch (_) {
+    // Không phải seller hoặc chưa có shop thì ẩn mục gắn sản phẩm
+  }
+}
+
+function openProductPicker() {
+  const modal = document.getElementById("modal-product-picker");
+  if (!modal) return;
+  tempSelectedProductIds = new Set(selectedProductIds);
+  renderPickerList("");
+  updatePickerCounter();
+  modal.style.display = "flex";
+}
+
+function closeProductPicker() {
+  const modal = document.getElementById("modal-product-picker");
+  if (modal) modal.style.display = "none";
+}
+
+function updatePickerCounter() {
+  const counter = document.getElementById("modal-picker-counter");
+  if (counter) counter.textContent = `Đã chọn: ${tempSelectedProductIds.size}/3 sản phẩm`;
+}
+
+function renderPickerList(filterText) {
+  const listEl = document.getElementById("picker-products-list");
+  const errorBox = document.getElementById("picker-error-msg");
+  if (errorBox) errorBox.style.display = "none";
+  if (!listEl) return;
+
+  const q = (filterText || "").toLowerCase().trim();
+  const filtered = myShopProducts.filter((p) => !q || p.name.toLowerCase().includes(q));
+
+  if (filtered.length === 0) {
+    listEl.innerHTML = `<div class="muted" style="text-align:center;padding:24px;">Không tìm thấy sản phẩm phù hợp.</div>`;
+    return;
+  }
+
+  listEl.innerHTML = "";
+  filtered.forEach((p) => {
+    const isChecked = tempSelectedProductIds.has(p.id);
+    const item = document.createElement("div");
+    item.className = `picker-product-item ${isChecked ? "selected" : ""}`;
+
+    let thumb = p.thumbnail_url || "";
+    if (p.images && p.images.length > 0) {
+      const primary = p.images.find((img) => img.is_primary) || p.images[0];
+      thumb = primary.image_url || primary.object_key || thumb;
+    }
+    if (thumb && thumb.startsWith("/uploads/")) {
+      thumb = `${CONFIG.API_BASE_URL.replace("/api", "")}${thumb}`;
+    } else if (!thumb) {
+      thumb = "../assets/images/logo.svg";
+    }
+
+    const priceText = Number(p.price || 0).toLocaleString("vi-VN") + " ₫";
+
+    item.innerHTML = `
+      <input type="checkbox" class="picker-checkbox" data-id="${p.id}" ${isChecked ? "checked" : ""}>
+      <img src="${escapeHtml(thumb)}" alt="${escapeHtml(p.name)}" class="picker-item-thumb" onerror="this.src='../assets/images/logo.svg'">
+      <div class="picker-item-info">
+        <div class="picker-item-name">${escapeHtml(p.name)}</div>
+        <div class="picker-item-price">${priceText}</div>
+      </div>
+    `;
+
+    item.addEventListener("click", (e) => {
+      if (e.target.tagName !== "INPUT") {
+        const cb = item.querySelector(".picker-checkbox");
+        cb.checked = !cb.checked;
+        cb.dispatchEvent(new Event("change"));
+      }
+    });
+
+    const checkbox = item.querySelector(".picker-checkbox");
+    checkbox.addEventListener("change", (e) => {
+      const pid = parseInt(e.target.dataset.id, 10);
+      if (e.target.checked) {
+        if (tempSelectedProductIds.size >= 3) {
+          e.target.checked = false;
+          if (errorBox) {
+            errorBox.textContent = "Một video chỉ được gắn tối đa 3 sản phẩm!";
+            errorBox.style.display = "block";
+          }
+          return;
+        }
+        tempSelectedProductIds.add(pid);
+        item.classList.add("selected");
+      } else {
+        tempSelectedProductIds.delete(pid);
+        item.classList.remove("selected");
+        if (errorBox) errorBox.style.display = "none";
+      }
+      updatePickerCounter();
+    });
+
+    listEl.appendChild(item);
+  });
+}
+
+function confirmProductPicker() {
+  selectedProductIds = new Set(tempSelectedProductIds);
+  renderSelectedProductsPreview();
+  closeProductPicker();
+}
+
+function renderSelectedProductsPreview() {
+  const container = document.getElementById("selected-products-preview");
+  const counter = document.getElementById("tagged-product-counter");
+  if (counter) counter.textContent = `${selectedProductIds.size} / 3 sản phẩm`;
+  if (!container) return;
+
+  container.innerHTML = "";
+  if (selectedProductIds.size === 0) return;
+
+  selectedProductIds.forEach((pid) => {
+    const p = myShopProducts.find((item) => item.id === pid);
+    if (!p) return;
+
+    let thumb = p.thumbnail_url || "";
+    if (p.images && p.images.length > 0) {
+      const primary = p.images.find((img) => img.is_primary) || p.images[0];
+      thumb = primary.image_url || primary.object_key || thumb;
+    }
+    if (thumb && thumb.startsWith("/uploads/")) {
+      thumb = `${CONFIG.API_BASE_URL.replace("/api", "")}${thumb}`;
+    } else if (!thumb) {
+      thumb = "../assets/images/logo.svg";
+    }
+
+    const priceText = Number(p.price || 0).toLocaleString("vi-VN") + " ₫";
+    const badge = document.createElement("div");
+    badge.className = "tagged-preview-card";
+    badge.innerHTML = `
+      <img src="${escapeHtml(thumb)}" alt="${escapeHtml(p.name)}" class="tagged-preview-img" onerror="this.src='../assets/images/logo.svg'">
+      <div class="tagged-preview-details">
+        <div class="tagged-preview-name">${escapeHtml(p.name)}</div>
+        <div class="tagged-preview-price">${priceText}</div>
+      </div>
+      <button type="button" class="btn-remove-tagged-prod" data-id="${p.id}" title="Gỡ sản phẩm">&times;</button>
+    `;
+
+    badge.querySelector(".btn-remove-tagged-prod").addEventListener("click", () => {
+      selectedProductIds.delete(pid);
+      renderSelectedProductsPreview();
+    });
+
+    container.appendChild(badge);
+  });
 }
 
 // ---------- GẮN SỰ KIỆN KHỞI TẠO ----------
@@ -437,7 +639,9 @@ function initEvents() {
   });
 
   // Chụp frame làm ảnh bìa
-  btnCaptureFrame.addEventListener("click", () => captureFrameToThumbnail(false));
+  btnCaptureFrame.addEventListener("click", () =>
+    captureFrameToThumbnail(false),
+  );
 
   // Tải ảnh bìa tùy chỉnh
   thumbFileInput.addEventListener("change", (e) => {
@@ -479,9 +683,28 @@ function initEvents() {
 
   // Submit form
   formUpload.addEventListener("submit", handleSubmitUpload);
+
+  // Gắn sản phẩm (Task T3D2296)
+  const btnOpenPicker = document.getElementById("btn-open-product-picker");
+  if (btnOpenPicker) btnOpenPicker.addEventListener("click", openProductPicker);
+
+  const btnConfirmPicker = document.getElementById("btn-confirm-picker");
+  if (btnConfirmPicker) btnConfirmPicker.addEventListener("click", confirmProductPicker);
+
+  const btnCancelPicker = document.getElementById("btn-cancel-picker");
+  if (btnCancelPicker) btnCancelPicker.addEventListener("click", closeProductPicker);
+
+  const btnClosePickerModal = document.getElementById("btn-close-picker-modal");
+  if (btnClosePickerModal) btnClosePickerModal.addEventListener("click", closeProductPicker);
+
+  const pickerSearch = document.getElementById("input-search-picker");
+  if (pickerSearch) {
+    pickerSearch.addEventListener("input", (e) => renderPickerList(e.target.value));
+  }
 }
 
 // Chạy khởi tạo khi trang đã sẵn sàng
 document.addEventListener("DOMContentLoaded", () => {
   initEvents();
+  checkSellerAndLoadProducts();
 });

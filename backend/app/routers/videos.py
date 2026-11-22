@@ -1,3 +1,4 @@
+import json
 import logging
 import re
 import subprocess
@@ -8,7 +9,7 @@ from fastapi import APIRouter, Depends, File, Form, HTTPException, Query, Respon
 from sqlalchemy.orm import Session
 
 from app.core.video_auth import get_video_user
-from app.dependencies.auth import get_optional_user
+from app.dependencies.auth import get_current_user, get_optional_user
 from app.core.video_media import (
     UploadTooLargeError,
     prepare_thumbnail_upload,
@@ -17,11 +18,13 @@ from app.core.video_media import (
 from app.db.session import get_db
 from app.models.user import User
 
+from app.schemas.product import ProductListItemOut
 from app.schemas.video import (
     UserVideoListResponse,
     VideoDescription,
     VideoDescriptionUpdate,
     VideoFeedResponse,
+    VideoProductsUpdate,
     VideoViewResponse,
 )
 
@@ -30,7 +33,10 @@ from app.crud.video import (
     delete_owned_video,
     get_feed_videos,
     get_user_videos,
+    get_video_products,
     increment_video_view,
+    serialize_product_item,
+    set_video_products,
     update_video_description,
 )
 
@@ -101,6 +107,7 @@ def create_video(
     video: UploadFile = File(...),
     thumbnail: UploadFile = File(...),
     description: VideoDescription | None = Form(None),
+    product_ids: str | None = Form(None),
     user: User = Depends(get_video_user),
     db: Session = Depends(get_db),
 ):
@@ -136,6 +143,15 @@ def create_video(
                 thumbnail_path=thumbnail_path,
                 duration_seconds=duration_seconds,
             )
+
+            # Gắn sản phẩm nếu người bán chọn khi tải lên video (Task T3D2296)
+            if product_ids:
+                try:
+                    pids = json.loads(product_ids) if isinstance(product_ids, str) else product_ids
+                    if isinstance(pids, list) and len(pids) > 0:
+                        set_video_products(db, record.id, user.id, [int(x) for x in pids])
+                except Exception as err:
+                    logging.getLogger(__name__).warning("Không gắn được sản phẩm khi tạo video: %s", err)
 
             return {
                 "id": record.id,
@@ -193,6 +209,11 @@ def get_for_you_feed(
     """
     items, next_cursor, has_more = get_feed_videos(db=db, limit=limit, cursor=cursor)
 
+    # Gắn kèm sản phẩm vào từng video trên Feed để hiện nút giỏ hàng (T3D2296)
+    for item in items:
+        prods = get_video_products(db, item.id)
+        item.products = [serialize_product_item(p) for p in prods]
+
     return VideoFeedResponse(
         items=items,
         next_cursor=str(next_cursor) if next_cursor is not None else None,
@@ -222,6 +243,10 @@ def get_user_video_list(
         db=db, user_id=user_id, limit=limit, cursor=cursor, include_hidden=allow_hidden
     )
 
+    for item in items:
+        prods = get_video_products(db, item.id)
+        item.products = [serialize_product_item(p) for p in prods]
+
     return UserVideoListResponse(
         items=items,
         next_cursor=str(next_cursor) if next_cursor is not None else None,
@@ -250,3 +275,27 @@ def record_video_view(
         view_count=new_view_count,
         message="Ghi nhận lượt xem thành công",
     )
+
+
+# --- APIs Quản lý Sản phẩm gắn trong Video (Task T3D2296) ---
+
+@router.get("/{video_id}/products", response_model=list[ProductListItemOut])
+def get_products_attached_to_video(
+    video_id: int,
+    db: Session = Depends(get_db),
+):
+    """Lấy danh sách các sản phẩm đang hoạt động được gắn trong video."""
+    products = get_video_products(db, video_id)
+    return [serialize_product_item(p) for p in products]
+
+
+@router.post("/{video_id}/products", response_model=list[ProductListItemOut])
+def update_products_attached_to_video(
+    video_id: int,
+    data: VideoProductsUpdate,
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """Người bán cập nhật danh sách sản phẩm gắn trong video của mình (tối đa 3)."""
+    products = set_video_products(db, video_id, user.id, data.product_ids)
+    return [serialize_product_item(p) for p in products]

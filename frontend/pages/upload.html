@@ -179,6 +179,21 @@
               <div id="thumb-error-box" class="upload-error-banner" style="display:none;"></div>
             </div>
 
+            <!-- Gắn sản phẩm của Shop vào video (Task T3D2296: Tối đa 3 sản phẩm) -->
+            <div class="form-group" id="video-products-section" style="display:none;">
+              <div class="label-row">
+                <label>Gắn sản phẩm của Shop vào video (Tối đa 3)</label>
+                <span id="tagged-product-counter" class="char-counter">0 / 3 sản phẩm</span>
+              </div>
+              <p class="muted" style="font-size:12px;margin:2px 0 8px;">
+                Người xem có thể bấm vào giỏ hàng trên video để xem và mua sản phẩm của shop bạn.
+              </p>
+              <button type="button" id="btn-open-product-picker" class="btn btn-small">
+                🛍️ Chọn sản phẩm từ shop của bạn...
+              </button>
+              <div id="selected-products-preview" class="selected-products-grid" style="margin-top:10px;"></div>
+            </div>
+
             <!-- Thanh tiến trình tải lên (Progress Bar) -->
             <div id="upload-progress-container" class="upload-progress-box" style="display:none;">
               <div class="progress-info-row">
@@ -205,6 +220,30 @@
       </div>
     </div>
   </main>
+
+  <!-- Modal chọn sản phẩm của Shop (Task T3D2296) -->
+  <div id="modal-product-picker" class="modal-backdrop" style="display:none;">
+    <div class="modal-dialog">
+      <div class="modal-header">
+        <h3 class="modal-title">🛍️ Chọn sản phẩm gắn vào video (Tối đa 3)</h3>
+        <button type="button" class="btn-close-modal" id="btn-close-picker-modal">&times;</button>
+      </div>
+      <div class="modal-body">
+        <div class="picker-search-bar" style="margin-bottom:12px;">
+          <input type="text" id="input-search-picker" placeholder="🔍 Tìm kiếm sản phẩm trong shop...">
+        </div>
+        <div id="picker-products-list" class="picker-products-list">
+          <div class="muted" style="text-align:center;padding:20px;">Đang tải sản phẩm của shop...</div>
+        </div>
+        <div id="picker-error-msg" class="upload-error-banner" style="display:none;margin-top:8px;"></div>
+      </div>
+      <div class="modal-footer">
+        <span class="muted" id="modal-picker-counter" style="margin-right:auto;font-size:13px;">Đã chọn: 0/3</span>
+        <button type="button" class="btn" id="btn-cancel-picker">Hủy</button>
+        <button type="button" class="btn btn-primary" id="btn-confirm-picker">Xác nhận chọn</button>
+      </div>
+    </div>
+  </div>
 
   <footer id="app-footer"></footer>
 

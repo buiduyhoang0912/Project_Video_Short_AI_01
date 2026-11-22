@@ -486,6 +486,7 @@ def get_video_detail(
             "share_count": share_count,
             "is_liked": is_liked,
             "is_following": is_following,
+            "products": [],
         }
 
     if increment_view:
@@ -501,6 +502,14 @@ def get_video_detail(
             tags = []
     if not isinstance(tags, list):
         tags = []
+
+    products_out = []
+    try:
+        from app.crud.video import get_video_products, serialize_product_item
+        prods = get_video_products(db, video.id)
+        products_out = [serialize_product_item(p) for p in prods]
+    except Exception:
+        products_out = []
 
     return {
         "id": video.id,
@@ -525,6 +534,7 @@ def get_video_detail(
         "share_count": share_count,
         "is_liked": is_liked,
         "is_following": is_following,
+        "products": products_out,
     }
 
 

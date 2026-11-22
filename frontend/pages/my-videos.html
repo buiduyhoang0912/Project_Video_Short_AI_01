@@ -129,6 +129,31 @@
     </div>
   </div>
 
+  <!-- Modal Gắn/Sửa sản phẩm cho video (Task T3D2296) -->
+  <div id="modal-video-products" class="modal-backdrop" style="display:none;">
+    <div class="modal-dialog">
+      <div class="modal-header">
+        <h3 class="modal-title">🛍️ Gắn sản phẩm của Shop vào video (Tối đa 3)</h3>
+        <button type="button" class="btn-close-modal" id="btn-close-prods-modal">&times;</button>
+      </div>
+      <div class="modal-body">
+        <div class="modal-video-title-preview" id="prods-video-title-text">Tiêu đề video</div>
+        <p class="muted" style="font-size:12px;margin:8px 0 12px;">
+          Chọn tối đa 3 sản phẩm của shop để hiển thị nút giỏ hàng trên video.
+        </p>
+        <div id="manage-prods-picker-list" class="picker-products-list">
+          <div class="muted" style="text-align:center;padding:20px;">Đang tải sản phẩm của shop...</div>
+        </div>
+        <div id="manage-prods-error" class="upload-error-banner" style="display:none;margin-top:8px;"></div>
+      </div>
+      <div class="modal-footer">
+        <span class="muted" id="manage-prods-counter" style="margin-right:auto;font-size:13px;">Đã chọn: 0/3</span>
+        <button type="button" class="btn" id="btn-cancel-prods">Hủy</button>
+        <button type="button" class="btn btn-primary" id="btn-save-prods">💾 Lưu sản phẩm</button>
+      </div>
+    </div>
+  </div>
+
   <footer id="app-footer"></footer>
 
   <!-- Scripts -->

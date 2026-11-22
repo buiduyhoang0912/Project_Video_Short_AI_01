@@ -169,6 +169,7 @@ function renderFilteredVideos() {
           <span>👁️ <strong>${Number(video.view_count || 0).toLocaleString("vi-VN")}</strong> lượt xem</span>
           <span>•</span>
           <span>📅 ${formatDateTime(video.created_at)}</span>
+          ${(video.products && video.products.length > 0) ? `<span>•</span> <span class="badge-status" style="background:#e0e7ff;color:#4338ca;">🛍️ ${video.products.length} sản phẩm</span>` : ""}
         </div>
 
         <div class="manage-card-desc-box">
@@ -182,6 +183,9 @@ function renderFilteredVideos() {
       <div class="manage-card-actions">
         <button type="button" class="btn btn-small btn-edit-desc" data-id="${video.id}">
           ✏️ Sửa mô tả
+        </button>
+        <button type="button" class="btn btn-small btn-tag-prods" data-id="${video.id}" style="background:#4f46e5;color:#fff;border-color:#4338ca;">
+          🛍️ Gắn sản phẩm
         </button>
         <button type="button" class="btn ${toggleBtnClass} btn-toggle-status" data-id="${video.id}" data-current="${video.status}">
           ${toggleBtnText}
@@ -329,6 +333,169 @@ async function handleConfirmDelete() {
   }
 }
 
+// ---------- 4. GẮN SẢN PHẨM VÀO VIDEO (TASK T3D2296) ----------
+let currentProdsVideoId = null;
+let manageShopProducts = [];
+let manageSelectedProductIds = new Set();
+
+const modalVideoProds = document.getElementById("modal-video-products");
+const prodsVideoTitleText = document.getElementById("prods-video-title-text");
+const manageProdsPickerList = document.getElementById("manage-prods-picker-list");
+const manageProdsError = document.getElementById("manage-prods-error");
+const manageProdsCounter = document.getElementById("manage-prods-counter");
+const btnSaveProds = document.getElementById("btn-save-prods");
+const btnCancelProds = document.getElementById("btn-cancel-prods");
+const btnCloseProdsModal = document.getElementById("btn-close-prods-modal");
+
+async function openVideoProductsModal(videoId) {
+  const video = myVideosList.find((v) => v.id === videoId);
+  if (!video) return;
+
+  currentProdsVideoId = videoId;
+  prodsVideoTitleText.textContent = video.title || `Video #${videoId}`;
+  manageProdsError.style.display = "none";
+  manageProdsPickerList.innerHTML = `<div class="muted" style="text-align:center;padding:20px;">Đang tải sản phẩm của shop...</div>`;
+  modalVideoProds.style.display = "flex";
+
+  try {
+    // 1. Tải danh sách sản phẩm thuộc shop của mình
+    if (manageShopProducts.length === 0) {
+      const prods = await api.get("/shops/me/products");
+      manageShopProducts = Array.isArray(prods) ? prods.filter((p) => p.status === "ACTIVE") : [];
+    }
+
+    if (manageShopProducts.length === 0) {
+      manageProdsPickerList.innerHTML = `
+        <div class="muted" style="text-align:center;padding:24px;">
+          Shop của bạn chưa có sản phẩm nào đang hoạt động.
+          <br><br>
+          <a href="seller.html" class="btn btn-small btn-primary">Thêm sản phẩm tại Seller Center</a>
+        </div>`;
+      return;
+    }
+
+    // 2. Lấy danh sách sản phẩm đang được gắn vào video này
+    let attached = [];
+    try {
+      attached = await api.get(`/videos/${videoId}/products`);
+    } catch (_) {
+      attached = video.products || [];
+    }
+
+    manageSelectedProductIds = new Set((attached || []).map((p) => p.id));
+    renderManageProdsList();
+  } catch (err) {
+    manageProdsPickerList.innerHTML = `<div style="color:var(--color-danger);text-align:center;padding:20px;">⚠️ ${escapeHtml(err.message || "Không thể tải sản phẩm")}</div>`;
+  }
+}
+
+function updateManageProdsCounter() {
+  if (manageProdsCounter) {
+    manageProdsCounter.textContent = `Đã chọn: ${manageSelectedProductIds.size}/3 sản phẩm`;
+  }
+}
+
+function renderManageProdsList() {
+  if (!manageProdsPickerList) return;
+  manageProdsPickerList.innerHTML = "";
+  updateManageProdsCounter();
+
+  manageShopProducts.forEach((p) => {
+    const isChecked = manageSelectedProductIds.has(p.id);
+    const item = document.createElement("div");
+    item.className = `picker-product-item ${isChecked ? "selected" : ""}`;
+
+    let thumb = p.thumbnail_url || "";
+    if (p.images && p.images.length > 0) {
+      const primary = p.images.find((img) => img.is_primary) || p.images[0];
+      thumb = primary.image_url || primary.object_key || thumb;
+    }
+    if (thumb && thumb.startsWith("/uploads/")) {
+      thumb = `${CONFIG.API_BASE_URL.replace("/api", "")}${thumb}`;
+    } else if (!thumb) {
+      thumb = "../assets/images/logo.svg";
+    }
+
+    const priceText = Number(p.price || 0).toLocaleString("vi-VN") + " ₫";
+
+    item.innerHTML = `
+      <input type="checkbox" class="picker-checkbox" data-id="${p.id}" ${isChecked ? "checked" : ""}>
+      <img src="${escapeHtml(thumb)}" alt="${escapeHtml(p.name)}" class="picker-item-thumb" onerror="this.src='../assets/images/logo.svg'">
+      <div class="picker-item-info">
+        <div class="picker-item-name">${escapeHtml(p.name)}</div>
+        <div class="picker-item-price">${priceText}</div>
+      </div>
+    `;
+
+    item.addEventListener("click", (e) => {
+      if (e.target.tagName !== "INPUT") {
+        const cb = item.querySelector(".picker-checkbox");
+        cb.checked = !cb.checked;
+        cb.dispatchEvent(new Event("change"));
+      }
+    });
+
+    const checkbox = item.querySelector(".picker-checkbox");
+    checkbox.addEventListener("change", (e) => {
+      const pid = parseInt(e.target.dataset.id, 10);
+      if (e.target.checked) {
+        if (manageSelectedProductIds.size >= 3) {
+          e.target.checked = false;
+          manageProdsError.textContent = "Một video chỉ được gắn tối đa 3 sản phẩm!";
+          manageProdsError.style.display = "block";
+          return;
+        }
+        manageSelectedProductIds.add(pid);
+        item.classList.add("selected");
+      } else {
+        manageSelectedProductIds.delete(pid);
+        item.classList.remove("selected");
+        manageProdsError.style.display = "none";
+      }
+      updateManageProdsCounter();
+    });
+
+    manageProdsPickerList.appendChild(item);
+  });
+}
+
+function closeVideoProductsModal() {
+  if (modalVideoProds) modalVideoProds.style.display = "none";
+  currentProdsVideoId = null;
+}
+
+async function handleSaveVideoProducts() {
+  if (!currentProdsVideoId) return;
+
+  btnSaveProds.disabled = true;
+  btnSaveProds.textContent = "⏳ Đang lưu...";
+  manageProdsError.style.display = "none";
+
+  try {
+    const productIdsArray = Array.from(manageSelectedProductIds);
+    const updatedProducts = await api.post(`/videos/${currentProdsVideoId}/products`, {
+      product_ids: productIdsArray,
+    });
+
+    // Cập nhật video trong danh sách local
+    const target = myVideosList.find((v) => v.id === currentProdsVideoId);
+    if (target) {
+      target.products = updatedProducts;
+    }
+
+    renderFilteredVideos();
+    showToast("Đã cập nhật sản phẩm gắn trong video thành công!", "success");
+    closeVideoProductsModal();
+  } catch (err) {
+    console.error("Lỗi gắn sản phẩm vào video:", err);
+    manageProdsError.textContent = err.message || "Không thể lưu sản phẩm gắn vào video.";
+    manageProdsError.style.display = "block";
+  } finally {
+    btnSaveProds.disabled = false;
+    btnSaveProds.textContent = "💾 Lưu sản phẩm";
+  }
+}
+
 // ---------- GẮN SỰ KIỆN ----------
 function initEvents() {
   // Tabs lọc trạng thái
@@ -353,6 +520,13 @@ function initEvents() {
     if (btnEdit) {
       const id = parseInt(btnEdit.dataset.id, 10);
       openEditDescModal(id);
+      return;
+    }
+
+    const btnTagProds = e.target.closest(".btn-tag-prods");
+    if (btnTagProds) {
+      const id = parseInt(btnTagProds.dataset.id, 10);
+      openVideoProductsModal(id);
       return;
     }
 
@@ -383,9 +557,15 @@ function initEvents() {
   btnCancelDelete.addEventListener("click", closeDeleteModal);
   btnCloseDeleteModal.addEventListener("click", closeDeleteModal);
 
+  // Modal Gắn sản phẩm (Task T3D2296)
+  if (btnSaveProds) btnSaveProds.addEventListener("click", handleSaveVideoProducts);
+  if (btnCancelProds) btnCancelProds.addEventListener("click", closeVideoProductsModal);
+  if (btnCloseProdsModal) btnCloseProdsModal.addEventListener("click", closeVideoProductsModal);
+
   // Đóng modal khi bấm ra ngoài backdrop
   window.addEventListener("click", (e) => {
     if (e.target === modalEdit) closeEditModal();
     if (e.target === modalDelete) closeDeleteModal();
+    if (e.target === modalVideoProds) closeVideoProductsModal();
   });
 }

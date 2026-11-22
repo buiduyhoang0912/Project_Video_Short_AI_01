@@ -123,17 +123,21 @@ def get_feed_videos(
 
 
 def get_user_videos(
-    db: Session, user_id: int, limit: int = 10, cursor: int | None = None
+    db: Session,
+    user_id: int,
+    limit: int = 10,
+    cursor: int | None = None,
+    include_hidden: bool = False,
 ) -> tuple[list[Video], int | None, bool]:
     """
-    Lấy danh sách video công khai của một người dùng:
-    - Lọc theo user_id và status == 'VISIBLE'.
+    Lấy danh sách video của một người dùng:
+    - Lọc theo user_id.
+    - Mặc định chỉ lấy status == 'VISIBLE', nếu include_hidden=True thì lấy cả VISIBLE và HIDDEN.
     - Sắp xếp mới nhất trước.
     """
-    query = select(Video).where(
-        Video.user_id == user_id,
-        Video.status == "VISIBLE",
-    )
+    query = select(Video).where(Video.user_id == user_id)
+    if not include_hidden:
+        query = query.where(Video.status == "VISIBLE")
 
     if cursor is not None:
         query = query.where(Video.id < cursor)

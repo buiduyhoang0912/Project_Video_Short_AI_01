@@ -71,6 +71,7 @@ def delete_owned_video(db, video_id, user_id):
         return None
 
     file_urls = (video.video_url, video.thumbnail_url)
+    db.execute(delete(VideoProduct).where(VideoProduct.video_id == video_id))
     db.delete(video)
     db.flush()
     return file_urls

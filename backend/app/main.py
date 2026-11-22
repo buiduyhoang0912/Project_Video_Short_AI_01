@@ -67,6 +67,7 @@ app = FastAPI(title=settings.APP_NAME, lifespan=lifespan)
 uploads_dir = Path(__file__).resolve().parents[1] / "uploads"
 (uploads_dir / "videos").mkdir(parents=True, exist_ok=True)
 (uploads_dir / "thumbnails").mkdir(parents=True, exist_ok=True)
+(uploads_dir / "covers").mkdir(parents=True, exist_ok=True)
 (uploads_dir / "products").mkdir(parents=True, exist_ok=True)
 (uploads_dir / "avatars").mkdir(parents=True, exist_ok=True)
 

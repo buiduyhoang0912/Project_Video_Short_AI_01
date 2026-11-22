@@ -42,6 +42,14 @@ class Settings(BaseSettings):
     AI_TIMEOUT_SECONDS: float = 15.0
     AI_DAILY_QUESTION_LIMIT: int = 20
 
+    # Cấu hình lưu trữ tệp tin: Local hoặc Cloudflare R2 (Task T3D2BC7)
+    STORAGE_DRIVER: str = "local"
+    R2_ACCOUNT_ID: str = ""
+    R2_ACCESS_KEY_ID: str = ""
+    R2_SECRET_ACCESS_KEY: str = ""
+    R2_BUCKET: str = ""
+    R2_PUBLIC_URL: str = ""
+
     @property
     def database_url(self) -> str:
         # mysql+pymysql://user:password@host:port/database

@@ -39,6 +39,7 @@ from app.crud.video import (
     set_video_products,
     update_video_description,
 )
+from app.core.storage import get_storage
 
 router = APIRouter(prefix="/videos", tags=["Videos"])
 
@@ -48,58 +49,53 @@ UPLOADS_DIR = Path(__file__).resolve().parents[2] / "uploads"
 def save_uploaded_video(
     db, user_id, title, description, video_path, thumbnail_path, duration_seconds
 ):
-    video_destination = UPLOADS_DIR / "videos" / video_path.name
-    thumbnail_destination = UPLOADS_DIR / "thumbnails" / thumbnail_path.name
-    moved_files = []
+    storage = get_storage()
+    video_key = f"videos/{video_path.name}"
+    cover_key = f"covers/{thumbnail_path.name}"
+    uploaded_urls = []
 
     try:
+        video_url = storage.save(video_path, video_key)
+        uploaded_urls.append(video_url)
+
+        thumbnail_url = storage.save(thumbnail_path, cover_key)
+        uploaded_urls.append(thumbnail_url)
+
         record = create_uploaded_video(
             db=db,
             user_id=user_id,
             title=title,
             description=description,
-            video_url=f"/uploads/videos/{video_path.name}",
-            thumbnail_url=f"/uploads/thumbnails/{thumbnail_path.name}",
+            video_url=video_url,
+            thumbnail_url=thumbnail_url,
             duration_seconds=duration_seconds,
         )
-
-        video_path.replace(video_destination)
-        moved_files.append(video_destination)
-
-        thumbnail_path.replace(thumbnail_destination)
-        moved_files.append(thumbnail_destination)
 
         db.commit()
     except Exception:
         db.rollback()
-        for path in moved_files:
-            path.unlink(missing_ok=True)
+        for url in uploaded_urls:
+            try:
+                storage.delete(url)
+            except Exception:
+                pass
         raise
 
     return record
 
+
 def remove_uploaded_files(video_url, thumbnail_url):
-    files = (
-        (video_url, "videos", r"[0-9a-f]{32}\.(mp4|webm)"),
-        (thumbnail_url, "thumbnails", r"[0-9a-f]{32}\.(jpg|png|webp)"),
-    )
-
-    for url, folder, pattern in files:
-        prefix = f"/uploads/{folder}/"
-        if url is None or not url.startswith(prefix):
-            continue
-
-        filename = url.removeprefix(prefix)
-        if not re.fullmatch(pattern, filename):
-            continue
-
-        path = UPLOADS_DIR / folder / filename
+    storage = get_storage()
+    if video_url:
         try:
-            path.unlink(missing_ok=True)
-        except OSError:
-            logging.getLogger(__name__).exception(
-                "Không thể dọn tệp %s", filename
-            )
+            storage.delete(video_url)
+        except Exception:
+            logging.getLogger(__name__).warning("Không thể dọn video: %s", video_url)
+    if thumbnail_url:
+        try:
+            storage.delete(thumbnail_url)
+        except Exception:
+            logging.getLogger(__name__).warning("Không thể dọn thumbnail: %s", thumbnail_url)
 
 @router.post("", status_code=201)
 def create_video(

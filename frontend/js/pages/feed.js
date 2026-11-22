@@ -15,6 +15,7 @@ const PAGE_SIZE = 5;
 document.addEventListener("DOMContentLoaded", () => {
   initFeedTabs();
   initCommentsSheet();
+  initProductsSheet();
   if (new URLSearchParams(window.location.search).get("tab") === "following") {
     document.getElementById("tab-following").click(); // menu "Đang theo dõi"
   } else {
@@ -148,6 +149,13 @@ function createVideoCard(video) {
 
     <!-- Thông tin video (góc trái dưới) -->
     <div class="video-info-bottom">
+      ${(video.products && video.products.length > 0) ? `
+        <div class="feed-product-tag-pill" data-video-id="${video.id}" title="Xem ${video.products.length} sản phẩm gắn trong video">
+          <span class="product-tag-icon">🛒</span>
+          <span class="product-tag-title">${escapeHtml(video.products[0].name)}</span>
+          <span class="product-tag-badge">${video.products.length > 1 ? `+${video.products.length - 1}` : "Xem"}</span>
+        </div>
+      ` : ""}
       <a href="profile.html?user_id=${video.user_id}">
         @${video.author_username}
         <span style="font-size:12px;font-weight:normal;opacity:0.8;">(${video.author_name})</span>
@@ -205,6 +213,16 @@ function createVideoCard(video) {
         </div>
         <span class="action-label" id="share-count-${video.id}">${video.share_count || 0}</span>
       </div>
+
+      <!-- 5. Nút Giỏ hàng trên video (Task T3D2296) -->
+      ${(video.products && video.products.length > 0) ? `
+        <div class="action-item cart feed-cart-action-btn" data-video-id="${video.id}" title="Xem ${video.products.length} sản phẩm trong video">
+          <div class="action-icon-wrap" style="background:#f59e0b;border:1px solid #d97706;">
+            <span style="font-size:18px;">🛒</span>
+          </div>
+          <span class="action-label" style="color:#fbbf24;font-weight:700;">${video.products.length}</span>
+        </div>
+      ` : ""}
     </div>
   `;
 
@@ -257,6 +275,23 @@ function createVideoCard(video) {
     e.stopPropagation();
     handleShareAction(video.id);
   });
+
+  // Sự kiện Nút Giỏ hàng / Thẻ sản phẩm trên video (Task T3D2296)
+  const productPill = card.querySelector(".feed-product-tag-pill");
+  if (productPill) {
+    productPill.addEventListener("click", (e) => {
+      e.stopPropagation();
+      openProductsSheet(video);
+    });
+  }
+
+  const cartActionBtn = card.querySelector(".feed-cart-action-btn");
+  if (cartActionBtn) {
+    cartActionBtn.addEventListener("click", (e) => {
+      e.stopPropagation();
+      openProductsSheet(video);
+    });
+  }
 
   return card;
 }
@@ -405,6 +440,81 @@ function initCommentsSheet() {
   });
 
   btnSubmit.addEventListener("click", submitComment);
+}
+
+// ---------- BẢNG THẺ SẢN PHẨM GẮN TRONG VIDEO (TASK T3D2296) ----------
+function initProductsSheet() {
+  const overlay = document.getElementById("products-overlay");
+  const btnClose = document.getElementById("btn-close-products");
+
+  if (overlay) overlay.addEventListener("click", closeProductsSheet);
+  if (btnClose) btnClose.addEventListener("click", closeProductsSheet);
+}
+
+async function openProductsSheet(video) {
+  const overlay = document.getElementById("products-overlay");
+  const sheet = document.getElementById("products-bottom-sheet");
+  const countEl = document.getElementById("sheet-product-count");
+  const listEl = document.getElementById("sheet-products-list");
+
+  if (!sheet || !overlay) return;
+
+  overlay.classList.add("active");
+  sheet.classList.add("open");
+
+  let products = video.products || [];
+  if (products.length === 0) {
+    listEl.innerHTML = `<div class="muted" style="text-align:center;padding:24px;">Đang tải sản phẩm...</div>`;
+    try {
+      products = await api.get(`/videos/${video.id}/products`);
+      video.products = products;
+    } catch (_) {
+      products = [];
+    }
+  }
+
+  if (countEl) countEl.textContent = products.length;
+
+  if (products.length === 0) {
+    listEl.innerHTML = `<div class="muted" style="text-align:center;padding:32px 16px;">Video này hiện không có sản phẩm gắn kèm.</div>`;
+    return;
+  }
+
+  listEl.innerHTML = products.map((p) => {
+    let thumb = p.thumbnail_url || "";
+    if (thumb && thumb.startsWith("/uploads/")) {
+      thumb = `${CONFIG.API_BASE_URL.replace("/api", "")}${thumb}`;
+    } else if (!thumb) {
+      thumb = "../assets/images/logo.svg";
+    }
+
+    const priceText = Number(p.price || 0).toLocaleString("vi-VN") + " ₫";
+    const shopName = p.shop_name ? `🏪 ${escapeHtml(p.shop_name)}` : "";
+
+    return `
+      <div class="tagged-sheet-item">
+        <a href="product.html?id=${p.id}" class="tagged-sheet-thumb-link">
+          <img src="${escapeHtml(thumb)}" alt="${escapeHtml(p.name)}" class="tagged-sheet-thumb" onerror="this.src='../assets/images/logo.svg'">
+        </a>
+        <div class="tagged-sheet-info">
+          <a href="product.html?id=${p.id}" class="tagged-sheet-name">${escapeHtml(p.name)}</a>
+          <div class="tagged-sheet-price">${priceText}</div>
+          ${shopName ? `<div class="tagged-sheet-shop">${shopName}</div>` : ""}
+        </div>
+        <a href="product.html?id=${p.id}" class="btn btn-small btn-primary btn-sheet-view">
+          Xem chi tiết
+        </a>
+      </div>
+    `;
+  }).join("");
+}
+
+function closeProductsSheet() {
+  const overlay = document.getElementById("products-overlay");
+  const sheet = document.getElementById("products-bottom-sheet");
+
+  if (sheet) sheet.classList.remove("open");
+  if (overlay) overlay.classList.remove("active");
 }
 
 function openCommentsSheet(videoId) {

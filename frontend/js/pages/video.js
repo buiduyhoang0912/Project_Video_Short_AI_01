@@ -331,6 +331,9 @@ function renderVideoDetail(video) {
 
   const shortPath = document.getElementById("share-short-path");
   if (shortPath) shortPath.textContent = `/video/${video.id}`;
+
+  // Gắn danh sách sản phẩm (Task T3D2296)
+  renderSingleVideoProducts(video);
 }
 
 function updateLikeBtnUI(isLiked, count) {
@@ -367,6 +370,60 @@ function updateFollowBtnUI(isFollowing) {
     btnFollow.className = "btn-profile-follow not-following";
     btnFollow.textContent = "+ Theo dõi";
   }
+}
+
+// ---------- 3.5. HIỂN THỊ SẢN PHẨM TRONG VIDEO (TASK T3D2296) ----------
+async function renderSingleVideoProducts(video) {
+  const wrap = document.getElementById("video-tagged-products-wrap");
+  const countEl = document.getElementById("video-prods-count");
+  const listEl = document.getElementById("video-tagged-products-list");
+  if (!wrap || !listEl) return;
+
+  let products = Array.isArray(video.products) ? video.products : [];
+
+  // Nếu trong object video chưa có products hoặc rỗng, gọi API /videos/{id}/products
+  if (products.length === 0) {
+    try {
+      const res = await api.get(`/videos/${video.id}/products`);
+      if (Array.isArray(res)) {
+        products = res;
+      }
+    } catch {
+      // Bỏ qua nếu có lỗi
+    }
+  }
+
+  if (products.length === 0) {
+    wrap.style.display = "none";
+    listEl.innerHTML = "";
+    return;
+  }
+
+  wrap.style.display = "block";
+  if (countEl) countEl.textContent = products.length;
+
+  listEl.innerHTML = products
+    .map((p) => {
+      let thumbUrl = p.thumbnail_url || "../assets/images/logo.svg";
+      if (thumbUrl && thumbUrl.startsWith("/uploads/")) {
+        thumbUrl = `${CONFIG.API_BASE_URL.replace("/api", "")}${thumbUrl}`;
+      }
+      const priceText = Number(p.price || 0).toLocaleString("vi-VN") + " đ";
+      const shopName = p.shop_name ? escapeHtml(p.shop_name) : "Shop";
+
+      return `
+        <a href="product.html?id=${p.id}" class="tagged-prod-mini-card" title="Xem chi tiết: ${escapeHtml(p.name)}">
+          <img src="${thumbUrl}" alt="${escapeHtml(p.name)}" class="tagged-prod-mini-thumb" onerror="this.src='../assets/images/logo.svg'">
+          <div class="tagged-prod-mini-info">
+            <span class="tagged-prod-mini-badge">🛍️ ${shopName}</span>
+            <div class="tagged-prod-mini-name">${escapeHtml(p.name)}</div>
+            <div class="tagged-prod-mini-price">${priceText}</div>
+          </div>
+          <span class="tagged-prod-mini-arrow">👉</span>
+        </a>
+      `;
+    })
+    .join("");
 }
 
 // ---------- 4. SAO CHÉP LINK & ĐẾM LƯỢT CHIA SẺ (YÊU CẦU CHÍNH TASK T3D245C) ----------

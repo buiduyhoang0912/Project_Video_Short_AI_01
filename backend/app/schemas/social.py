@@ -2,6 +2,8 @@ from datetime import datetime
 from typing import Literal
 from pydantic import BaseModel, ConfigDict, Field
 
+from app.schemas.product import ProductListItemOut
+
 
 class CommentCreate(BaseModel):
     content: str = Field(min_length=1, max_length=2000)
@@ -67,6 +69,7 @@ class FollowingFeedItem(BaseModel):
     share_count: int = 0
     is_liked: bool = False
     is_following: bool = False
+    products: list[ProductListItemOut] = []
 
 
 class ProfileVideoItem(BaseModel):
@@ -137,6 +140,7 @@ class VideoDetailOut(BaseModel):
     share_count: int = 0
     is_liked: bool = False
     is_following: bool = False
+    products: list[ProductListItemOut] = []
 
 
 class VideoStatusUpdate(BaseModel):

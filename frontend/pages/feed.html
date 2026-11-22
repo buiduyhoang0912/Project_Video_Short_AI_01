@@ -48,6 +48,18 @@
         <button id="btn-submit-comment" class="btn-send-comment">Gửi</button>
       </div>
     </div>
+
+    <!-- Backdrop & Bảng thẻ sản phẩm gắn trong video trượt lên (Task T3D2296) -->
+    <div id="products-overlay" class="comments-sheet-overlay"></div>
+    <div id="products-bottom-sheet" class="comments-bottom-sheet">
+      <div class="comments-header">
+        <h3 id="sheet-product-title">🛍️ Sản phẩm trong video (<span id="sheet-product-count">0</span>)</h3>
+        <button id="btn-close-products" class="btn-close-sheet">&times;</button>
+      </div>
+      <div class="products-list-body" id="sheet-products-list">
+        <!-- Danh sách thẻ sản phẩm sẽ render vào đây -->
+      </div>
+    </div>
   </main>
 
   <footer id="app-footer"></footer>

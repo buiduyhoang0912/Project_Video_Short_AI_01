@@ -1,8 +1,10 @@
-from sqlalchemy import and_, or_, select
+from fastapi import HTTPException
+from sqlalchemy import and_, delete, or_, select
 from sqlalchemy.orm import Session
 
+from app.models.product import Product
+from app.models.shop import Shop
 from app.models.video import Video, VideoProduct
-
 
 def add_video_product(db, video_id, product_id):
     query = select(Video.id).where(Video.id == video_id).with_for_update()
@@ -165,3 +167,104 @@ def increment_video_view(db: Session, video_id: int) -> int | None:
     video.view_count = (video.view_count or 0) + 1
     db.flush()
     return video.view_count
+
+# --- Xử lý gắn sản phẩm vào video (Task T3D2296) ---
+
+def get_video_products(db: Session, video_id: int) -> list[Product]:
+    """Lấy danh sách các sản phẩm đang ACTIVE được gắn trong video."""
+    return list(
+        db.scalars(
+            select(Product)
+            .join(VideoProduct, VideoProduct.product_id == Product.id)
+            .where(VideoProduct.video_id == video_id, Product.status == "ACTIVE")
+        ).all()
+    )
+
+
+def set_video_products(
+    db: Session, video_id: int, user_id: int, product_ids: list[int]
+) -> list[Product]:
+    """
+    Người bán gắn sản phẩm vào video:
+    - Kiểm tra video thuộc quyền sở hữu của user.
+    - Tối đa 3 sản phẩm.
+    - Chỉ được gắn sản phẩm thuộc Shop của người bán.
+    """
+    video = db.scalar(select(Video).where(Video.id == video_id))
+    if video is None:
+        raise HTTPException(status_code=404, detail="Không tìm thấy video")
+    if video.user_id != user_id:
+        raise HTTPException(
+            status_code=403,
+            detail="Bạn không có quyền gắn sản phẩm vào video này",
+        )
+
+    # Khống chế tối đa 3 sản phẩm theo yêu cầu đề bài
+    unique_ids = list(dict.fromkeys(product_ids))
+    if len(unique_ids) > 3:
+        raise HTTPException(
+            status_code=400,
+            detail="Một video chỉ được gắn tối đa 3 sản phẩm",
+        )
+
+    shop = db.scalar(select(Shop).where(Shop.owner_id == user_id))
+    if not shop and unique_ids:
+        raise HTTPException(
+            status_code=400,
+            detail="Bạn chưa có cửa hàng để gắn sản phẩm vào video",
+        )
+
+    if unique_ids:
+        products = list(
+            db.scalars(
+                select(Product).where(
+                    Product.id.in_(unique_ids),
+                    Product.shop_id == shop.id,
+                    Product.status == "ACTIVE",
+                )
+            ).all()
+        )
+        if len(products) != len(unique_ids):
+            raise HTTPException(
+                status_code=400,
+                detail="Chỉ được gắn sản phẩm đang hoạt động thuộc cửa hàng của bạn",
+            )
+    else:
+        products = []
+
+    # Cập nhật liên kết trong bảng video_products
+    db.execute(delete(VideoProduct).where(VideoProduct.video_id == video_id))
+    for pid in unique_ids:
+        db.add(VideoProduct(video_id=video_id, product_id=pid))
+
+    db.commit()
+    return products
+
+
+def serialize_product_item(p: Product) -> dict:
+    """Chuyển đổi đối tượng Product sang dict khớp ProductListItemOut."""
+    thumb = None
+    if getattr(p, "images", None):
+        for img in p.images:
+            if getattr(img, "is_primary", False):
+                thumb = getattr(img, "image_url", None) or getattr(img, "object_key", None)
+                break
+        if not thumb and len(p.images) > 0:
+            thumb = getattr(p.images[0], "image_url", None) or getattr(p.images[0], "object_key", None)
+    if not thumb:
+        thumb = getattr(p, "thumbnail_url", None)
+
+    return {
+        "id": p.id,
+        "shop_id": p.shop_id,
+        "shop_name": p.shop.name if getattr(p, "shop", None) else None,
+        "category_id": p.category_id,
+        "category_name": p.category.name if getattr(p, "category", None) else None,
+        "name": p.name,
+        "price": float(p.price) if p.price is not None else 0.0,
+        "stock": p.stock or 0,
+        "sold_count": p.sold_count or 0,
+        "thumbnail_url": thumb,
+        "status": p.status,
+        "created_at": p.created_at,
+    }

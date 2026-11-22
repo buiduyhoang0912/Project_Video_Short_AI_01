@@ -244,6 +244,7 @@ def create_orders_from_cart(
                 )
             )
 
+        qr_info = _extract_vietqr_info(o, shop_record)
         order_responses.append(
             OrderResponse(
                 id=o.id,
@@ -258,6 +259,7 @@ def create_orders_from_cart(
                 recipient_address=o.recipient_address,
                 created_at=o.created_at,
                 items=item_resps,
+                **qr_info,
                 **voucher_info.get(id(o), {}),
             )
         )
@@ -270,6 +272,36 @@ def create_orders_from_cart(
         total_before_discount=round(float(total_before_discount), 2),
         total_discount=round(float(total_discount), 2),
     )
+
+
+def _extract_vietqr_info(o: Order, shop_obj=None) -> dict:
+    """Tạo thông tin thanh toán chuyển khoản VietQR cho đơn hàng."""
+    is_bank = (o.payment_method or "").upper() in ("BANK_TRANSFER", "QR_TRANSFER")
+    shop = shop_obj or o.shop
+    vietqr_url = None
+    b_name = None
+    b_num = None
+    b_holder = None
+    if is_bank and shop:
+        b_name = getattr(shop, "bank_name", "MB") or "MB"
+        b_num = getattr(shop, "bank_account_number", "0987654321") or "0987654321"
+        b_holder = getattr(shop, "bank_account_holder", shop.name) or (shop.name.upper() if shop.name else "SHOP")
+        if hasattr(shop, "generate_vietqr_url"):
+            vietqr_url = shop.generate_vietqr_url(float(o.total_amount), o.id)
+        else:
+            import urllib.parse
+            encoded_memo = urllib.parse.quote(f"DH{o.id}")
+            encoded_holder = urllib.parse.quote(b_holder)
+            vietqr_url = f"https://img.vietqr.io/image/{b_name}-{b_num}-compact2.png?amount={int(o.total_amount)}&addInfo={encoded_memo}&accountName={encoded_holder}"
+
+    pay_status = "PAID" if (o.status or "").upper() in ("CONFIRMED", "SHIPPED", "DELIVERED", "COMPLETED") else "UNPAID"
+    return {
+        "payment_status": pay_status,
+        "vietqr_url": vietqr_url,
+        "bank_name": b_name,
+        "bank_account_number": b_num,
+        "bank_account_holder": b_holder,
+    }
 
 
 def get_user_orders(db: Session, user_id: int) -> list[OrderResponse]:
@@ -299,6 +331,7 @@ def get_user_orders(db: Session, user_id: int) -> list[OrderResponse]:
             )
             for it in o.items
         ]
+        qr_info = _extract_vietqr_info(o)
         res.append(
             OrderResponse(
                 id=o.id,
@@ -313,6 +346,7 @@ def get_user_orders(db: Session, user_id: int) -> list[OrderResponse]:
                 recipient_address=o.recipient_address,
                 created_at=o.created_at,
                 items=item_resps,
+                **qr_info,
             )
         )
     return voucher_crud.attach_voucher_info(db, res)
@@ -347,6 +381,7 @@ def get_order_detail(db: Session, user_id: int, order_id: int) -> OrderResponse:
         )
         for it in o.items
     ]
+    qr_info = _extract_vietqr_info(o)
     resp = OrderResponse(
         id=o.id,
         buyer_id=o.buyer_id,
@@ -360,5 +395,6 @@ def get_order_detail(db: Session, user_id: int, order_id: int) -> OrderResponse:
         recipient_address=o.recipient_address,
         created_at=o.created_at,
         items=item_resps,
+        **qr_info,
     )
     return voucher_crud.attach_voucher_info(db, [resp])[0]

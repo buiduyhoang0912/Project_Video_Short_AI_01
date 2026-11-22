@@ -14,6 +14,7 @@ from app.routers import (
     social,
     videos,
     vouchers,
+    notifications,
 )
 
 __all__ = [
@@ -24,6 +25,7 @@ __all__ = [
     "categories",
     "health",
     "items",
+    "notifications",
     "orders",
     "products",
     "profile",

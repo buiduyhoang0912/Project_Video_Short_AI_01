@@ -14,6 +14,7 @@ from app.models.video import Video, VideoProduct
 from app.models.revoked_token import RevokedToken
 from app.models.social import AiChatLog, Comment, Follow, Like, VideoShare
 from app.models.voucher import ShopVoucher, VoucherUsage
+from app.models.notification import Notification
 
 if not hasattr(User, "addresses"):
     User.addresses = relationship("Address", back_populates="user")

@@ -271,6 +271,31 @@ def update_shop_order_status(
         voucher_crud.release_voucher_for_order(db, order.id)
 
     order.status = target_status
+
+    # Tạo thông báo đổi trạng thái đơn hàng cho người mua (T3D2BAD)
+    if order.buyer_id:
+        from app.crud.notification import create_notification
+        if target_status == "shipping":
+            msg = f"Đơn #{order.id} đang được giao"
+        elif target_status == "confirmed":
+            msg = f"Đơn #{order.id} đã được xác nhận"
+        elif target_status == "completed":
+            msg = f"Đơn #{order.id} đã hoàn thành"
+        elif target_status == "cancelled":
+            msg = f"Đơn #{order.id} đã bị huỷ"
+        else:
+            tgt_label = STATUS_LABELS_VI.get(target_status, target_status)
+            msg = f"Đơn #{order.id} đã chuyển sang trạng thái: {tgt_label}"
+
+        create_notification(
+            db=db,
+            recipient_id=order.buyer_id,
+            actor_id=shop.owner_id,
+            type="ORDER_STATUS",
+            content=msg,
+            order_id=order.id,
+        )
+
     db.commit()
     db.refresh(order)
     return _serialize_order(order, shop.name)

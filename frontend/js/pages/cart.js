@@ -330,14 +330,26 @@ async function loadMyOrders() {
       myOrdersContainer.innerHTML = `<div class="muted">Bạn chưa có đơn hàng nào.</div>`;
       return;
     }
+
+    const targetOrderId = new URLSearchParams(window.location.search).get("order_id") || 
+      (window.location.hash.startsWith("#order-") ? window.location.hash.replace("#order-", "") : null);
+
     myOrdersContainer.innerHTML = orders
-      .slice(0, 8)
+      .slice(0, 15)
       .map((o) => {
+        const isTarget = targetOrderId && String(o.id) === String(targetOrderId);
+        const highlightStyle = isTarget
+          ? "border: 2px solid #2563eb; background: #eff6ff; box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.15);"
+          : "border: 1px solid #e2e8f0; background: #ffffff;";
+
         return `
-          <div style="padding: 12px; border: 1px solid #e2e8f0; border-radius: 10px; margin-bottom: 10px;">
+          <div id="order-${o.id}" class="my-order-card" style="padding: 12px; ${highlightStyle} border-radius: 10px; margin-bottom: 10px; transition: all 0.3s ease;">
             <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 6px;">
               <strong>Đơn #${o.id} · 🏪 ${escapeHtml(o.shop_name || `Shop #${o.shop_id}`)}</strong>
-              <span class="order-badge ${escapeHtml(o.status)}">${escapeHtml(o.status)}</span>
+              <div>
+                ${isTarget ? '<span style="display: inline-block; background: #2563eb; color: #fff; font-size: 11px; font-weight: 700; padding: 2px 8px; border-radius: 999px; margin-right: 6px;">Vừa cập nhật</span>' : ''}
+                <span class="order-badge ${escapeHtml(o.status)}">${escapeHtml(o.status)}</span>
+              </div>
             </div>
             <div class="muted" style="font-size: 13px; margin-top: 4px;">
               ${
@@ -351,6 +363,15 @@ async function loadMyOrders() {
           </div>`;
       })
       .join("");
+
+    if (targetOrderId) {
+      setTimeout(() => {
+        const el = document.getElementById(`order-${targetOrderId}`) || document.getElementById("section-my-orders");
+        if (el) {
+          el.scrollIntoView({ behavior: "smooth", block: "center" });
+        }
+      }, 100);
+    }
   } catch (error) {
     myOrdersContainer.innerHTML = `<div class="text-error">${escapeHtml(error.message)}</div>`;
   }

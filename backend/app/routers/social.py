@@ -80,22 +80,22 @@ def like_video(
             "liked": True,
         }
 
-    db.add(Like(user_id=uid, video_id=video_id))
-
-    # Tạo thông báo thích video cho chủ video (T3D2BAD)
-    video = db.get(Video, video_id)
-    if video and video.user_id != uid:
-        actor_name = user.display_name or user.username
-        notif_crud.create_notification(
-            db=db,
-            recipient_id=video.user_id,
-            actor_id=uid,
-            type="LIKE",
-            content=f"{actor_name} đã thích video của bạn",
-            video_id=video_id,
-        )
-
     try:
+        db.add(Like(user_id=uid, video_id=video_id))
+
+        # Tạo thông báo thích video cho chủ video (T3D2BAD)
+        video = db.get(Video, video_id)
+        if video and video.user_id != uid:
+            actor_name = user.display_name or user.username
+            notif_crud.create_notification(
+                db=db,
+                recipient_id=video.user_id,
+                actor_id=uid,
+                type="LIKE",
+                content=f"{actor_name} đã thích video của bạn",
+                video_id=video_id,
+            )
+
         db.commit()
     except IntegrityError:
         db.rollback()
@@ -168,23 +168,29 @@ def create_comment(
         content=data.content.strip(),
     )
 
-    db.add(comment)
+    try:
+        db.add(comment)
 
-    # Tạo thông báo bình luận video cho chủ video (T3D2BAD)
-    video = db.get(Video, video_id)
-    if video and video.user_id != user.id:
-        actor_name = user.display_name or user.username
-        notif_crud.create_notification(
-            db=db,
-            recipient_id=video.user_id,
-            actor_id=user.id,
-            type="COMMENT",
-            content=f"{actor_name} đã bình luận video của bạn",
-            video_id=video_id,
+        # Tạo thông báo bình luận video cho chủ video (T3D2BAD)
+        video = db.get(Video, video_id)
+        if video and video.user_id != user.id:
+            actor_name = user.display_name or user.username
+            notif_crud.create_notification(
+                db=db,
+                recipient_id=video.user_id,
+                actor_id=user.id,
+                type="COMMENT",
+                content=f"{actor_name} đã bình luận video của bạn",
+                video_id=video_id,
+            )
+
+        db.commit()
+        db.refresh(comment)
+    except IntegrityError:
+        db.rollback()
+        raise HTTPException(
+            409, "Không thể tạo bình luận"
         )
-
-    db.commit()
-    db.refresh(comment)
 
     return comment
 
@@ -279,25 +285,25 @@ def follow_user(
             "following": True,
         }
 
-    db.add(
-        Follow(
-            follower_id=uid,
-            following_id=following_id,
-        )
-    )
-
-    # Tạo thông báo theo dõi cho người được theo dõi (T3D2BAD)
-    if following_id != uid:
-        actor_name = user.display_name or user.username
-        notif_crud.create_notification(
-            db=db,
-            recipient_id=following_id,
-            actor_id=uid,
-            type="FOLLOW",
-            content=f"{actor_name} đã bắt đầu theo dõi bạn",
-        )
-
     try:
+        db.add(
+            Follow(
+                follower_id=uid,
+                following_id=following_id,
+            )
+        )
+
+        # Tạo thông báo theo dõi cho người được theo dõi (T3D2BAD)
+        if following_id != uid:
+            actor_name = user.display_name or user.username
+            notif_crud.create_notification(
+                db=db,
+                recipient_id=following_id,
+                actor_id=uid,
+                type="FOLLOW",
+                content=f"{actor_name} đã bắt đầu theo dõi bạn",
+            )
+
         db.commit()
     except IntegrityError:
         db.rollback()

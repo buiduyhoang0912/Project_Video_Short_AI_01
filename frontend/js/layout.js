@@ -20,6 +20,9 @@ const MENU = [
   { href: "pages/admin.html", label: "🛡️ Admin", access: "role:ADMIN" },
 ];
 
+// TASK T3D2BAD: Biến lưu timer polling thông báo (phải khai báo trước khi renderLayout() chạy)
+let notifPollingTimer = null;
+
 function getCurrentUser() {
   return session.getUser();
 }
@@ -587,7 +590,6 @@ function initAiChatbotWidget() {
 // ==========================================================
 // TASK T3D2BAD: QUẢN LÝ CHUÔNG THÔNG BÁO VÀ DANH SÁCH DROPDOWN
 // ==========================================================
-let notifPollingTimer = null;
 
 function formatNotifTime(dateStr) {
   if (!dateStr) return "";
@@ -702,7 +704,7 @@ async function handleNotificationClick(el, root) {
   if (videoId) {
     window.location.href = `${root}pages/video.html?id=${videoId}`;
   } else if (orderId) {
-    window.location.href = `${root}pages/cart.html`;
+    window.location.href = `${root}pages/cart.html?order_id=${encodeURIComponent(orderId)}#order-${encodeURIComponent(orderId)}`;
   } else if (type === "FOLLOW" && actorUsername) {
     window.location.href = `${root}pages/profile.html?username=${encodeURIComponent(actorUsername)}`;
   }

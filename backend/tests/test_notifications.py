@@ -33,6 +33,7 @@ from app.models.notification import Notification
 from app.models.order import Order
 from app.models.product import Product
 from app.models.shop import Shop
+from app.models.social import Follow, Like
 from app.models.user import User
 from app.models.video import Video
 
@@ -312,3 +313,36 @@ def test_mark_as_read_and_read_all(client, db_session):
 
     # User2 vẫn còn 1 thông báo chưa đọc
     assert client.get("/api/notifications/unread-count", headers=h2).json()["unread_count"] == 1
+
+
+def test_like_and_follow_integrity_error_handled(client, db_session, monkeypatch):
+    """Khi có IntegrityError phát sinh đồng thời (ví dụ tại flush hoặc commit), exception được bắt và xử lý an toàn."""
+    u1 = make_user(db_session, "user_ie1")
+    u2 = make_user(db_session, "user_ie2")
+
+    vid = Video(title="Vid IE", video_url="/uploads/videos/ie.mp4", duration_seconds=10, user_id=u2.id, status="VISIBLE")
+    db_session.add(vid)
+    db_session.commit()
+
+    # Giả lập trước đã có Like trong DB
+    db_session.add(Like(user_id=u1.id, video_id=vid.id))
+    db_session.commit()
+
+    # Khi gọi lại, nếu monkeypatch làm find_like trả về None ở lượt kiểm tra đầu tiên để ép vào khối try,
+    # nhưng IntegrityError bắn ra vì đã có Like -> khối except phải bắt được và trả về 200 vì đã tồn tại Like.
+    import app.routers.social as social_module
+    orig_find_like = social_module.crud.find_like
+
+    call_count = {"count": 0}
+    def mock_find_like(db, uid, video_id):
+        call_count["count"] += 1
+        if call_count["count"] == 1:
+            return None  # Ép vào khối try
+        return orig_find_like(db, uid, video_id)  # Lượt kiểm tra trong except
+
+    monkeypatch.setattr(social_module.crud, "find_like", mock_find_like)
+
+    res = client.post(f"/api/videos/{vid.id}/likes", headers=auth_header(u1.id))
+    assert res.status_code == 200
+    assert res.json()["liked"] is True
+

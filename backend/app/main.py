@@ -24,6 +24,7 @@ from app.routers import (
     categories,
     health,
     items,
+    notifications,
     orders,
     products,
     profile,
@@ -84,6 +85,7 @@ app.include_router(health.router, prefix="/api")
 app.include_router(admin.router, prefix="/api")
 app.include_router(admin_moderation.router, prefix="/api")
 app.include_router(items.router, prefix="/api")
+app.include_router(notifications.router, prefix="/api")
 app.include_router(videos.router, prefix="/api")
 app.include_router(seller_applications.router, prefix="/api")
 app.include_router(vouchers.router, prefix="/api")  # T3D2BFB: đặt trước shops để /shops/me/vouchers khớp đúng

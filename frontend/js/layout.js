@@ -68,6 +68,21 @@ function renderLayout() {
 
   const authHtml = user
     ? `<div class="header-user">
+         <div class="notif-bell-container" id="notif-bell-container">
+           <button id="btn-notif-bell" class="btn-notif-bell" type="button" aria-label="Thông báo" title="Thông báo">
+             <span class="bell-icon">🔔</span>
+             <span id="notif-badge" class="notif-badge" style="display: none;">0</span>
+           </button>
+           <div id="notif-dropdown" class="notif-dropdown" style="display: none;">
+             <div class="notif-header">
+               <div class="notif-header-title">🔔 Thông báo</div>
+               <button id="btn-notif-read-all" class="btn-notif-read-all" type="button">Đọc tất cả</button>
+             </div>
+             <div id="notif-list" class="notif-list">
+               <div class="notif-empty">Đang tải...</div>
+             </div>
+           </div>
+         </div>
          <span class="user-greeting">Hi, <strong>${escapeHtml(user.display_name || user.username)}</strong>
            <span class="role-badge role-${escapeHtml(user.role)}">${escapeHtml(roleLabel(user.role))}</span></span>
          <button id="btn-header-logout" class="btn btn-small">Đăng xuất</button>
@@ -89,6 +104,10 @@ function renderLayout() {
 
     const btnLogout = document.getElementById("btn-header-logout");
     if (btnLogout) btnLogout.addEventListener("click", logout);
+
+    if (user) {
+      initNotificationBell();
+    }
   }
 
   const footerEl = document.getElementById("app-footer");
@@ -104,6 +123,7 @@ function loginUrlFromRoot() {
 
 // Đăng xuất: gọi POST /auth/logout, rồi xóa token + thông tin người dùng (kể cả khi gọi API lỗi)
 async function logout() {
+  if (notifPollingTimer) clearInterval(notifPollingTimer);
   const btn = document.getElementById("btn-header-logout");
   if (btn) btn.disabled = true;
   try {
@@ -562,4 +582,195 @@ function initAiChatbotWidget() {
       }
     }
   }
+}
+
+// ==========================================================
+// TASK T3D2BAD: QUẢN LÝ CHUÔNG THÔNG BÁO VÀ DANH SÁCH DROPDOWN
+// ==========================================================
+let notifPollingTimer = null;
+
+function formatNotifTime(dateStr) {
+  if (!dateStr) return "";
+  const d = new Date(dateStr);
+  if (isNaN(d.getTime())) return "";
+  const now = new Date();
+  const diffSec = Math.floor((now - d) / 1000);
+  if (diffSec < 60) return "Vừa xong";
+  if (diffSec < 3600) return `${Math.floor(diffSec / 60)} phút trước`;
+  if (diffSec < 86400) return `${Math.floor(diffSec / 3600)} giờ trước`;
+  if (diffSec < 86400 * 7) return `${Math.floor(diffSec / 86400)} ngày trước`;
+  return `${d.getDate()}/${d.getMonth() + 1}/${d.getFullYear()}`;
+}
+
+function getNotifIcon(type) {
+  switch (type) {
+    case "LIKE":
+      return "❤️";
+    case "COMMENT":
+      return "💬";
+    case "FOLLOW":
+      return "👤";
+    case "ORDER_STATUS":
+      return "📦";
+    default:
+      return "🔔";
+  }
+}
+
+async function updateNotificationBadge() {
+  if (!session.getToken()) return;
+  const badgeEl = document.getElementById("notif-badge");
+  if (!badgeEl) return;
+  try {
+    const res = await api.get("/notifications/unread-count");
+    const count =
+      res && typeof res.unread_count === "number" ? res.unread_count : 0;
+    if (count > 0) {
+      badgeEl.textContent = count > 99 ? "99+" : count;
+      badgeEl.style.display = "flex";
+    } else {
+      badgeEl.style.display = "none";
+    }
+  } catch (err) {
+    // Không làm gián đoạn UI nếu request lỗi
+  }
+}
+
+async function loadNotificationsDropdown() {
+  const listEl = document.getElementById("notif-list");
+  if (!listEl) return;
+  listEl.innerHTML = `<div class="notif-empty">Đang tải thông báo...</div>`;
+
+  try {
+    const items = await api.get("/notifications?limit=30");
+    if (!Array.isArray(items) || items.length === 0) {
+      listEl.innerHTML = `<div class="notif-empty">Chưa có thông báo nào</div>`;
+      return;
+    }
+
+    const root = document.body.dataset.root || "./";
+    listEl.innerHTML = items
+      .map((item) => {
+        const icon = getNotifIcon(item.type);
+        const timeStr = formatNotifTime(item.created_at);
+        const unreadClass = item.is_read ? "read" : "unread";
+        return `
+          <div class="notif-item ${unreadClass}" data-id="${item.id}" data-type="${escapeHtml(item.type)}" data-video-id="${item.video_id || ""}" data-order-id="${item.order_id || ""}" data-actor-username="${escapeHtml((item.actor && item.actor.username) || "")}">
+            <div class="notif-icon-wrap">${icon}</div>
+            <div class="notif-body">
+              <div class="notif-content">${escapeHtml(item.content)}</div>
+              <div class="notif-time">${escapeHtml(timeStr)}</div>
+            </div>
+            ${!item.is_read ? '<span class="notif-unread-dot"></span>' : ""}
+          </div>`;
+      })
+      .join("");
+
+    listEl.querySelectorAll(".notif-item").forEach((el) => {
+      el.addEventListener("click", () => handleNotificationClick(el, root));
+    });
+  } catch (err) {
+    listEl.innerHTML = `<div class="notif-empty">Không thể tải thông báo. Vui lòng thử lại.</div>`;
+  }
+}
+
+async function handleNotificationClick(el, root) {
+  const notifId = el.dataset.id;
+  const isUnread = el.classList.contains("unread");
+  const type = el.dataset.type;
+  const videoId = el.dataset.videoId;
+  const orderId = el.dataset.orderId;
+  const actorUsername = el.dataset.actorUsername;
+
+  // Nếu chưa đọc, đánh dấu đã đọc trên server
+  if (isUnread && notifId) {
+    try {
+      await api.patch(`/notifications/${notifId}/read`);
+      el.classList.remove("unread");
+      el.classList.add("read");
+      const dot = el.querySelector(".notif-unread-dot");
+      if (dot) dot.remove();
+      updateNotificationBadge();
+    } catch (_) {}
+  }
+
+  // Đóng dropdown
+  const dropdown = document.getElementById("notif-dropdown");
+  if (dropdown) dropdown.style.display = "none";
+
+  // Điều hướng tương ứng
+  if (videoId) {
+    window.location.href = `${root}pages/video.html?id=${videoId}`;
+  } else if (orderId) {
+    window.location.href = `${root}pages/cart.html`;
+  } else if (type === "FOLLOW" && actorUsername) {
+    window.location.href = `${root}pages/profile.html?username=${encodeURIComponent(actorUsername)}`;
+  }
+}
+
+async function markAllNotificationsRead() {
+  try {
+    await api.patch("/notifications/read-all");
+    const listEl = document.getElementById("notif-list");
+    if (listEl) {
+      listEl.querySelectorAll(".notif-item.unread").forEach((el) => {
+        el.classList.remove("unread");
+        el.classList.add("read");
+        const dot = el.querySelector(".notif-unread-dot");
+        if (dot) dot.remove();
+      });
+    }
+    const badgeEl = document.getElementById("notif-badge");
+    if (badgeEl) badgeEl.style.display = "none";
+    if (typeof showToast === "function") {
+      showToast("Đã đánh dấu tất cả thông báo là đã đọc", "success");
+    }
+  } catch (err) {
+    if (typeof showToast === "function") {
+      showToast("Không thể cập nhật thông báo", "error");
+    }
+  }
+}
+
+function initNotificationBell() {
+  const bellBtn = document.getElementById("btn-notif-bell");
+  const dropdown = document.getElementById("notif-dropdown");
+  const readAllBtn = document.getElementById("btn-notif-read-all");
+
+  if (!bellBtn || !dropdown) return;
+
+  // Bấm chuông mở/đóng dropdown
+  bellBtn.addEventListener("click", (e) => {
+    e.stopPropagation();
+    const isHidden = dropdown.style.display === "none";
+    dropdown.style.display = isHidden ? "flex" : "none";
+    if (isHidden) {
+      loadNotificationsDropdown();
+    }
+  });
+
+  // Bấm nút Đọc tất cả
+  if (readAllBtn) {
+    readAllBtn.addEventListener("click", (e) => {
+      e.stopPropagation();
+      markAllNotificationsRead();
+    });
+  }
+
+  // Bấm bên trong dropdown không đóng
+  dropdown.addEventListener("click", (e) => e.stopPropagation());
+
+  // Bấm ngoài đóng dropdown
+  document.addEventListener("click", () => {
+    if (dropdown.style.display !== "none") {
+      dropdown.style.display = "none";
+    }
+  });
+
+  // Khởi chạy đếm chưa đọc lần đầu
+  updateNotificationBadge();
+
+  // Polling mỗi 25 giây
+  if (notifPollingTimer) clearInterval(notifPollingTimer);
+  notifPollingTimer = setInterval(updateNotificationBadge, 25000);
 }

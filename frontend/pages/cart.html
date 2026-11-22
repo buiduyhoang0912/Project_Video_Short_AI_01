@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Giỏ hàng &amp; Thanh toán áp Mã giảm giá | ClipShop AI</title>
+  <title>Giỏ hàng &amp; Thanh toán | ClipShop AI</title>
   <link rel="icon" href="../assets/images/logo.svg">
   <link rel="stylesheet" href="../css/style.css">
   <link rel="stylesheet" href="../css/seller-center.css">
@@ -42,9 +42,17 @@
       align-items: center;
       justify-content: space-between;
       gap: 12px;
-      padding: 10px 0;
+      padding: 12px 0;
       border-bottom: 1px dashed #f1f5f9;
       flex-wrap: wrap;
+      transition: background 0.2s;
+    }
+    .cart-item-row.item-invalid {
+      background: #fff5f5;
+      border: 1px solid #fed7d7;
+      border-radius: 8px;
+      padding: 10px 12px;
+      margin: 6px 0;
     }
     .cart-qty-box {
       display: inline-flex;
@@ -59,6 +67,10 @@
       background: #f8fafc;
       cursor: pointer;
       font-weight: 700;
+    }
+    .cart-qty-box button:disabled {
+      opacity: 0.4;
+      cursor: not-allowed;
     }
     .shop-voucher-box {
       margin-top: 14px;
@@ -112,6 +124,51 @@
       font-weight: 800;
       color: #dc2626;
     }
+    .address-book-box {
+      background: #f0fdf4;
+      border: 1px solid #bbf7d0;
+      border-radius: 10px;
+      padding: 12px;
+      margin-bottom: 14px;
+    }
+    .address-book-title {
+      font-size: 13px;
+      font-weight: 700;
+      color: #166534;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 8px;
+    }
+    .saved-addr-chip {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      background: #fff;
+      border: 1px solid #86efac;
+      padding: 6px 10px;
+      border-radius: 8px;
+      font-size: 12px;
+      margin: 4px 4px 0 0;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+    .saved-addr-chip:hover, .saved-addr-chip.active {
+      background: #dcfce7;
+      border-color: #22c55e;
+      font-weight: 700;
+    }
+    .cart-warning-banner {
+      background: #fffbeb;
+      border: 1px solid #fde68a;
+      border-radius: 10px;
+      padding: 12px 14px;
+      color: #b45309;
+      font-size: 13px;
+      font-weight: 600;
+      margin-bottom: 16px;
+      display: none;
+    }
   </style>
 </head>
 <body data-root="../" data-auth="required">
@@ -120,9 +177,9 @@
   <main class="container container-wide">
     <section class="seller-topbar">
       <div>
-        <h1>🛒 Giỏ hàng &amp; Thanh toán áp Mã giảm giá của Shop</h1>
+        <h1>🛒 Giỏ hàng &amp; Thanh toán đơn hàng</h1>
         <p class="muted" style="margin: 0;">
-          Nhập hoặc chọn Mã giảm giá của từng Shop khi thanh toán — Server tự động kiểm tra điều kiện và tính lại tổng tiền.
+          Quản lý sản phẩm trong giỏ theo từng Shop, chọn sổ địa chỉ giao hàng và phương thức thanh toán an toàn.
         </p>
       </div>
       <div style="display: flex; gap: 8px; flex-wrap: wrap;">
@@ -131,8 +188,13 @@
       </div>
     </section>
 
+    <!-- Cảnh báo nếu có sản phẩm hết hàng -->
+    <div id="cart-out-of-stock-alert" class="cart-warning-banner">
+      ⚠️ Giỏ hàng có sản phẩm hết hàng hoặc không đủ tồn kho. Vui lòng điều chỉnh số lượng hoặc xoá sản phẩm trước khi thanh toán.
+    </div>
+
     <div class="cart-layout">
-      <!-- Cột trái: Danh sách sản phẩm trong giỏ theo từng Shop + Ô nhập mã giảm giá -->
+      <!-- Cột trái: Danh sách sản phẩm trong giỏ theo từng Shop -->
       <div>
         <div id="cart-shops-container">
           <div class="card muted">Đang tải giỏ hàng của bạn...</div>
@@ -150,18 +212,37 @@
         </section>
       </div>
 
-      <!-- Cột phải: Thông tin nhận hàng & Tổng tiền sau khi Server tính lại giảm giá -->
+      <!-- Cột phải: Thông tin nhận hàng & Sổ địa chỉ & Thanh toán -->
       <section class="card">
-        <h2>🧾 Thanh toán &amp; Tính lại tiền</h2>
+        <h2>🧾 Thanh toán &amp; Đặt hàng</h2>
+
+        <!-- Sổ địa chỉ giao hàng -->
+        <div class="address-book-box" id="address-book-wrapper">
+          <div class="address-book-title">
+            <span>📖 Sổ địa chỉ đã lưu</span>
+            <span class="muted" style="font-weight: normal; font-size: 11px;">Chọn để điền nhanh</span>
+          </div>
+          <div id="saved-address-list">
+            <span class="muted" style="font-size: 12px;">Chưa có địa chỉ nào được lưu. Hãy nhập bên dưới và lưu lại.</span>
+          </div>
+        </div>
+
         <form id="checkout-form">
           <label for="rec-name">Họ tên người nhận *</label>
-          <input id="rec-name" type="text" placeholder="VD: Nguyễn Hoàng Văn" required>
+          <input id="rec-name" type="text" placeholder="VD: Nguyễn Văn A" required>
 
           <label for="rec-phone">Số điện thoại nhận hàng *</label>
           <input id="rec-phone" type="text" placeholder="VD: 0912345678" required>
 
           <label for="rec-address">Địa chỉ giao hàng chi tiết *</label>
-          <input id="rec-address" type="text" placeholder="VD: Số 10 Nguyễn Trãi, Hà Đông, Hà Nội" required>
+          <input id="rec-address" type="text" placeholder="VD: Số 10 Nguyễn Trãi, Thanh Xuân, Hà Nội" required>
+
+          <div style="margin-bottom: 12px; display: flex; align-items: center; gap: 8px;">
+            <input type="checkbox" id="chk-save-address" checked style="margin: 0; width: auto;">
+            <label for="chk-save-address" style="margin: 0; font-size: 13px; font-weight: normal; cursor: pointer;">
+              Lưu địa chỉ này vào Sổ địa chỉ để dùng lần sau
+            </label>
+          </div>
 
           <label for="pay-method">Phương thức thanh toán *</label>
           <select id="pay-method">
@@ -169,6 +250,7 @@
             <option value="SIMULATED">Thanh toán mô phỏng (Tự động xác nhận)</option>
           </select>
 
+          <!-- Tóm tắt đơn hàng -->
           <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 12px; padding: 14px; margin: 14px 0;">
             <div class="summary-row">
               <span class="muted">Tạm tính tiền hàng:</span>
@@ -179,6 +261,10 @@
               <strong id="summary-discount">-0 ₫</strong>
             </div>
             <div id="applied-vouchers-summary" class="muted" style="font-size: 12px;"></div>
+            <div class="summary-row">
+              <span class="muted">Phí vận chuyển:</span>
+              <span style="color: #16a34a; font-weight: 600;">Miễn phí (0 ₫)</span>
+            </div>
             <div class="summary-row total">
               <span>Tổng thanh toán:</span>
               <span id="summary-final-total">0 ₫</span>

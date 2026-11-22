@@ -105,6 +105,8 @@ flowchart LR
 | **BUG-01** | Chủ video vẫn tự bật lại được video bị Admin ẩn | **High** | API cũ `/api/videos/{id}/status` chỉ kiểm tra quyền sở hữu mà chưa kiểm tra cờ `moderated_at`. | Bổ sung kiểm tra `moderated_at IS NOT NULL`: chặn 403 đối với non-admin. *(Retest: PASS)* |
 | **BUG-02** | Request body rỗng `{}` gửi đến `/visibility` tự động chạy nhánh "hiện lại" | **Medium** | Schema cho phép cả `status` và `is_visible` là `None`. | Áp dụng `model_validator` bắt buộc chọn trạng thái và bắt lỗi mâu thuẫn -> trả về 422. *(Retest: PASS)* |
 | **BUG-03** | Tên video/sản phẩm chứa ký tự nháy kép `"` làm vỡ thuộc tính `data-name` | **Medium** | `escapeHtml` chỉ dựa vào `div.innerHTML` nên không escape ký tự nháy kép. | Viết hàm chuyên biệt `escapeAttr()` mã hóa `"` thành `&quot;` và `'` thành `&#39;`. *(Retest: PASS)* |
+| **BUG-04** | Tài khoản USER chưa có cửa hàng gọi `/api/shops/me/orders` trả về 404 thay vì 403 Forbidden | **Medium** | Hàm `_get_owned_shop_or_404()` ném ngay 404 mà chưa kiểm tra vai trò người bán đã duyệt. | Bổ sung kiểm tra `_is_approved_seller(db, user)`; trả về 403 chuẩn RBAC cho non-seller. *(Retest: PASS)* |
+| **BUG-05** | Video bị Admin ẩn vi phạm vẫn cho phép thả tim (like), đăng bình luận mới và xem bình luận | **High** | API likes và comments chỉ gọi `check_video()` (kiểm tra tồn tại) mà chưa kiểm tra cờ `status == HIDDEN`. | Thêm hàm `check_video_available()`; chặn 400 Bad Request cho like, comment và xem comment trên video ẩn. *(Retest: PASS)* |
 
 > **Speaker Notes:**  
 > *"Trong quá trình kiểm thử, em chủ động tìm kiếm các trường hợp biên và lỗ hổng bảo mật. Việc phát hiện sớm 3 lỗi trên và viết test tự động hồi quy giúp hệ thống đạt độ tin cậy và an toàn cao nhất trước khi bàn giao."*
@@ -118,12 +120,18 @@ flowchart LR
 - **Tổng số Test Cases**: **52 tình huống** bao phủ 100% chức năng Admin, phân quyền, bảo mật và logic tính toán.
 - **Tổng số lần thực thi (Test Log)**: **55 lượt kiểm thử** (kèm bằng chứng chi tiết).
 - **Kết quả kiểm thử cuối cùng**: **52/52 Test Cases PASSED (100%)**.
+- **Quản lý lỗi (Bug Log)**: **5 lỗi (BUG-01 → BUG-05)** được phát hiện và khắc phục triệt để (100% Closed).
 
 ### Kiểm thử tự động với Pytest (Backend):
 - **Bộ test Admin & Moderation (`test_admin.py`, `test_admin_moderation.py`)**: 39 tests Passed.
 - **Bộ test Social & Permissions (`test_social.py`)**: 19 tests Passed.
 - **Bộ test luồng xuyên suốt E2E (`test_e2e_full_flow.py`)**: 1 test toàn diện Passed.
-- **Toàn bộ test suite dự án**: **165 tests Passed (0 lỗi)** trên nhánh `develop`.
+- **Toàn bộ test suite dự án**: **176 tests Passed (0 lỗi)** sau khi tích hợp toàn bộ các nhánh.
+
+### Kiểm thử luồng tích hợp xuyên suốt trực tiếp (Live HTTP E2E Flow):
+- **Script chạy**: `python e2e_live_flow.py --reset --base http://127.0.0.1:8000` (hoặc cổng 8001).
+- **Phạm vi kiểm thử**: Chuỗi thực tế qua HTTP & MySQL từ Đăng ký → Đăng nhập → Nộp đơn bán hàng → Admin duyệt → Tạo shop → Thêm sản phẩm & video → Khách thêm giỏ → Đặt hàng → Admin ẩn vi phạm → Chặn chủ shop tự bật lại → Khoá/Mở khoá tài khoản → Dashboard thống kê.
+- **Kết quả kiểm thử thực tế**: **105/105 Tình huống PASSED (100% PASS, 0 FAIL)**. Ghi log tại `e2e_live_results.json`.
 
 ---
 

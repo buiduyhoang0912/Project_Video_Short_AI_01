@@ -70,6 +70,13 @@ def _is_approved_seller(db: Session, user: User) -> bool:
 def _get_owned_shop_or_404(db: Session, user: User) -> Shop:
     shop = shop_crud.get_shop_by_owner(db, user.id)
     if shop is None:
+        # T3D1DB4: tài khoản chưa được Admin duyệt bán hàng (USER/ADMIN) là sai quyền -> 403,
+        # chỉ người bán đã duyệt nhưng chưa tạo shop mới nhận 404.
+        if not _is_approved_seller(db, user):
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Chức năng dành cho người bán đã được Admin duyệt",
+            )
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Bạn chưa có cửa hàng nào",

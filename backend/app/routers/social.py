@@ -38,6 +38,18 @@ def check_video(db: Session, video_id: int):
         raise HTTPException(404, "Không tìm thấy video")
 
 
+def check_video_available(db: Session, video_id: int):
+    """Video phải tồn tại VÀ đang hiển thị (T3D1DB4).
+
+    Video bị Admin/chủ ẩn không được nhận thêm tương tác (thích, bình luận)
+    và không được lộ danh sách bình luận ra công khai. Cùng quy ước 400 với /share.
+    """
+    check_video(db, video_id)
+    status_value = db.scalar(select(Video.status).where(Video.id == video_id))
+    if status_value == "HIDDEN":
+        raise HTTPException(400, "Video này đã bị ẩn và không còn khả dụng")
+
+
 def check_user(db: Session, user_id: int):
     if not crud.user_exists(db, user_id):
         raise HTTPException(404, "Không tìm thấy người dùng")
@@ -58,7 +70,7 @@ def like_video(
     db: Session = Depends(get_db),
     user=Depends(get_current_user),
 ):
-    check_video(db, video_id)
+    check_video_available(db, video_id)
     uid = current_user_id(user)
 
     if crud.find_like(db, uid, video_id) is not None:
@@ -113,7 +125,7 @@ def create_comment(
     db: Session = Depends(get_db),
     user=Depends(get_current_user),
 ):
-    check_video(db, video_id)
+    check_video_available(db, video_id)
 
     if not data.content.strip():
         raise HTTPException(
@@ -160,7 +172,7 @@ def list_comments(
     limit: int = 20,
     db: Session = Depends(get_db),
 ):
-    check_video(db, video_id)
+    check_video_available(db, video_id)
 
     if skip < 0 or not 1 <= limit <= 100:
         raise HTTPException(422, "Phân trang không hợp lệ")

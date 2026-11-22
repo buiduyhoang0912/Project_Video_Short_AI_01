@@ -11,8 +11,14 @@ Tài khoản được tạo (mật khẩu chung: Password123!):
 """
 
 import sys
-from decimal import Decimal
 from datetime import timedelta
+from decimal import Decimal
+from pathlib import Path
+
+# Đảm bảo import được package app khi chạy trực tiếp `python app/seed_demo_flow.py`
+BACKEND_DIR = Path(__file__).resolve().parents[1]
+if str(BACKEND_DIR) not in sys.path:
+    sys.path.insert(0, str(BACKEND_DIR))
 
 from sqlalchemy import select
 from app.core.security import hash_password

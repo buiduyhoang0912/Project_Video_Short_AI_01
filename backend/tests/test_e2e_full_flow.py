@@ -350,3 +350,186 @@ def test_e2e_complete_platform_flow(client, Session):
     today_point = dash_data["daily"][-1]
     assert Decimal(str(today_point["revenue"])) == Decimal("350000")
     assert today_point["orders"] == 1
+
+
+def test_e2e_seller_shop_ai_voucher_order_lifecycle_and_analytics(
+    client, Session
+):
+    """Kiểm thử luồng tích hợp xuyên suốt phân hệ Người bán & Cửa hàng (Task T3D1DBA - Nguyễn Hoàng Văn):
+    Đăng ký bán hàng -> Admin duyệt -> Tạo Shop -> Gợi ý sản phẩm & kịch bản 30-60s bằng AI ->
+    Đăng sản phẩm & tồn kho -> Tạo Mã giảm giá của Shop -> Người mua áp mã đặt hàng (Server tính lại tiền) ->
+    Người bán xử lý đơn (Chờ xác nhận -> Đã xác nhận -> Đang giao -> Hoàn thành) ->
+    Thống kê Doanh thu theo ngày & Sản phẩm bán chạy của Shop.
+    """
+    from datetime import datetime, timedelta
+
+    admin_id = make_user(Session, role="ADMIN", username="admin_t3d1dba")
+    admin_h = auth_header(admin_id)
+
+    # 1. Người dùng đăng ký tài khoản & gửi đơn đăng ký bán hàng
+    client.post(
+        "/auth/register",
+        json={
+            "username": "van_seller_e2e",
+            "email": "van_seller_e2e@clipshop.ai",
+            "password": "Password123!",
+            "display_name": "Nguyễn Hoàng Văn",
+        },
+    )
+    r_login_s = client.post(
+        "/auth/login",
+        json={"identifier": "van_seller_e2e", "password": "Password123!"},
+    )
+    seller_h = {"Authorization": f"Bearer {r_login_s.json()['access_token']}"}
+
+    r_app = client.post(
+        "/api/seller-applications",
+        json={
+            "proposed_shop_name": "Hoàng Văn Flagship Store",
+            "phone": "0912345678",
+            "description": "Chuyên thời trang và phụ kiện công nghệ chính hãng",
+        },
+        headers=seller_h,
+    )
+    assert r_app.status_code == 201
+    app_id = r_app.json()["id"]
+
+    # Admin duyệt đơn -> user lên quyền SELLER
+    r_approve = client.patch(
+        f"/api/admin/seller-applications/{app_id}/approve",
+        headers=admin_h,
+    )
+    assert r_approve.status_code == 200
+
+    # 2. Người bán tạo cửa hàng mới
+    r_shop = client.post(
+        "/api/shops",
+        json={
+            "name": "Hoàng Văn Flagship Store",
+            "description": "Gian hàng chính hãng uy tín",
+            "address": "Hà Nội",
+        },
+        headers=seller_h,
+    )
+    assert r_shop.status_code == 201
+    shop_id = r_shop.json()["id"]
+
+    with Session() as db:
+        cat = Category(name="Phụ kiện & Thời trang", status="ACTIVE")
+        db.add(cat)
+        db.commit()
+        cat_id = cat.id
+
+    # 3. Người bán bấm 'Gợi ý bằng AI' để sinh tên, mô tả & kịch bản video 30-60s rồi sửa trước khi lưu
+    r_ai = client.post(
+        "/api/products/ai-suggest",
+        json={
+            "raw_name": "Áo Khoác Bomber Hàn Quốc",
+            "category_id": cat_id,
+            "price": 250000,
+            "features": "Chống gió, lót dù thoáng khí, form unisex",
+            "duration_seconds": 45,
+        },
+        headers=seller_h,
+    )
+    assert r_ai.status_code == 200
+    ai_data = r_ai.json()
+    assert "00s - 05s" in ai_data["video_script_30_60s"]
+
+    r_prod = client.post(
+        "/api/products",
+        json={
+            "category_id": cat_id,
+            "name": ai_data["suggested_name"][:120],
+            "description": ai_data["suggested_description"],
+            "price": 250000,
+            "stock": 20,
+        },
+        headers=seller_h,
+    )
+    assert r_prod.status_code == 201
+    prod_id = r_prod.json()["id"]
+
+    # 4. Người bán tạo Mã giảm giá của Shop (GIAM10: giảm 10% tối đa 30k cho đơn từ 300k)
+    r_voucher = client.post(
+        "/api/shops/me/vouchers",
+        json={
+            "code": "GIAM10",
+            "description": "Giảm 10% tối đa 30k cho đơn từ 300k",
+            "discount_type": "PERCENT",
+            "discount_value": 10,
+            "max_discount_amount": 30000,
+            "min_order_amount": 300000,
+            "usage_limit": 10,
+            "per_user_limit": 2,
+            "expires_at": (datetime.now() + timedelta(days=7)).isoformat(
+                timespec="seconds"
+            ),
+        },
+        headers=seller_h,
+    )
+    assert r_voucher.status_code == 201
+
+    # Kiểm tra trang cửa hàng công khai hiển thị sản phẩm và voucher
+    assert len(client.get(f"/api/shops/{shop_id}/products").json()) == 1
+    assert len(client.get(f"/api/shops/{shop_id}/vouchers").json()) == 1
+
+    # 5. Người mua thêm 2 sản phẩm vào giỏ (500.000đ), áp mã GIAM10 (giảm 30.000đ -> còn 470.000đ) và đặt hàng COD
+    buyer_id = make_user(Session, role="USER", username="buyer_t3d1dba")
+    buyer_h = auth_header(buyer_id)
+
+    client.post(
+        "/api/cart/items",
+        json={"product_id": prod_id, "quantity": 2},
+        headers=buyer_h,
+    )
+    r_apply = client.post(
+        "/api/vouchers/apply",
+        json={"code": "giam10"},
+        headers=buyer_h,
+    )
+    assert r_apply.status_code == 200
+    assert r_apply.json()["discount_amount"] == 30000
+    assert r_apply.json()["total_after_discount"] == 470000
+
+    r_checkout = client.post(
+        "/api/orders",
+        json={
+            "recipient_name": "Khách Mua Hàng",
+            "recipient_phone": "0988112233",
+            "recipient_address": "Cầu Giấy, Hà Nội",
+            "payment_method": "COD",
+            "voucher_codes": ["GIAM10"],
+        },
+        headers=buyer_h,
+    )
+    assert r_checkout.status_code == 201
+    checkout_res = r_checkout.json()
+    assert checkout_res["total_before_discount"] == 500000
+    assert checkout_res["total_discount"] == 30000
+    assert checkout_res["total_amount"] == 470000
+    order_id = checkout_res["orders"][0]["id"]
+
+    # 6. Người bán xem đơn của shop và cập nhật tuần tự: pending -> confirmed -> shipping -> completed
+    r_shop_orders = client.get("/api/shops/me/orders", headers=seller_h)
+    assert r_shop_orders.status_code == 200
+    assert r_shop_orders.json()[0]["voucher_code"] == "GIAM10"
+
+    for next_st in ("confirmed", "shipping", "completed"):
+        r_st = client.patch(
+            f"/api/shops/me/orders/{order_id}/status",
+            json={"status": next_st},
+            headers=seller_h,
+        )
+        assert r_st.status_code == 200
+        assert r_st.json()["status"] == next_st
+
+    # 7. Người bán kiểm tra thống kê Doanh thu theo ngày & Sản phẩm bán chạy của Shop
+    r_analytics = client.get("/api/shops/me/analytics", headers=seller_h)
+    assert r_analytics.status_code == 200
+    an = r_analytics.json()
+    assert an["completed_orders"] == 1
+    assert an["total_revenue"] == 470000.0
+    assert an["best_selling_products"][0]["product_id"] == prod_id
+    assert an["best_selling_products"][0]["total_quantity_sold"] == 2
+

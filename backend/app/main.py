@@ -37,22 +37,57 @@ from app.routers import (
 
 
 
+def ensure_schema_columns(db_engine) -> None:
+    """Tự động bổ sung các cột mới thêm ở Sprint 2-3 (sold_count, moderation_*) cho MySQL cũ."""
+    insp = inspect(db_engine)
+    alter_stmts: list[str] = []
+
+    if insp.has_table("products"):
+        prod_cols = {c["name"] for c in insp.get_columns("products")}
+        if "sold_count" not in prod_cols:
+            alter_stmts.append(
+                "ALTER TABLE products ADD COLUMN sold_count INTEGER UNSIGNED NOT NULL DEFAULT 0"
+            )
+        if "moderation_reason" not in prod_cols:
+            alter_stmts.append(
+                "ALTER TABLE products ADD COLUMN moderation_reason VARCHAR(500) NULL"
+            )
+        if "moderated_by" not in prod_cols:
+            alter_stmts.append(
+                "ALTER TABLE products ADD COLUMN moderated_by BIGINT UNSIGNED NULL"
+            )
+        if "moderated_at" not in prod_cols:
+            alter_stmts.append(
+                "ALTER TABLE products ADD COLUMN moderated_at DATETIME NULL"
+            )
+
+    if insp.has_table("videos"):
+        vid_cols = {c["name"] for c in insp.get_columns("videos")}
+        if "moderation_reason" not in vid_cols:
+            alter_stmts.append(
+                "ALTER TABLE videos ADD COLUMN moderation_reason VARCHAR(500) NULL"
+            )
+        if "moderated_by" not in vid_cols:
+            alter_stmts.append(
+                "ALTER TABLE videos ADD COLUMN moderated_by BIGINT UNSIGNED NULL"
+            )
+        if "moderated_at" not in vid_cols:
+            alter_stmts.append(
+                "ALTER TABLE videos ADD COLUMN moderated_at DATETIME NULL"
+            )
+
+    if alter_stmts:
+        with db_engine.begin() as conn:
+            for stmt in alter_stmts:
+                conn.execute(text(stmt))
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     # Tự tạo các bảng còn thiếu khi server khởi động (bảng đã có thì bỏ qua).
-    # Lưu ý: create_all KHÔNG sửa bảng đã tồn tại. Đổi cột -> sửa bằng SQL hoặc xoá bảng tạo lại.
     try:
         Base.metadata.create_all(bind=engine)
-        insp = inspect(engine)
-        if insp.has_table("products"):
-            prod_cols = {c["name"] for c in insp.get_columns("products")}
-            if "sold_count" not in prod_cols:
-                with engine.begin() as conn:
-                    conn.execute(
-                        text(
-                            "ALTER TABLE products ADD COLUMN sold_count INTEGER UNSIGNED NOT NULL DEFAULT 0"
-                        )
-                    )
+        ensure_schema_columns(engine)
         print(f"[DB] Đã kết nối MySQL {settings.DB_HOST}:{settings.DB_PORT}/{settings.DB_NAME}")
     except OperationalError as error:
         print("[DB] KHÔNG kết nối được MySQL! Kiểm tra MySQL đã bật chưa và file .env.")

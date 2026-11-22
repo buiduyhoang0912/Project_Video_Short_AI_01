@@ -23,6 +23,7 @@ if str(BACKEND_DIR) not in sys.path:
 from sqlalchemy import select
 from app.core.security import hash_password
 from app.db.session import Base, SessionLocal, engine
+from app.main import ensure_schema_columns
 from app.models.category import Category
 from app.models.order import Order, OrderItem
 from app.models.product import Product
@@ -30,11 +31,13 @@ from app.models.seller_application import SellerApplication
 from app.models.shop import Shop
 from app.models.user import User, utc_now
 from app.models.video import Video
+from app.models.voucher import ShopVoucher
 
 
 def seed_demo():
     print("[Seed] Đang khởi tạo dữ liệu mẫu cho demo T3D1DB4...")
     Base.metadata.create_all(bind=engine)
+    ensure_schema_columns(engine)
     now = utc_now()
     default_pwd = hash_password("Password123!")
 
@@ -142,6 +145,50 @@ def seed_demo():
             )
             db.add(vid)
             print(" -> Tạo seller_active: có shop, 2 sản phẩm và 1 video")
+
+        # 3b. Mã giảm giá mẫu cho Shop Hoàng Văn Studio (Task T3D2BFB / T3D1DBA)
+        shop_for_voucher = db.scalar(select(Shop).limit(1))
+        if shop_for_voucher:
+            existing_v1 = db.scalar(
+                select(ShopVoucher).where(
+                    ShopVoucher.shop_id == shop_for_voucher.id,
+                    ShopVoucher.code == "GIAM10",
+                )
+            )
+            if not existing_v1:
+                db.add_all(
+                    [
+                        ShopVoucher(
+                            shop_id=shop_for_voucher.id,
+                            code="GIAM10",
+                            description="Giảm 10% tối đa 30.000đ cho đơn từ 150.000đ",
+                            discount_type="PERCENT",
+                            discount_value=Decimal("10"),
+                            max_discount_amount=Decimal("30000"),
+                            min_order_amount=Decimal("150000"),
+                            usage_limit=50,
+                            used_count=0,
+                            per_user_limit=5,
+                            expires_at=now + timedelta(days=14),
+                            status="ACTIVE",
+                        ),
+                        ShopVoucher(
+                            shop_id=shop_for_voucher.id,
+                            code="HOANGVAN50K",
+                            description="Giảm ngay 50.000đ cho đơn từ 300.000đ",
+                            discount_type="FIXED",
+                            discount_value=Decimal("50000"),
+                            max_discount_amount=None,
+                            min_order_amount=Decimal("300000"),
+                            usage_limit=30,
+                            used_count=0,
+                            per_user_limit=3,
+                            expires_at=now + timedelta(days=14),
+                            status="ACTIVE",
+                        ),
+                    ]
+                )
+                print(" -> Tạo 2 mã giảm giá mẫu của shop: GIAM10 và HOANGVAN50K")
 
         # 4. User Normal (để demo khoá)
         u_norm = db.scalar(select(User).where(User.username == "user_normal"))

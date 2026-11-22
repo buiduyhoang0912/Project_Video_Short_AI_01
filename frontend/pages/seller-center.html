@@ -1,0 +1,579 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Seller Center - Quản lý sản phẩm, Đơn hàng &amp; Doanh thu | ClipShop AI</title>
+  <link rel="icon" href="../assets/images/logo.svg">
+  <link rel="stylesheet" href="../css/style.css">
+  <link rel="stylesheet" href="../css/seller-center.css">
+</head>
+<body data-root="../">
+  <header id="app-header"></header>
+
+  <main class="container container-wide">
+    <!-- Topbar Seller Center -->
+    <section class="seller-topbar">
+      <div>
+        <h1>Seller Center · Quản lý Cửa hàng, Đơn hàng &amp; Doanh thu</h1>
+        <p id="shop-subtitle">Quản lý danh mục sản phẩm, tồn kho, xử lý đơn hàng của shop và thống kê doanh thu theo ngày.</p>
+      </div>
+      <div class="seller-shop-badge">
+        <a href="seller-register.html" class="btn btn-small" style="text-decoration: none;">📝 Đơn đăng ký &amp; Hồ sơ Shop</a>
+        <a href="shop-public.html" class="btn btn-small" style="text-decoration: none;">🏪 Cửa hàng công khai</a>
+        <span id="current-user-badge" class="badge-pill badge-shop">Chưa đăng nhập</span>
+        <span id="current-shop-badge" class="badge-pill badge-shop" hidden></span>
+        <button id="btn-logout-seller" type="button" class="btn btn-small" hidden>Đăng xuất</button>
+      </div>
+    </section>
+
+    <!-- Khung Đăng nhập khi chưa đăng nhập -->
+    <section id="auth-section" class="card auth-panel" hidden>
+      <h2>Đăng nhập tài khoản Người bán (Seller)</h2>
+      <p class="muted">
+        Vui lòng đăng nhập tài khoản Người bán đã được duyệt để quản lý sản phẩm, đơn hàng và xem báo cáo doanh thu của cửa hàng.
+      </p>
+      <form id="quick-login-form" class="auth-grid">
+        <div>
+          <label for="login-identifier">Username hoặc Email</label>
+          <input id="login-identifier" type="text" placeholder="VD: seller_demo" required>
+        </div>
+        <div>
+          <label for="login-password">Mật khẩu</label>
+          <input id="login-password" type="password" placeholder="Tối thiểu 8 ký tự" required>
+        </div>
+        <div class="form-actions" style="margin-top: 0;">
+          <button type="submit" class="btn btn-primary">Đăng nhập</button>
+        </div>
+      </form>
+    </section>
+
+    <!-- Thanh Tabs Điều hướng chính của Seller Center -->
+    <nav class="seller-nav-tabs" aria-label="Chức năng Seller Center">
+      <button
+        id="seller-tab-btn-products"
+        type="button"
+        class="seller-nav-tab active"
+        data-seller-tab="products"
+      >
+        📦 Sản phẩm &amp; Tồn kho
+      </button>
+      <button
+        id="seller-tab-btn-orders"
+        type="button"
+        class="seller-nav-tab"
+        data-seller-tab="orders"
+      >
+        🧾 Đơn hàng của Shop <span id="nav-orders-count" class="tab-count-pill">0</span>
+      </button>
+      <button
+        id="seller-tab-btn-analytics"
+        type="button"
+        class="seller-nav-tab"
+        data-seller-tab="analytics"
+      >
+        📊 Doanh thu &amp; Bán chạy
+      </button>
+      <button
+        id="seller-tab-btn-vouchers"
+        type="button"
+        class="seller-nav-tab"
+        data-seller-tab="vouchers"
+      >
+        🎟️ Mã giảm giá của Shop <span id="nav-vouchers-count" class="tab-count-pill">0</span>
+      </button>
+    </nav>
+
+    <!-- TAB 1: QUẢN LÝ SẢN PHẨM & TỒN KHO -->
+    <div id="seller-panel-products">
+      <section class="stats-grid">
+        <div class="stat-card">
+          <span class="stat-label">Tổng sản phẩm</span>
+          <span id="stat-total" class="stat-value">0</span>
+        </div>
+        <div class="stat-card stat-active">
+          <span class="stat-label">Đang bán (ACTIVE)</span>
+          <span id="stat-active" class="stat-value">0</span>
+        </div>
+        <div class="stat-card stat-hidden">
+          <span class="stat-label">Đã ẩn (HIDDEN)</span>
+          <span id="stat-hidden" class="stat-value">0</span>
+        </div>
+        <div class="stat-card stat-warning">
+          <span class="stat-label">Cảnh báo sắp hết / Hết hàng</span>
+          <span id="stat-low-stock" class="stat-value">0</span>
+        </div>
+      </section>
+
+      <section id="low-stock-banner" class="low-stock-banner" hidden>
+        <div>
+          <div class="low-stock-banner-title">
+            <span>⚠️ Cảnh báo tồn kho:</span>
+            <span id="low-stock-summary">Có sản phẩm sắp hết hàng hoặc đã hết hàng!</span>
+          </div>
+          <div id="low-stock-items-list" class="low-stock-items-list"></div>
+        </div>
+        <div>
+          <button id="btn-filter-low-stock" type="button" class="btn btn-small">
+            Chỉ xem SP sắp hết hàng
+          </button>
+        </div>
+      </section>
+
+      <div class="seller-layout">
+        <section class="card">
+          <div class="form-header-with-ai">
+            <h2 id="form-title">Thêm sản phẩm mới</h2>
+            <button id="btn-ai-suggest" type="button" class="btn-ai-magic" title="Dùng AI gợi ý tên, mô tả và kịch bản video 30-60s">
+              ✨ Gợi ý bằng AI
+            </button>
+          </div>
+          <p class="muted" style="margin-top: 0; font-size: 13px;">
+            Nhập tên/ý tưởng sản phẩm rồi bấm <strong>"✨ Gợi ý bằng AI"</strong> để AI tự viết tên chuẩn SEO, mô tả và kịch bản video 30–60s (bạn có thể sửa lại trước khi lưu).
+          </p>
+          <form id="product-form">
+            <label for="product-name">Tên sản phẩm *</label>
+            <input
+              id="product-name"
+              name="name"
+              type="text"
+              required
+              maxlength="200"
+              placeholder="VD: Áo thun oversize Cotton hoặc Tai nghe Bluetooth"
+            >
+
+            <label for="product-category">Danh mục *</label>
+            <select id="product-category" name="category_id" required>
+              <option value="">-- Chọn danh mục --</option>
+            </select>
+
+            <div class="form-row-2">
+              <div>
+                <label for="product-price">Giá bán (VNĐ, &gt; 0) *</label>
+                <input
+                  id="product-price"
+                  name="price"
+                  type="number"
+                  min="1"
+                  step="any"
+                  required
+                  placeholder="150000"
+                >
+              </div>
+              <div>
+                <label for="product-stock">Tồn kho (&ge; 0) *</label>
+                <input
+                  id="product-stock"
+                  name="stock"
+                  type="number"
+                  min="0"
+                  step="1"
+                  required
+                  value="10"
+                >
+              </div>
+            </div>
+
+            <div id="status-field-wrap" hidden>
+              <label for="product-status">Trạng thái hiển thị</label>
+              <select id="product-status" name="status">
+                <option value="ACTIVE">Đang bán (ACTIVE)</option>
+                <option value="HIDDEN">Tạm ẩn (HIDDEN)</option>
+              </select>
+            </div>
+
+            <label for="product-description">Mô tả sản phẩm (Có thể sửa sau khi AI gợi ý)</label>
+            <textarea
+              id="product-description"
+              name="description"
+              rows="5"
+              placeholder="Chất liệu, kích thước, hướng dẫn bảo quản..."
+            ></textarea>
+
+            <!-- Khung Trợ lý AI gợi ý phương án tên & Kịch bản Video 30-60 giây -->
+            <div id="ai-assistant-box" class="ai-assistant-panel" hidden>
+              <div class="ai-assistant-header">
+                <span class="ai-assistant-title">🤖 Trợ lý AI gợi ý Nội dung &amp; Kịch bản Video</span>
+                <span id="ai-provider-badge" class="ai-provider-tag">AI</span>
+              </div>
+              <div class="muted" style="font-size: 12px;">
+                Tên và mô tả đã được điền vào form ở trên để bạn tự do chỉnh sửa trước khi bấm Lưu. Bạn cũng có thể chọn nhanh phương án tên khác dưới đây:
+              </div>
+              <div id="ai-alt-names-list" class="ai-alt-names-wrap"></div>
+
+              <label for="ai-video-script" style="margin-top: 8px; color: #4c1d95;">
+                🎬 Kịch bản Video ngắn (30–60 giây) — Có thể chỉnh sửa:
+              </label>
+              <textarea
+                id="ai-video-script"
+                rows="7"
+                placeholder="Kịch bản quay và lời thoại video 30-60 giây sẽ hiển thị tại đây..."
+              ></textarea>
+              <div id="ai-hashtags-list" class="ai-hashtags-row"></div>
+              <div class="form-actions" style="margin-top: 10px;">
+                <button id="btn-copy-script" type="button" class="btn btn-small">
+                  📋 Sao chép kịch bản Video
+                </button>
+              </div>
+            </div>
+
+            <label>Hình ảnh sản phẩm (Chọn nhiều ảnh, có xem trước)</label>
+            <label for="product-images-input" class="upload-dropzone">
+              <div><strong>📷 Bấm để chọn nhiều ảnh</strong> (.jpg, .png, .webp)</div>
+              <div class="muted">Ảnh đầu tiên sẽ được đặt làm ảnh chính của sản phẩm</div>
+              <input
+                id="product-images-input"
+                type="file"
+                multiple
+                accept=".jpg,.jpeg,.png,.webp"
+              >
+            </label>
+
+            <div id="existing-images-wrap" hidden>
+              <div class="preview-section-label">Ảnh hiện có của sản phẩm:</div>
+              <div id="existing-images-grid" class="image-preview-grid"></div>
+            </div>
+
+            <div id="new-images-wrap" hidden>
+              <div class="preview-section-label">Xem trước ảnh mới chuẩn bị tải lên:</div>
+              <div id="new-images-grid" class="image-preview-grid"></div>
+            </div>
+
+            <div class="form-actions">
+              <button id="btn-submit" type="submit" class="btn btn-primary">Thêm sản phẩm</button>
+              <button id="btn-cancel" type="button" class="btn" hidden>Huỷ sửa</button>
+            </div>
+          </form>
+        </section>
+
+        <section class="card">
+          <div class="list-header">
+            <h2>Danh sách sản phẩm của Shop</h2>
+            <div class="threshold-control">
+              <label for="low-stock-threshold" style="margin: 0;">Ngưỡng báo sắp hết:</label>
+              <input id="low-stock-threshold" type="number" min="1" max="100" value="5">
+            </div>
+          </div>
+
+          <div class="filter-toolbar">
+            <div class="filter-group">
+              <input
+                id="search-input"
+                type="search"
+                placeholder="🔍 Tìm theo tên sản phẩm..."
+              >
+              <select id="status-filter" title="Lọc theo trạng thái">
+                <option value="ALL">Tất cả trạng thái</option>
+                <option value="ACTIVE">Đang bán (ACTIVE)</option>
+                <option value="HIDDEN">Đã ẩn (HIDDEN)</option>
+                <option value="LOW_STOCK">⚠️ Sắp hết / Hết hàng</option>
+                <option value="OUT_OF_STOCK">🚨 Đã hết hàng (Tồn = 0)</option>
+              </select>
+              <select id="category-filter" title="Lọc theo danh mục">
+                <option value="ALL">Tất cả danh mục</option>
+              </select>
+            </div>
+
+            <div class="threshold-control">
+              <label for="page-size-select" style="margin: 0;">Hiển thị:</label>
+              <select id="page-size-select" style="min-width: 90px; width: auto;">
+                <option value="5">5 / trang</option>
+                <option value="10" selected>10 / trang</option>
+                <option value="20">20 / trang</option>
+              </select>
+            </div>
+          </div>
+
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>ID</th>
+                  <th>Sản phẩm</th>
+                  <th class="text-right">Giá bán</th>
+                  <th>Tồn kho (Sửa nhanh)</th>
+                  <th>Trạng thái</th>
+                  <th class="text-right">Thao tác</th>
+                </tr>
+              </thead>
+              <tbody id="product-table-body">
+                <tr>
+                  <td colspan="6" class="muted">Đang tải dữ liệu...</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+
+          <div class="pagination-bar">
+            <div id="pagination-info" class="muted">Hiển thị 0 - 0 / 0 sản phẩm</div>
+            <div id="pagination-controls" class="pagination-controls"></div>
+          </div>
+        </section>
+      </div>
+    </div>
+
+    <!-- TAB 2: QUẢN LÝ ĐƠN HÀNG CỦA SHOP -->
+    <div id="seller-panel-orders" hidden>
+      <section class="card">
+        <div class="list-header">
+          <div>
+            <h2 style="margin-bottom: 4px;">🧾 Quản lý Đơn hàng của Shop</h2>
+            <p class="muted" style="margin: 0;">
+              Xác nhận hoặc huỷ đơn; cập nhật tiến trình:
+              <strong>Chờ xác nhận &rarr; Đã xác nhận &rarr; Đang giao &rarr; Hoàn thành</strong>.
+            </p>
+          </div>
+          <div style="display: flex; gap: 8px; align-items: center; flex-wrap: wrap;">
+            <input
+              id="order-search-input"
+              type="search"
+              placeholder="🔍 Tìm mã đơn, người nhận, SĐT..."
+              style="width: 240px;"
+            >
+            <button id="btn-refresh-orders" type="button" class="btn btn-small">↻ Làm mới</button>
+          </div>
+        </div>
+
+        <div id="order-status-tabs" class="order-status-tabs" style="margin-top: 14px;">
+          <button type="button" class="order-filter-pill active" data-order-status="ALL">Tất cả</button>
+          <button type="button" class="order-filter-pill" data-order-status="pending">⏳ Chờ xác nhận</button>
+          <button type="button" class="order-filter-pill" data-order-status="confirmed">✅ Đã xác nhận</button>
+          <button type="button" class="order-filter-pill" data-order-status="shipping">🚚 Đang giao</button>
+          <button type="button" class="order-filter-pill" data-order-status="completed">🎉 Hoàn thành</button>
+          <button type="button" class="order-filter-pill" data-order-status="cancelled">❌ Đã huỷ</button>
+        </div>
+
+        <div id="shop-orders-container">
+          <div class="muted">Đang tải danh sách đơn hàng của shop...</div>
+        </div>
+      </section>
+    </div>
+
+    <!-- TAB 3: DOANH THU THEO NGÀY & SẢN PHẨM BÁN CHẠY -->
+    <div id="seller-panel-analytics" hidden>
+      <section class="stats-grid">
+        <div class="stat-card stat-active">
+          <span class="stat-label">Doanh thu thực thu (Đơn Hoàn thành)</span>
+          <span id="analytics-total-revenue" class="stat-value">0 ₫</span>
+        </div>
+        <div class="stat-card">
+          <span class="stat-label">Doanh thu ước tính (Đã xác nhận/Đang giao/Hoàn thành)</span>
+          <span id="analytics-estimated-revenue" class="stat-value">0 ₫</span>
+        </div>
+        <div class="stat-card stat-active">
+          <span class="stat-label">Số đơn Hoàn thành / Tổng số đơn</span>
+          <span id="analytics-completed-ratio" class="stat-value">0 / 0</span>
+        </div>
+        <div class="stat-card stat-hidden">
+          <span class="stat-label">Đang xử lý / Đã huỷ</span>
+          <span id="analytics-pending-cancelled" class="stat-value">0 / 0</span>
+        </div>
+      </section>
+
+      <div class="analytics-grid">
+        <section class="card">
+          <div class="list-header">
+            <h2>📅 Doanh thu theo ngày của Shop</h2>
+            <button id="btn-refresh-analytics" type="button" class="btn btn-small">↻ Cập nhật</button>
+          </div>
+          <p class="muted">Tổng hợp doanh thu các đơn hàng đã hoàn thành theo từng ngày.</p>
+
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>Ngày</th>
+                  <th>Đơn hoàn thành / Tổng đơn</th>
+                  <th class="text-right">Doanh thu ngày</th>
+                </tr>
+              </thead>
+              <tbody id="daily-revenue-tbody">
+                <tr>
+                  <td colspan="3" class="muted">Đang tải dữ liệu doanh thu...</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </section>
+
+        <section class="card">
+          <h2>🔥 Sản phẩm bán chạy của Shop</h2>
+          <p class="muted">Xếp hạng theo tổng số lượng đã bán từ các đơn hàng hợp lệ của shop.</p>
+
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>Hạng</th>
+                  <th>Sản phẩm</th>
+                  <th class="text-right">Đã bán</th>
+                  <th class="text-right">Doanh thu SP</th>
+                </tr>
+              </thead>
+              <tbody id="best-sellers-tbody">
+                <tr>
+                  <td colspan="4" class="muted">Đang tải danh sách sản phẩm bán chạy...</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </section>
+      </div>
+    </div>
+
+    <!-- ============================================================
+         TAB 4: MÃ GIẢM GIÁ CỦA SHOP (Task T3D2BFB)
+         ============================================================ -->
+    <div id="seller-panel-vouchers" hidden>
+      <div class="seller-layout">
+        <section class="card">
+          <h2>🎟️ Tạo Mã giảm giá mới</h2>
+          <p class="muted" style="margin-top: -4px; margin-bottom: 14px;">
+            Tạo voucher giảm theo phần trăm (%) hoặc số tiền cố định (VNĐ), giới hạn đơn tối thiểu, hạn dùng và số lượt.
+          </p>
+          <form id="voucher-form">
+            <label for="voucher-code">Mã giảm giá (3–30 ký tự, chữ/số không dấu) *</label>
+            <input
+              id="voucher-code"
+              type="text"
+              maxlength="30"
+              placeholder="VD: GIAM10, SALE50K, FREESHIP"
+              style="text-transform: uppercase; font-weight: 700;"
+              required
+            >
+
+            <label for="voucher-description">Mô tả ưu đãi</label>
+            <input
+              id="voucher-description"
+              type="text"
+              maxlength="255"
+              placeholder="VD: Giảm 10% tối đa 30k cho đơn từ 200k"
+            >
+
+            <div class="form-row-2">
+              <div>
+                <label for="voucher-type">Hình thức giảm *</label>
+                <select id="voucher-type" required>
+                  <option value="PERCENT">Theo phần trăm (%)</option>
+                  <option value="FIXED">Theo số tiền (VNĐ)</option>
+                </select>
+              </div>
+              <div>
+                <label id="voucher-value-label" for="voucher-value">Mức giảm (%) *</label>
+                <input
+                  id="voucher-value"
+                  type="number"
+                  min="1"
+                  max="100"
+                  step="any"
+                  placeholder="VD: 10"
+                  required
+                >
+              </div>
+            </div>
+
+            <div class="form-row-2">
+              <div id="voucher-max-wrap">
+                <label for="voucher-max-discount">Giảm tối đa (VNĐ, tuỳ chọn)</label>
+                <input
+                  id="voucher-max-discount"
+                  type="number"
+                  min="1000"
+                  step="1000"
+                  placeholder="VD: 30000"
+                >
+              </div>
+              <div>
+                <label for="voucher-min-order">Đơn hàng tối thiểu (VNĐ) *</label>
+                <input
+                  id="voucher-min-order"
+                  type="number"
+                  min="0"
+                  step="1000"
+                  value="0"
+                  required
+                >
+              </div>
+            </div>
+
+            <div class="form-row-2">
+              <div>
+                <label for="voucher-usage-limit">Tổng số lượt sử dụng *</label>
+                <input
+                  id="voucher-usage-limit"
+                  type="number"
+                  min="1"
+                  max="100000"
+                  value="50"
+                  required
+                >
+              </div>
+              <div>
+                <label for="voucher-per-user-limit">Số lượt / 1 người mua *</label>
+                <input
+                  id="voucher-per-user-limit"
+                  type="number"
+                  min="1"
+                  max="100"
+                  value="1"
+                  required
+                >
+              </div>
+            </div>
+
+            <label for="voucher-expires-at">Hạn dùng *</label>
+            <input id="voucher-expires-at" type="datetime-local" required>
+
+            <div class="form-actions">
+              <button id="voucher-submit-btn" type="submit" class="btn btn-primary">
+                + Tạo mã giảm giá
+              </button>
+            </div>
+          </form>
+        </section>
+
+        <section class="card">
+          <div class="list-header">
+            <div>
+              <h2 style="margin-bottom: 4px;">📋 Danh sách Mã giảm giá của Shop</h2>
+              <p class="muted" style="margin: 0;">
+                Người mua nhập mã khi thanh toán, hệ thống tự động kiểm tra điều kiện và tính lại tổng tiền đơn hàng.
+              </p>
+            </div>
+            <button id="btn-refresh-vouchers" type="button" class="btn btn-small">↻ Làm mới</button>
+          </div>
+
+          <div class="table-wrap" style="margin-top: 14px;">
+            <table>
+              <thead>
+                <tr>
+                  <th>Mã Voucher</th>
+                  <th>Mức giảm &amp; Đơn tối thiểu</th>
+                  <th>Lượt dùng</th>
+                  <th>Hạn dùng</th>
+                  <th>Trạng thái</th>
+                  <th class="text-right">Thao tác</th>
+                </tr>
+              </thead>
+              <tbody id="vouchers-tbody">
+                <tr>
+                  <td colspan="6" class="muted">Đang tải danh sách mã giảm giá...</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </section>
+      </div>
+    </div>
+  </main>
+
+  <footer id="app-footer"></footer>
+
+  <script src="https://cdn.jsdelivr.net/npm/axios@1.7.9/dist/axios.min.js"></script>
+  <script src="../js/config.js"></script>
+  <script src="../js/api.js"></script>
+  <script src="../js/utils.js"></script>
+  <script src="../js/layout.js"></script>
+  <script src="../js/pages/seller-center.js"></script>
+</body>
+</html>

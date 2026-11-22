@@ -1,0 +1,36 @@
+from app.routers import (
+    admin,
+    admin_moderation,
+    auth,
+    cart,
+    categories,
+    health,
+    items,
+    orders,
+    products,
+    profile,
+    seller_applications,
+    shops,
+    social,
+    videos,
+    vouchers,
+)
+
+__all__ = [
+    "admin",
+    "admin_moderation",
+    "auth",
+    "cart",
+    "categories",
+    "health",
+    "items",
+    "orders",
+    "products",
+    "profile",
+    "seller_applications",
+    "shops",
+    "social",
+    "videos",
+    "vouchers",
+]
+

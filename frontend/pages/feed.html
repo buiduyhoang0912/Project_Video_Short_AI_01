@@ -1,0 +1,63 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Feed Video | ClipShop AI</title>
+  <link rel="icon" href="../assets/images/logo.svg">
+  <link rel="stylesheet" href="../css/style.css">
+</head>
+<body data-root="../">
+  <header id="app-header"></header>
+
+  <main class="feed-page-wrap">
+    <!-- Tabs For You / Following -->
+    <div class="feed-tabs">
+      <button id="tab-for-you" class="feed-tab-btn active">Dành cho bạn</button>
+      <button id="tab-following" class="feed-tab-btn">Đang theo dõi</button>
+    </div>
+
+    <!-- Feed cuộn dọc -->
+    <div class="feed-container" id="feed-container">
+      <div id="feed-loading" style="color:#fff;text-align:center;padding:40px;">
+        Đang tải video...
+      </div>
+    </div>
+
+    <!-- Backdrop & Bảng bình luận trượt lên -->
+    <div id="comments-overlay" class="comments-sheet-overlay"></div>
+    <div id="comments-bottom-sheet" class="comments-bottom-sheet">
+      <div class="comments-header">
+        <h3 id="sheet-comment-title">Bình luận</h3>
+        <button id="btn-close-comments" class="btn-close-sheet">&times;</button>
+      </div>
+
+      <div class="comments-list-body" id="sheet-comments-list">
+        <!-- Danh sách comment sẽ render vào đây -->
+      </div>
+
+      <!-- Banner thông báo khi đang reply ai đó -->
+      <div id="reply-banner" class="comment-replying-banner">
+        <span>Đang trả lời <strong id="reply-to-user">@user</strong></span>
+        <button id="btn-cancel-reply" class="btn-cancel-reply">Hủy</button>
+      </div>
+
+      <!-- Khung nhập comment -->
+      <div class="comments-input-bar">
+        <input type="text" id="input-comment-text" placeholder="Thêm bình luận..." maxlength="2000">
+        <button id="btn-submit-comment" class="btn-send-comment">Gửi</button>
+      </div>
+    </div>
+  </main>
+
+  <footer id="app-footer"></footer>
+
+  <!-- Nạp scripts -->
+  <script src="https://cdn.jsdelivr.net/npm/axios@1.7.9/dist/axios.min.js"></script>
+  <script src="../js/config.js"></script>
+  <script src="../js/api.js"></script>
+  <script src="../js/utils.js"></script>
+  <script src="../js/layout.js"></script>
+  <script src="../js/pages/feed.js"></script>
+</body>
+</html>

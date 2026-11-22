@@ -1,0 +1,115 @@
+from datetime import datetime, timezone
+from decimal import Decimal
+
+from sqlalchemy import DateTime, ForeignKey, Numeric, String, Text
+from sqlalchemy.dialects.mysql import BIGINT, INTEGER
+from sqlalchemy.orm import Mapped, mapped_column, relationship
+
+from app.db.session import Base
+
+
+def utc_now() -> datetime:
+    return datetime.now(timezone.utc).replace(tzinfo=None)
+
+
+class Product(Base):
+    __tablename__ = "products"
+
+    __table_args__ = {
+        "mysql_engine": "InnoDB",
+        "mysql_charset": "utf8mb4",
+        "mysql_collate": "utf8mb4_unicode_ci",
+    }
+
+    id: Mapped[int] = mapped_column(
+        BIGINT(unsigned=True),
+        primary_key=True,
+        autoincrement=True,
+    )
+
+    shop_id: Mapped[int] = mapped_column(
+        BIGINT(unsigned=True),
+        ForeignKey("shops.id"),
+        nullable=False,
+    )
+
+    category_id: Mapped[int] = mapped_column(
+        BIGINT(unsigned=True),
+        ForeignKey("categories.id"),
+        nullable=False,
+    )
+
+    name: Mapped[str] = mapped_column(
+        String(200),
+        nullable=False,
+    )
+
+    description: Mapped[str | None] = mapped_column(
+        Text,
+        nullable=True,
+    )
+
+    price: Mapped[Decimal] = mapped_column(
+        Numeric(10, 2),
+        nullable=False,
+    )
+
+    stock: Mapped[int] = mapped_column(
+        INTEGER(unsigned=True),
+        nullable=False,
+        default=0,
+    )
+
+    sold_count: Mapped[int] = mapped_column(
+        INTEGER(unsigned=True),
+        nullable=False,
+        default=0,
+    )
+
+    status: Mapped[str] = mapped_column(
+        String(20),
+        nullable=False,
+        default="ACTIVE",
+    )
+
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime,
+        nullable=False,
+        default=utc_now,
+    )
+
+    # Kiểm duyệt (Admin ẩn sản phẩm vi phạm): lý do, người ẩn, thời điểm. NULL = chưa bị Admin ẩn.
+    moderation_reason: Mapped[str | None] = mapped_column(String(500), nullable=True)
+    moderated_by: Mapped[int | None] = mapped_column(
+        BIGINT(unsigned=True), ForeignKey("users.id"), nullable=True
+    )
+    moderated_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+
+    # Relationships
+    shop: Mapped["Shop"] = relationship("Shop", back_populates="products")  # noqa: F821
+    category: Mapped["Category"] = relationship("Category", back_populates="products")  # noqa: F821
+    images: Mapped[list["ProductImage"]] = relationship(  # noqa: F821
+        "ProductImage",
+        back_populates="product",
+        cascade="all, delete-orphan",
+        order_by="ProductImage.sort_order, ProductImage.id",
+    )
+    videos: Mapped[list["Video"]] = relationship(  # noqa: F821
+        "Video", secondary="video_products", backref="tagged_products"
+    )
+
+    @property
+    def thumbnail_url(self) -> str | None:
+        if not self.images:
+            return None
+        for img in self.images:
+            if img.is_primary:
+                return img.object_key
+        return self.images[0].object_key
+
+    @property
+    def updated_at(self) -> datetime:
+        return self.created_at
+
+
+from app.models.product_image import ProductImage  # noqa: F401, E402

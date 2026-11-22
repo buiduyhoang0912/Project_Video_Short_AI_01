@@ -163,3 +163,49 @@ Khi lỗi, API trả về JSON dạng `{"detail": "..."}`. Ví dụ: 404 khi kh�
 ## 11. (Không bắt buộc) Chạy MySQL bằng Docker
 
 Chỉ dành cho bạn nào đã biết Docker và không muốn cài MySQL. Trong `backend/` chạy `docker compose up -d`: MySQL chạy ở cổng **3307**, tự tạo bảng từ `sql/init.sql`. Khi đó sửa `.env` thành `DB_PORT=3307`, `DB_USER=app_user`, `DB_PASSWORD=app_password`.
+
+
+## Auth API (đăng ký / đăng nhập / JWT)
+
+| Method | Đường dẫn | Mô tả |
+|---|---|---|
+| POST | `/auth/register` | Đăng ký (201). Trùng email/username → 409, dữ liệu sai → 422. Mật khẩu lưu bằng bcrypt |
+| POST | `/auth/login` | Body `{"identifier": "<email hoặc username>", "password": "..."}` → 200 + JWT, sai → 401 |
+| POST | `/auth/logout` | Cần `Authorization: Bearer <token>`; thu hồi token (bảng `revoked_tokens`) |
+| GET | `/auth/me` | Thông tin người dùng hiện tại; thiếu/sai/hết hạn/đã logout → 401 |
+
+### Cách chạy
+```
+cd backend
+pip install -r requirements.txt
+copy .env.example .env        # rồi sửa DB_* và JWT_SECRET_KEY
+uvicorn app.main:app --reload
+```
+Mở http://127.0.0.1:8000/docs.
+
+### Cấu hình JWT (trong `.env`, KHÔNG commit)
+- `JWT_SECRET_KEY`: khóa ngẫu nhiên, tạo bằng `python -c "import secrets;print(secrets.token_urlsafe(48))"`
+- `JWT_ALGORITHM` (mặc định `HS256`), `JWT_EXPIRE_MINUTES` (mặc định `60`)
+- Token bắt buộc có claim `sub`, `jti`, `exp`; thiếu claim → 401.
+
+### Cách test
+- **Tự động** (SQLite in-memory, không cần MySQL): `cd backend && pytest`
+- **Swagger**: vào `/docs`, gọi `/auth/login`, bấm **Authorize**, dán token (chỉ phần token) rồi gọi `/auth/me`, `/auth/logout`.
+- Ảnh test Swagger nằm trong thư mục `docs/auth-test/`.
+
+
+## Profile API (hồ sơ cá nhân, avatar, đổi mật khẩu) - T3D1FE9
+
+Các API `/api/me/*` yêu cầu header `Authorization: Bearer <token>` và **luôn tác động lên tài khoản trong token** (không có tham số user_id nên không sửa được hồ sơ người khác).
+
+| Method | Đường dẫn | Mô tả |
+|---|---|---|
+| GET | `/api/me/profile` | Hồ sơ của mình: `id, username, display_name, bio, avatar_url` |
+| PATCH | `/api/me/profile` | Sửa `display_name` (1-100 ký tự), `bio` (tối đa 500, gửi rỗng/`null` để xóa). Trường lạ (role, avatar...) bị 422 |
+| POST | `/api/me/avatar` | Upload avatar, multipart field `file`. Chỉ JPG/PNG (kiểm tra nội dung thật), tối đa **2 MB** (413 nếu vượt), tối đa 4096x4096 px. Lưu `uploads/avatars/<uuid>.jpg\|png`, mã hóa lại ảnh để bỏ EXIF, xóa file cũ |
+| PUT | `/api/me/password` | Body `current_password, new_password, confirm_password`. Sai mật khẩu hiện tại: 400; xác nhận không khớp/mật khẩu mới yếu hoặc trùng cũ: 422. Lưu bcrypt |
+| GET | `/api/profiles/{username}` | **Công khai** (không cần đăng nhập): `id, username, display_name, bio, avatar_url`. Không tồn tại hoặc tài khoản bị khóa: 404 |
+
+- `avatar_url` được tạo từ `avatar_key` (cột `users.avatar_key`, dạng `avatars/<uuid>.jpg`) với `PUBLIC_BASE_URL` trong `.env` (mặc định `http://127.0.0.1:8000`). Khi deploy hãy đổi biến này.
+- Module Video lấy `id` từ API công khai để gắn lưới video (xem `frontend/pages/profile.html`).
+- Test: `pytest tests/test_profile.py`.

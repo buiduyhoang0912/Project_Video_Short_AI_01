@@ -5,3 +5,11 @@ PyMySQL==1.1.1
 # cryptography: bắt buộc để PyMySQL đăng nhập được MySQL 8 (caching_sha2_password)
 cryptography==43.0.3
 pydantic-settings==2.6.1
+email-validator==2.2.0
+bcrypt==5.0.0
+python-multipart==0.0.33
+filetype==1.2.0
+Pillow==13.0.0
+PyJWT==2.10.1
+pytest==8.3.4
+httpx==0.28.1

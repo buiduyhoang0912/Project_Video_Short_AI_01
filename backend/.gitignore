@@ -11,3 +11,7 @@ env/
 # IDE
 .vscode/
 .idea/
+
+/uploads/
+scratch/
+.pytest_cache/

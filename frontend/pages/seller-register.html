@@ -1,0 +1,183 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Đăng ký bán hàng &amp; Hồ sơ Cửa hàng | ClipShop AI</title>
+  <link rel="icon" href="../assets/images/logo.svg">
+  <link rel="stylesheet" href="../css/style.css">
+  <link rel="stylesheet" href="../css/shop-public.css">
+</head>
+<body data-root="../">
+  <header id="app-header"></header>
+
+  <main class="container container-shop">
+    <!-- Hero Banner -->
+    <section class="page-hero">
+      <div>
+        <h1>📝 Đăng ký Bán hàng &amp; Trạng thái Đơn</h1>
+        <p>Gửi đơn đăng ký mở gian hàng trên ClipShop AI, theo dõi trạng thái xét duyệt và thiết lập cửa hàng công khai của bạn.</p>
+      </div>
+      <div class="hero-actions">
+        <a href="shop-public.html" class="btn">🏪 Xem Cửa hàng công khai</a>
+        <a id="btn-goto-seller-center" href="seller.html" class="btn btn-primary" hidden>🧾 Vào Seller Center</a>
+      </div>
+    </section>
+
+    <!-- Khung thông báo khi chưa đăng nhập -->
+    <section id="guest-auth-card" class="card" hidden>
+      <h2>Bạn cần đăng nhập để gửi đơn đăng ký bán hàng</h2>
+      <p class="muted">
+        Hãy đăng nhập tài khoản hiện có của bạn hoặc bấm nút khởi tạo nhanh bên dưới để trải nghiệm ngay luồng Gửi đơn &rarr; Xét duyệt &rarr; Tạo cửa hàng.
+      </p>
+      <div class="form-actions">
+        <a href="login.html?next=pages/seller-register.html" class="btn btn-primary">Đăng nhập ngay</a>
+        <a href="register.html" class="btn">Đăng ký tài khoản mới</a>
+        <button id="btn-demo-applicant" type="button" class="btn">⚡ Tạo nhanh tài khoản User để thử gửi đơn</button>
+      </div>
+    </section>
+
+    <!-- Nội dung chính khi đã đăng nhập: 2 cột -->
+    <div id="seller-register-content" class="register-seller-grid" hidden>
+      <!-- Cột trái: Form Gửi đơn đăng ký bán hàng HOẶC Form Tạo/Sửa Cửa hàng (sau khi đơn được duyệt) -->
+      <div>
+        <!-- Card 1: Form gửi đơn đăng ký bán hàng -->
+        <section id="application-form-card" class="card">
+          <h2>Gửi đơn đăng ký trở thành Người bán</h2>
+          <p id="application-form-hint" class="muted">
+            Mỗi tài khoản chỉ gửi 1 đơn đang chờ duyệt (PENDING). Sau khi Admin duyệt đơn, bạn sẽ được tạo cửa hàng.
+          </p>
+
+          <form id="seller-application-form">
+            <label for="proposed-shop-name">Tên cửa hàng dự kiến *</label>
+            <input
+              id="proposed-shop-name"
+              name="proposed_shop_name"
+              type="text"
+              required
+              maxlength="150"
+              placeholder="VD: Hoàng Văn Fashion Official"
+            >
+
+            <label for="applicant-phone">Số điện thoại liên hệ (10–15 số) *</label>
+            <input
+              id="applicant-phone"
+              name="phone"
+              type="tel"
+              required
+              pattern="^\+?[0-9]{10,15}$"
+              maxlength="20"
+              placeholder="VD: 0912345678"
+            >
+
+            <label for="applicant-description">Mô tả cửa hàng &amp; mặt hàng kinh doanh *</label>
+            <textarea
+              id="applicant-description"
+              name="description"
+              rows="4"
+              required
+              maxlength="2000"
+              placeholder="Giới thiệu ngành hàng, nguồn gốc sản phẩm, cam kết chất lượng của cửa hàng..."
+            ></textarea>
+
+            <div class="form-actions">
+              <button id="btn-submit-application" type="submit" class="btn btn-primary">
+                📨 Gửi đơn đăng ký bán hàng
+              </button>
+            </div>
+          </form>
+        </section>
+
+        <!-- Card 2: Form Tạo / Cập nhật Cửa hàng & Logo (Hiển thị sau khi đơn đã APPROVED) -->
+        <section id="shop-setup-card" class="card" hidden>
+          <h2 id="shop-setup-title">🏪 Thiết lập Cửa hàng công khai của bạn</h2>
+          <p class="muted">
+            Đơn đăng ký bán hàng của bạn đã được duyệt! Hãy cập nhật Logo, mô tả và địa chỉ để hiển thị trên Trang cửa hàng công khai.
+          </p>
+
+          <form id="shop-profile-form">
+            <label>Logo / Ảnh đại diện Cửa hàng</label>
+            <div class="logo-upload-row">
+              <img
+                id="shop-logo-preview"
+                class="shop-logo-preview"
+                src="../assets/images/logo.svg"
+                alt="Logo cửa hàng"
+              >
+              <div style="flex: 1; min-width: 200px;">
+                <input
+                  id="shop-logo-file"
+                  type="file"
+                  accept=".jpg,.jpeg,.png,.webp"
+                >
+                <div class="muted" style="font-size: 12px; margin-top: 4px;">
+                  Chọn tệp ảnh (.jpg, .png, .webp) từ máy tính để tải lên làm Logo cửa hàng.
+                </div>
+              </div>
+            </div>
+
+            <label for="shop-name-input">Tên cửa hàng *</label>
+            <input
+              id="shop-name-input"
+              type="text"
+              required
+              maxlength="150"
+              placeholder="Nhập tên cửa hàng"
+            >
+
+            <label for="shop-address-input">Địa chỉ cửa hàng</label>
+            <input
+              id="shop-address-input"
+              type="text"
+              maxlength="255"
+              placeholder="VD: Cầu Giấy, Hà Nội"
+            >
+
+            <label for="shop-description-input">Mô tả giới thiệu cửa hàng</label>
+            <textarea
+              id="shop-description-input"
+              rows="4"
+              placeholder="Mô tả hiển thị trên trang cửa hàng công khai cho khách mua hàng..."
+            ></textarea>
+
+            <div class="form-actions">
+              <button id="btn-save-shop" type="submit" class="btn btn-primary">
+                💾 Lưu thông tin Cửa hàng
+              </button>
+              <a id="btn-view-my-public-shop" href="shop-public.html" class="btn" hidden>
+                👁️ Xem trang Cửa hàng công khai
+              </a>
+            </div>
+          </form>
+        </section>
+      </div>
+
+      <!-- Cột phải: Trạng thái đơn đăng ký bán hàng -->
+      <section class="card">
+        <div class="list-header">
+          <h2>📋 Trạng thái đơn đăng ký của bạn</h2>
+          <button id="btn-refresh-applications" type="button" class="btn btn-small">
+            ↻ Làm mới
+          </button>
+        </div>
+        <p class="muted">
+          Theo dõi tiến trình xét duyệt đơn từ Quản trị viên (PENDING &rarr; APPROVED / REJECTED).
+        </p>
+
+        <div id="applications-list-container">
+          <div class="muted">Đang tải trạng thái đơn...</div>
+        </div>
+      </section>
+    </div>
+  </main>
+
+  <footer id="app-footer"></footer>
+
+  <script src="https://cdn.jsdelivr.net/npm/axios@1.7.9/dist/axios.min.js"></script>
+  <script src="../js/config.js"></script>
+  <script src="../js/api.js"></script>
+  <script src="../js/utils.js"></script>
+  <script src="../js/layout.js"></script>
+  <script src="../js/pages/seller-register.js"></script>
+</body>
+</html>

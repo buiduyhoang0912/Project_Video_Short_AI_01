@@ -1,10 +1,25 @@
 // Các hàm tiện ích dùng chung cho nhiều trang.
 
-// Chống XSS: luôn dùng hàm này khi chèn dữ liệu người dùng nhập vào innerHTML
+// Chống XSS: luôn dùng hàm này khi chèn dữ liệu người dùng nhập vào innerHTML hoặc thuộc tính
 function escapeHtml(value) {
-  const div = document.createElement("div");
-  div.textContent = value ?? "";
-  return div.innerHTML;
+  if (value == null) return "";
+  return String(value)
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
+}
+
+// Chống XSS chuyên biệt khi chèn giá trị vào thuộc tính HTML (data-*, title, value...)
+function escapeAttr(value) {
+  if (value == null) return "";
+  return String(value)
+    .replace(/&/g, "&amp;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;");
 }
 
 // 45000 -> "45.000 ₫"
@@ -26,4 +41,17 @@ function showToast(message, type = "success") {
   toast.textContent = message;
   document.body.appendChild(toast);
   setTimeout(() => toast.remove(), 3000);
+}
+
+
+// Lấy lỗi theo từng ô nhập từ lỗi 422 của FastAPI -> { ten_truong: "thông báo" }
+function getFieldErrors(err) {
+  const result = {};
+  const detail = err && err.data && err.data.detail;
+  if (!Array.isArray(detail)) return result;
+  detail.forEach((e) => {
+    const field = Array.isArray(e.loc) ? e.loc[e.loc.length - 1] : null;
+    if (field && !result[field]) result[field] = String(e.msg).replace(/^Value error,\s*/i, "");
+  });
+  return result;
 }

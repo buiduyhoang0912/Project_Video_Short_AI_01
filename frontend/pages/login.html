@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Đăng nhập | ClipShop AI</title>
+  <link rel="icon" href="../assets/images/logo.svg">
+  <link rel="stylesheet" href="../css/style.css">
+</head>
+<body data-root="../">
+  <header id="app-header"></header>
+
+  <main class="container">
+    <section class="card auth-card">
+      <h1>Đăng nhập</h1>
+      <div id="auth-notice" class="status status-error" style="display:none;"></div>
+      <form id="login-form" novalidate>
+        <label for="identifier">Email hoặc username</label>
+        <input type="text" id="identifier" autocomplete="username" required>
+        <div class="field-error" id="err-identifier"></div>
+
+        <label for="password">Mật khẩu</label>
+        <input type="password" id="password" autocomplete="current-password" required>
+        <div class="field-error" id="err-password"></div>
+
+        <div class="form-error" id="form-error" role="alert"></div>
+        <button type="submit" class="btn btn-primary" id="btn-submit" style="width:100%;">Đăng nhập</button>
+      </form>
+      <p class="muted">Chưa có tài khoản? <a href="register.html">Đăng ký</a></p>
+    </section>
+  </main>
+
+  <footer id="app-footer"></footer>
+
+  <script src="https://cdn.jsdelivr.net/npm/axios@1.7.9/dist/axios.min.js"></script>
+  <script src="../js/config.js"></script>
+  <script src="../js/api.js"></script>
+  <script src="../js/utils.js"></script>
+  <script src="../js/layout.js"></script>
+  <script src="../js/pages/auth.js"></script>
+</body>
+</html>

@@ -1,0 +1,744 @@
+{
+  "run": "8a3f85",
+  "base": "http://127.0.0.1:8001",
+  "total": 105,
+  "pass": 105,
+  "fail": 0,
+  "cases": [
+    {
+      "id": "E2E-01s",
+      "description": "Đăng ký tài khoản seller",
+      "expected": "201",
+      "actual": "201",
+      "result": "PASS"
+    },
+    {
+      "id": "E2E-01b",
+      "description": "Đăng ký tài khoản buyer",
+      "expected": "201",
+      "actual": "201",
+      "result": "PASS"
+    },
+    {
+      "id": "E2E-01b",
+      "description": "Đăng ký tài khoản buyer2",
+      "expected": "201",
+      "actual": "201",
+      "result": "PASS"
+    },
+    {
+      "id": "E2E-02",
+      "description": "Đăng ký trùng username",
+      "expected": "409",
+      "actual": "409",
+      "result": "PASS"
+    },
+    {
+      "id": "E2E-03",
+      "description": "Đăng ký mật khẩu quá ngắn",
+      "expected": "422",
+      "actual": "422",
+      "result": "PASS"
+    },
+    {
+      "id": "E2E-04",
+      "description": "Đăng ký cố ý gửi role=ADMIN (leo quyền)",
+      "expected": "422 (bị từ chối)",
+      "actual": "422",
+      "result": "PASS"
+    },
+    {
+      "id": "E2E-05s",
+      "description": "Đăng nhập seller",
+      "expected": "200 + access_token",
+      "actual": "200",
+      "result": "PASS"
+    },
+    {
+      "id": "E2E-05b",
+      "description": "Đăng nhập buyer",
+      "expected": "200 + access_token",
+      "actual": "200",
+      "result": "PASS"
+    },
+    {
+      "id": "E2E-05b",
+      "description": "Đăng nhập buyer2",
+      "expected": "200 + access_token",
+      "actual": "200",
+      "result": "PASS"
+    },
+    {
+      "id": "E2E-05a",
+      "description": "Đăng nhập admin",
+      "expected": "200 + access_token",
+      "actual": "200",
+      "result": "PASS"
+    },
+    {
+      "id": "E2E-06",
+      "description": "Đăng nhập sai mật khẩu",
+      "expected": "401",
+      "actual": "401",
+      "result": "PASS"
+    },
+    {
+      "id": "E2E-07",
+      "description": "GET /auth/me với token hợp lệ",
+      "expected": "200 role=USER",
+      "actual": "200 USER",
+      "result": "PASS"
+    },
+    {
+      "id": "E2E-08",
+      "description": "USER chưa được duyệt tạo shop",
+      "expected": "403",
+      "actual": "403",
+      "result": "PASS"
+    },
+    {
+      "id": "E2E-09",
+      "description": "Gửi đơn đăng ký bán hàng",
+      "expected": "201 PENDING",
+      "actual": "201",
+      "result": "PASS"
+    },
+    {
+      "id": "E2E-10",
+      "description": "Gửi đơn thứ 2 khi đã có đơn PENDING",
+      "expected": "409",
+      "actual": "409",
+      "result": "PASS"
+    },
+    {
+      "id": "E2E-11",
+      "description": "USER thường gọi API Admin (xem danh sách đơn)",
+      "expected": "403",
+      "actual": "403",
+      "result": "PASS"
+    },
+    {
+      "id": "E2E-12",
+      "description": "Không token gọi API Admin",
+      "expected": "401",
+      "actual": "401",
+      "result": "PASS"
+    },
+    {
+      "id": "E2E-13",
+      "description": "Người nộp đơn tự duyệt đơn của mình",
+      "expected": "403",
+      "actual": "403",
+      "result": "PASS"
+    },
+    {
+      "id": "E2E-14",
+      "description": "Người nộp đơn tự duyệt qua API /seller-applications (PUT)",
+      "expected": "403",
+      "actual": "403",
+      "result": "PASS"
+    },
+    {
+      "id": "E2E-15",
+      "description": "Admin xem danh sách đơn PENDING",
+      "expected": "200, có đơn vừa gửi",
+      "actual": "200",
+      "result": "PASS"
+    },
+    {
+      "id": "E2E-16",
+      "description": "Admin từ chối không nhập lý do",
+      "expected": "422",
+      "actual": "422",
+      "result": "PASS"
+    },
+    {
+      "id": "E2E-17",
+      "description": "Admin duyệt đơn",
+      "expected": "200 APPROVED",
+      "actual": "200",
+      "result": "PASS"
+    },
+    {
+      "id": "E2E-18",
+      "description": "Duyệt lại đơn đã duyệt",
+      "expected": "409",
+      "actual": "409",
+      "result": "PASS"
+    },
+    {
+      "id": "E2E-19",
+      "description": "Sau duyệt role người nộp đơn = SELLER",
+      "expected": "SELLER",
+      "actual": "SELLER",
+      "result": "PASS"
+    },
+    {
+      "id": "E2E-20",
+      "description": "Seller tạo shop",
+      "expected": "201",
+      "actual": "201",
+      "result": "PASS"
+    },
+    {
+      "id": "E2E-21",
+      "description": "Seller tạo shop thứ 2",
+      "expected": "409",
+      "actual": "409",
+      "result": "PASS"
+    },
+    {
+      "id": "E2E-22",
+      "description": "Lấy danh mục sản phẩm",
+      "expected": "200, có danh mục",
+      "actual": "5 danh mục",
+      "result": "PASS"
+    },
+    {
+      "id": "E2E-231",
+      "description": "Seller thêm sản phẩm Áo Hoodie Nỉ Unisex",
+      "expected": "201",
+      "actual": "201",
+      "result": "PASS"
+    },
+    {
+      "id": "E2E-232",
+      "description": "Seller thêm sản phẩm Mũ Lưỡi Trai Classic",
+      "expected": "201",
+      "actual": "201",
+      "result": "PASS"
+    },
+    {
+      "id": "E2E-233",
+      "description": "Seller thêm sản phẩm Tất Cổ Cao",
+      "expected": "201",
+      "actual": "201",
+      "result": "PASS"
+    },
+    {
+      "id": "E2E-24",
+      "description": "USER thường thêm sản phẩm",
+      "expected": "403",
+      "actual": "403",
+      "result": "PASS"
+    },
+    {
+      "id": "E2E-25",
+      "description": "Thêm sản phẩm giá âm",
+      "expected": "422",
+      "actual": "422",
+      "result": "PASS"
+    },
+    {
+      "id": "E2E-26",
+      "description": "Seller đăng video (MP4 + ảnh bìa)",
+      "expected": "201",
+      "actual": "201 ",
+      "result": "PASS"
+    },
+    {
+      "id": "E2E-27",
+      "description": "File video phát được qua /uploads",
+      "expected": "200 video/mp4",
+      "actual": "200 video/mp4",
+      "result": "PASS"
+    },
+    {
+      "id": "E2E-28",
+      "description": "Video mới có trong feed công khai",
+      "expected": "200, có video",
+      "actual": "200, feed=1",
+      "result": "PASS"
+    },
+    {
+      "id": "E2E-29",
+      "description": "Khách xem chi tiết sản phẩm công khai",
+      "expected": "200",
+      "actual": "200",
+      "result": "PASS"
+    },
+    {
+      "id": "E2E-30",
+      "description": "Buyer thêm sản phẩm 1 vào giỏ (x2)",
+      "expected": "201",
+      "actual": "201",
+      "result": "PASS"
+    },
+    {
+      "id": "E2E-31",
+      "description": "Buyer thêm sản phẩm 2 vào giỏ (x1)",
+      "expected": "201",
+      "actual": "201",
+      "result": "PASS"
+    },
+    {
+      "id": "E2E-32",
+      "description": "Thêm vượt tồn kho",
+      "expected": "400/409",
+      "actual": "400",
+      "result": "PASS"
+    },
+    {
+      "id": "E2E-33",
+      "description": "Thêm giỏ khi chưa đăng nhập",
+      "expected": "401",
+      "actual": "401",
+      "result": "PASS"
+    },
+    {
+      "id": "E2E-34",
+      "description": "Xem giỏ hàng",
+      "expected": "200",
+      "actual": "200",
+      "result": "PASS"
+    },
+    {
+      "id": "E2E-35",
+      "description": "Buyer đặt hàng (2×150k + 1×50k)",
+      "expected": "201, tổng 350000",
+      "actual": "201 tổng=350000.0",
+      "result": "PASS"
+    },
+    {
+      "id": "E2E-36",
+      "description": "Tồn kho bị trừ sau đặt hàng (10→8)",
+      "expected": "stock=8",
+      "actual": "stock=8",
+      "result": "PASS"
+    },
+    {
+      "id": "E2E-37",
+      "description": "Giỏ hàng được dọn sau đặt hàng",
+      "expected": "giỏ rỗng",
+      "actual": "200",
+      "result": "PASS"
+    },
+    {
+      "id": "E2E-38",
+      "description": "Người mua khác xem đơn không phải của mình",
+      "expected": "403/404",
+      "actual": "404",
+      "result": "PASS"
+    },
+    {
+      "id": "E2E-39",
+      "description": "Seller thấy đơn của shop mình",
+      "expected": "200, có đơn",
+      "actual": "200",
+      "result": "PASS"
+    },
+    {
+      "id": "E2E-40",
+      "description": "USER thường xem đơn của shop",
+      "expected": "403",
+      "actual": "403",
+      "result": "PASS"
+    },
+    {
+      "id": "E2E-41",
+      "description": "Buyer 2 đặt đơn COD (2×30k)",
+      "expected": "201",
+      "actual": "201 tổng=60000.0",
+      "result": "PASS"
+    },
+    {
+      "id": "E2E-42",
+      "description": "Seller huỷ đơn 2",
+      "expected": "200 cancelled",
+      "actual": "200 cancelled",
+      "result": "PASS"
+    },
+    {
+      "id": "E2E-43",
+      "description": "Admin gửi body rỗng vào /visibility",
+      "expected": "422",
+      "actual": "422",
+      "result": "PASS"
+    },
+    {
+      "id": "E2E-44",
+      "description": "Admin ẩn video không có lý do",
+      "expected": "422",
+      "actual": "422",
+      "result": "PASS"
+    },
+    {
+      "id": "E2E-45",
+      "description": "Admin ẩn video kèm lý do",
+      "expected": "200 HIDDEN",
+      "actual": "200",
+      "result": "PASS"
+    },
+    {
+      "id": "E2E-46",
+      "description": "Video bị ẩn biến mất khỏi feed",
+      "expected": "không còn trong feed",
+      "actual": "feed=0",
+      "result": "PASS"
+    },
+    {
+      "id": "E2E-47",
+      "description": "Chủ video tự bật lại video bị Admin ẩn",
+      "expected": "403",
+      "actual": "403",
+      "result": "PASS"
+    },
+    {
+      "id": "E2E-48",
+      "description": "Seller gọi API Admin bật video",
+      "expected": "403",
+      "actual": "403",
+      "result": "PASS"
+    },
+    {
+      "id": "E2E-48a",
+      "description": "Khách mở chi tiết video bị ẩn: chỉ thấy thông báo, không lộ video_url",
+      "expected": "200, is_available=false, video_url=null",
+      "actual": "200 available=False url=None",
+      "result": "PASS"
+    },
+    {
+      "id": "E2E-48b",
+      "description": "Tăng lượt xem video bị ẩn",
+      "expected": "404",
+      "actual": "404",
+      "result": "PASS"
+    },
+    {
+      "id": "E2E-48c",
+      "description": "Thả tim video bị ẩn",
+      "expected": "400",
+      "actual": "400",
+      "result": "PASS"
+    },
+    {
+      "id": "E2E-48d",
+      "description": "Xem bình luận video bị ẩn",
+      "expected": "400",
+      "actual": "400",
+      "result": "PASS"
+    },
+    {
+      "id": "E2E-48d2",
+      "description": "Bình luận vào video bị ẩn",
+      "expected": "400",
+      "actual": "400",
+      "result": "PASS"
+    },
+    {
+      "id": "E2E-48e",
+      "description": "Trang video của chủ kênh (khách xem) không có video bị ẩn",
+      "expected": "không chứa id 1",
+      "actual": "200",
+      "result": "PASS"
+    },
+    {
+      "id": "E2E-48f",
+      "description": "Tìm kiếm không trả video bị ẩn",
+      "expected": "videos không chứa video bị ẩn",
+      "actual": "200 kết quả=[]",
+      "result": "PASS"
+    },
+    {
+      "id": "E2E-48g",
+      "description": "Trang shop công khai không có video bị ẩn",
+      "expected": "không thấy tiêu đề",
+      "actual": "200",
+      "result": "PASS"
+    },
+    {
+      "id": "E2E-48h",
+      "description": "Đặt hàng khi sản phẩm trong giỏ đã bị Admin ẩn",
+      "expected": "bị chặn (4xx), tồn kho không đổi",
+      "actual": "hide=200 order=400 stock 5->5",
+      "result": "PASS"
+    },
+    {
+      "id": "E2E-49",
+      "description": "Admin ẩn sản phẩm kèm lý do",
+      "expected": "200 HIDDEN",
+      "actual": "200",
+      "result": "PASS"
+    },
+    {
+      "id": "E2E-50",
+      "description": "Khách xem sản phẩm bị ẩn",
+      "expected": "404",
+      "actual": "404",
+      "result": "PASS"
+    },
+    {
+      "id": "E2E-51",
+      "description": "Thêm sản phẩm bị ẩn vào giỏ",
+      "expected": "400",
+      "actual": "400",
+      "result": "PASS"
+    },
+    {
+      "id": "E2E-52",
+      "description": "Seller tự bật lại sản phẩm bị Admin ẩn (PATCH status)",
+      "expected": "403",
+      "actual": "403",
+      "result": "PASS"
+    },
+    {
+      "id": "E2E-53",
+      "description": "Seller tự bật lại sản phẩm bị Admin ẩn (PUT status)",
+      "expected": "403",
+      "actual": "403",
+      "result": "PASS"
+    },
+    {
+      "id": "E2E-54",
+      "description": "Seller gọi /hide (toggle) trên sản phẩm bị Admin ẩn không làm hiện lại",
+      "expected": "vẫn HIDDEN",
+      "actual": "200, status=HIDDEN",
+      "result": "PASS"
+    },
+    {
+      "id": "E2E-55",
+      "description": "Admin xem danh sách sản phẩm đã ẩn",
+      "expected": "200, có sản phẩm",
+      "actual": "200",
+      "result": "PASS"
+    },
+    {
+      "id": "E2E-56",
+      "description": "Admin bật lại video",
+      "expected": "200 VISIBLE",
+      "actual": "200",
+      "result": "PASS"
+    },
+    {
+      "id": "E2E-57",
+      "description": "Admin bật lại sản phẩm",
+      "expected": "200 ACTIVE",
+      "actual": "200",
+      "result": "PASS"
+    },
+    {
+      "id": "E2E-58",
+      "description": "Sản phẩm xem lại được sau khi Admin bật",
+      "expected": "200",
+      "actual": "200",
+      "result": "PASS"
+    },
+    {
+      "id": "E2E-59",
+      "description": "USER thường tự khoá tài khoản qua API Admin",
+      "expected": "403",
+      "actual": "403",
+      "result": "PASS"
+    },
+    {
+      "id": "E2E-60",
+      "description": "Admin tự khoá chính mình",
+      "expected": "400",
+      "actual": "400",
+      "result": "PASS"
+    },
+    {
+      "id": "E2E-61",
+      "description": "Admin khoá buyer",
+      "expected": "200 LOCKED",
+      "actual": "200",
+      "result": "PASS"
+    },
+    {
+      "id": "E2E-62",
+      "description": "Buyer bị khoá đăng nhập lại",
+      "expected": "403",
+      "actual": "403",
+      "result": "PASS"
+    },
+    {
+      "id": "E2E-63",
+      "description": "Buyer bị khoá dùng token cũ",
+      "expected": "403",
+      "actual": "403",
+      "result": "PASS"
+    },
+    {
+      "id": "E2E-64",
+      "description": "Admin khoá seller",
+      "expected": "200 LOCKED",
+      "actual": "200",
+      "result": "PASS"
+    },
+    {
+      "id": "E2E-65",
+      "description": "Seller bị khoá đăng video",
+      "expected": "401/403",
+      "actual": "401",
+      "result": "PASS"
+    },
+    {
+      "id": "E2E-66",
+      "description": "Seller bị khoá thêm sản phẩm (token cũ)",
+      "expected": "403",
+      "actual": "403",
+      "result": "PASS"
+    },
+    {
+      "id": "E2E-67",
+      "description": "Admin tìm tài khoản theo tên",
+      "expected": "200, 1 kết quả",
+      "actual": "200",
+      "result": "PASS"
+    },
+    {
+      "id": "E2E-68b",
+      "description": "Admin mở khoá buyer",
+      "expected": "200 ACTIVE",
+      "actual": "200",
+      "result": "PASS"
+    },
+    {
+      "id": "E2E-68s",
+      "description": "Admin mở khoá seller",
+      "expected": "200 ACTIVE",
+      "actual": "200",
+      "result": "PASS"
+    },
+    {
+      "id": "E2E-69",
+      "description": "Buyer đăng nhập lại sau khi mở khoá",
+      "expected": "200",
+      "actual": "200",
+      "result": "PASS"
+    },
+    {
+      "id": "E2E-70",
+      "description": "Token cũ dùng lại được sau mở khoá",
+      "expected": "200",
+      "actual": "200",
+      "result": "PASS"
+    },
+    {
+      "id": "E2E-71a",
+      "description": "Seller giao đơn 1 (confirmed → shipping)",
+      "expected": "200",
+      "actual": "200",
+      "result": "PASS"
+    },
+    {
+      "id": "E2E-71",
+      "description": "Seller hoàn tất đơn 1 (shipping → completed)",
+      "expected": "200",
+      "actual": "200 ",
+      "result": "PASS"
+    },
+    {
+      "id": "E2E-72",
+      "description": "Dashboard trả về 200 với summary + daily",
+      "expected": "200",
+      "actual": "200",
+      "result": "PASS"
+    },
+    {
+      "id": "E2E-73",
+      "description": "Doanh thu = 350.000 (đơn nhiều item không cộng trùng, bỏ đơn huỷ)",
+      "expected": "350000",
+      "actual": "350000.00",
+      "result": "PASS"
+    },
+    {
+      "id": "E2E-74",
+      "description": "Tổng đơn hàng (mọi trạng thái, gồm cả đơn huỷ)",
+      "expected": "2",
+      "actual": "2",
+      "result": "PASS"
+    },
+    {
+      "id": "E2E-75",
+      "description": "Tổng người dùng / người bán",
+      "expected": "users=4, sellers=1",
+      "actual": "users=4 sellers=1",
+      "result": "PASS"
+    },
+    {
+      "id": "E2E-76",
+      "description": "Tổng video / sản phẩm",
+      "expected": "videos=1, products=3",
+      "actual": "videos=1 products=3",
+      "result": "PASS"
+    },
+    {
+      "id": "E2E-77",
+      "description": "Biểu đồ daily có đủ 7 điểm, điểm cuối = 350.000",
+      "expected": "7 điểm, 350000",
+      "actual": "7 điểm",
+      "result": "PASS"
+    },
+    {
+      "id": "E2E-78",
+      "description": "USER thường xem dashboard",
+      "expected": "403",
+      "actual": "403",
+      "result": "PASS"
+    },
+    {
+      "id": "E2E-79",
+      "description": "Dashboard khoảng ngày ngược (from > to)",
+      "expected": "400/422",
+      "actual": "400",
+      "result": "PASS"
+    },
+    {
+      "id": "E2E-80",
+      "description": "Frontend phục vụ /index.html",
+      "expected": "200 text/html",
+      "actual": "200",
+      "result": "PASS"
+    },
+    {
+      "id": "E2E-81",
+      "description": "Frontend phục vụ /pages/login.html",
+      "expected": "200 text/html",
+      "actual": "200",
+      "result": "PASS"
+    },
+    {
+      "id": "E2E-82",
+      "description": "Frontend phục vụ /pages/register.html",
+      "expected": "200 text/html",
+      "actual": "200",
+      "result": "PASS"
+    },
+    {
+      "id": "E2E-83",
+      "description": "Frontend phục vụ /pages/admin.html",
+      "expected": "200 text/html",
+      "actual": "200",
+      "result": "PASS"
+    },
+    {
+      "id": "E2E-84",
+      "description": "Frontend phục vụ /pages/seller-center.html",
+      "expected": "200 text/html",
+      "actual": "200",
+      "result": "PASS"
+    },
+    {
+      "id": "E2E-85",
+      "description": "Frontend phục vụ /pages/feed.html",
+      "expected": "200 text/html",
+      "actual": "200",
+      "result": "PASS"
+    },
+    {
+      "id": "E2E-86",
+      "description": "Frontend phục vụ /pages/cart.html",
+      "expected": "200 text/html",
+      "actual": "200",
+      "result": "PASS"
+    },
+    {
+      "id": "E2E-87",
+      "description": "Frontend phục vụ /pages/product.html",
+      "expected": "200 text/html",
+      "actual": "200",
+      "result": "PASS"
+    }
+  ]
+}

@@ -1,0 +1,487 @@
+// ==========================================================
+// T3D2235: Xử lý Trang đăng video (Upload Video UI)
+// ==========================================================
+
+const MAX_VIDEO_BYTES = 50 * 1024 * 1024; // 50 MB
+const MAX_IMAGE_BYTES = 50 * 1024 * 1024; // 50 MB
+const MAX_VIDEO_DURATION_SECONDS = 60; // Tối đa 60 giây
+const ALLOWED_VIDEO_EXTS = [".mp4", ".webm"];
+const ALLOWED_VIDEO_TYPES = ["video/mp4", "video/webm"];
+const ALLOWED_IMAGE_EXTS = [".jpg", ".jpeg", ".png", ".webp"];
+const ALLOWED_IMAGE_TYPES = ["image/jpeg", "image/png", "image/webp"];
+
+// State
+let selectedVideoFile = null;
+let selectedThumbnailFile = null;
+let selectedHashtags = new Set();
+let isUploading = false;
+let videoObjectUrl = null;
+
+// DOM Elements
+const dropzone = document.getElementById("video-dropzone");
+const videoFileInput = document.getElementById("video-file-input");
+const videoPreviewWrapper = document.getElementById("video-preview-wrapper");
+const videoPlayer = document.getElementById("video-preview-player");
+const metaFileName = document.getElementById("meta-file-name");
+const metaFileSize = document.getElementById("meta-file-size");
+const metaFileDuration = document.getElementById("meta-file-duration");
+const btnReselectVideo = document.getElementById("btn-reselect-video");
+const videoErrorBox = document.getElementById("video-error-box");
+
+const formUpload = document.getElementById("form-upload-video");
+const inputTitle = document.getElementById("input-video-title");
+const titleCharCounter = document.getElementById("title-char-counter");
+const inputDesc = document.getElementById("input-video-desc");
+const descCharCounter = document.getElementById("desc-char-counter");
+
+const inputHashtag = document.getElementById("input-video-hashtag");
+const btnAddHashtag = document.getElementById("btn-add-hashtag");
+const hashtagsContainer = document.getElementById("selected-hashtags-container");
+const tagPills = document.querySelectorAll(".btn-tag-pill");
+
+const thumbPreviewImage = document.getElementById("thumb-preview-image");
+const thumbSourceBadge = document.getElementById("thumb-source-badge");
+const btnCaptureFrame = document.getElementById("btn-capture-frame");
+const thumbFileInput = document.getElementById("thumb-file-input");
+const thumbFileName = document.getElementById("thumb-file-name");
+const thumbErrorBox = document.getElementById("thumb-error-box");
+
+const progressContainer = document.getElementById("upload-progress-container");
+const progressFill = document.getElementById("upload-progress-fill");
+const progressPercent = document.getElementById("upload-percent-text");
+const progressStatus = document.getElementById("upload-status-text");
+const serverErrorBox = document.getElementById("upload-server-error");
+const btnSubmit = document.getElementById("btn-submit-upload");
+
+// ---------- XỬ LÝ LỖI & THÔNG BÁO ----------
+function showVideoError(msg) {
+  videoErrorBox.textContent = msg;
+  videoErrorBox.style.display = "block";
+}
+
+function hideVideoError() {
+  videoErrorBox.textContent = "";
+  videoErrorBox.style.display = "none";
+}
+
+function showThumbError(msg) {
+  thumbErrorBox.textContent = msg;
+  thumbErrorBox.style.display = "block";
+}
+
+function hideThumbError() {
+  thumbErrorBox.textContent = "";
+  thumbErrorBox.style.display = "none";
+}
+
+function showServerError(msg) {
+  serverErrorBox.textContent = msg;
+  serverErrorBox.style.display = "block";
+}
+
+function hideServerError() {
+  serverErrorBox.textContent = "";
+  serverErrorBox.style.display = "none";
+}
+
+function formatBytes(bytes) {
+  if (!bytes) return "0 B";
+  const mb = bytes / (1024 * 1024);
+  return `${mb.toFixed(2)} MB`;
+}
+
+// ---------- VALIDATE & XỬ LÝ TỆP VIDEO ----------
+function isVideoFileValid(file) {
+  if (!file) return { valid: false, error: "Vui lòng chọn tệp video." };
+
+  const name = file.name.toLowerCase();
+  const hasValidExt = ALLOWED_VIDEO_EXTS.some((ext) => name.endsWith(ext));
+  const hasValidType = file.type ? ALLOWED_VIDEO_TYPES.includes(file.type) : hasValidExt;
+
+  if (!hasValidExt && !hasValidType) {
+    return {
+      valid: false,
+      error: `Định dạng tệp không hợp lệ (${file.name}). Chỉ chấp nhận video định dạng MP4 hoặc WebM.`,
+    };
+  }
+
+  if (file.size > MAX_VIDEO_BYTES) {
+    return {
+      valid: false,
+      error: `Dung lượng video vượt quá 50MB (Tệp hiện tại: ${formatBytes(file.size)}). Vui lòng nén video hoặc chọn tệp khác.`,
+    };
+  }
+
+  return { valid: true };
+}
+
+function handleVideoSelection(file) {
+  hideVideoError();
+  hideServerError();
+
+  const check = isVideoFileValid(file);
+  if (!check.valid) {
+    showVideoError(check.error);
+    resetVideoSelection();
+    return;
+  }
+
+  selectedVideoFile = file;
+
+  if (videoObjectUrl) {
+    URL.revokeObjectURL(videoObjectUrl);
+  }
+  videoObjectUrl = URL.createObjectURL(file);
+
+  metaFileName.textContent = file.name;
+  metaFileSize.textContent = formatBytes(file.size);
+  metaFileDuration.textContent = "Đang kiểm tra...";
+
+  videoPlayer.src = videoObjectUrl;
+  videoPlayer.load();
+
+  videoPlayer.onloadedmetadata = () => {
+    const duration = videoPlayer.duration;
+    if (isNaN(duration) || duration <= 0) {
+      showVideoError("Không đọc được thời lượng của video. Tệp có thể bị lỗi.");
+      resetVideoSelection();
+      return;
+    }
+
+    if (duration > MAX_VIDEO_DURATION_SECONDS) {
+      showVideoError(
+        `Thời lượng video tối đa là 60 giây (Video của bạn dài ${Math.ceil(duration)} giây). Vui lòng cắt ngắn trước khi tải lên.`
+      );
+      resetVideoSelection();
+      return;
+    }
+
+    metaFileDuration.textContent = `${Math.ceil(duration)} giây`;
+    dropzone.style.display = "none";
+    videoPreviewWrapper.style.display = "flex";
+
+    // Tự động seek tới giây thứ 0.5 để chụp frame làm ảnh bìa mặc định
+    videoPlayer.currentTime = Math.min(0.5, duration / 2);
+  };
+
+  videoPlayer.onseeked = () => {
+    // Nếu người dùng chưa chọn ảnh bìa riêng từ máy, tự động tạo ảnh bìa từ video
+    if (!thumbFileInput.files || thumbFileInput.files.length === 0) {
+      captureFrameToThumbnail(true);
+    }
+  };
+
+  videoPlayer.onerror = () => {
+    showVideoError("Không thể phát video này. Tệp bị hỏng hoặc mã hóa không được hỗ trợ.");
+    resetVideoSelection();
+  };
+}
+
+function resetVideoSelection() {
+  selectedVideoFile = null;
+  videoFileInput.value = "";
+  if (videoObjectUrl) {
+    URL.revokeObjectURL(videoObjectUrl);
+    videoObjectUrl = null;
+  }
+  videoPlayer.removeAttribute("src");
+  dropzone.style.display = "block";
+  videoPreviewWrapper.style.display = "none";
+}
+
+// ---------- TRÍCH XUẤT ẢNH BÌA TỪ VIDEO ----------
+function captureFrameToThumbnail(isAuto = false) {
+  if (!videoPlayer || videoPlayer.readyState < 2) {
+    if (!isAuto) showToast("Video chưa tải xong khung hình để chụp.", "error");
+    return;
+  }
+
+  try {
+    const canvas = document.createElement("canvas");
+    canvas.width = videoPlayer.videoWidth || 720;
+    canvas.height = videoPlayer.videoHeight || 1280;
+    const ctx = canvas.getContext("2d");
+    ctx.drawImage(videoPlayer, 0, 0, canvas.width, canvas.height);
+
+    canvas.toBlob(
+      (blob) => {
+        if (!blob) return;
+        selectedThumbnailFile = new File([blob], "thumbnail.jpg", { type: "image/jpeg" });
+        thumbPreviewImage.src = URL.createObjectURL(blob);
+        thumbSourceBadge.textContent = isAuto ? "Tự động từ video" : `Khung hình (${Math.round(videoPlayer.currentTime)}s)`;
+        thumbFileName.textContent = "Đã trích xuất từ khung hình video";
+        hideThumbError();
+        if (!isAuto) showToast("Đã chụp khung hình làm ảnh bìa!", "success");
+      },
+      "image/jpeg",
+      0.9
+    );
+  } catch (e) {
+    console.error("Lỗi trích xuất khung hình:", e);
+  }
+}
+
+// ---------- CHỌN ẢNH BÌA TỪ MÁY TÍNH ----------
+function handleThumbnailSelection(file) {
+  hideThumbError();
+  if (!file) return;
+
+  const name = file.name.toLowerCase();
+  const hasValidExt = ALLOWED_IMAGE_EXTS.some((ext) => name.endsWith(ext));
+  const hasValidType = file.type ? ALLOWED_IMAGE_TYPES.includes(file.type) : hasValidExt;
+
+  if (!hasValidExt && !hasValidType) {
+    showThumbError("Ảnh bìa phải có định dạng JPG, PNG hoặc WebP.");
+    thumbFileInput.value = "";
+    return;
+  }
+
+  if (file.size > MAX_IMAGE_BYTES) {
+    showThumbError(`Dung lượng ảnh bìa vượt quá 50MB (${formatBytes(file.size)}).`);
+    thumbFileInput.value = "";
+    return;
+  }
+
+  selectedThumbnailFile = file;
+  thumbPreviewImage.src = URL.createObjectURL(file);
+  thumbSourceBadge.textContent = "Ảnh tùy chỉnh";
+  thumbFileName.textContent = file.name;
+}
+
+// ---------- QUẢN LÝ HASHTAGS ----------
+function addHashtag(tag) {
+  if (!tag) return;
+  // Bỏ khoảng trắng, dấu # nếu có
+  let clean = tag.trim().replace(/^#+/, "").toLowerCase();
+  // Chỉ lấy chữ cái tiếng Việt/Anh, số và gạch dưới
+  clean = clean.replace(/[^a-zA-Z0-9_\u00C0-\u1EF9]/g, "");
+
+  if (!clean) return;
+  if (selectedHashtags.size >= 10) {
+    showToast("Tối đa 10 hashtag cho mỗi video.", "error");
+    return;
+  }
+
+  selectedHashtags.add(clean);
+  renderHashtags();
+  inputHashtag.value = "";
+}
+
+function removeHashtag(tag) {
+  selectedHashtags.delete(tag);
+  renderHashtags();
+}
+
+function renderHashtags() {
+  hashtagsContainer.innerHTML = "";
+  selectedHashtags.forEach((tag) => {
+    const item = document.createElement("span");
+    item.className = "selected-tag-item";
+    item.innerHTML = `
+      #${escapeHtml(tag)}
+      <button type="button" class="btn-remove-tag" data-tag="${escapeHtml(tag)}" title="Xóa">&times;</button>
+    `;
+    hashtagsContainer.appendChild(item);
+  });
+}
+
+// ---------- TIẾN TRÌNH UPLOAD ----------
+function setUploadProgress(percent, label) {
+  progressContainer.style.display = "block";
+  progressFill.style.width = `${percent}%`;
+  progressPercent.textContent = `${percent}%`;
+  progressStatus.textContent = label || `Đang tải lên... ${percent}%`;
+}
+
+function hideUploadProgress() {
+  progressContainer.style.display = "none";
+  progressFill.style.width = "0%";
+  progressPercent.textContent = "0%";
+}
+
+// ---------- SUBMIT ĐĂNG VIDEO ----------
+async function handleSubmitUpload(e) {
+  e.preventDefault();
+  hideServerError();
+  hideVideoError();
+  hideThumbError();
+
+  if (isUploading) return;
+
+  // 1. Kiểm tra video
+  if (!selectedVideoFile) {
+    showVideoError("Vui lòng chọn hoặc kéo thả tệp video trước khi đăng.");
+    dropzone.scrollIntoView({ behavior: "smooth" });
+    return;
+  }
+
+  // 2. Kiểm tra ảnh bìa
+  if (!selectedThumbnailFile) {
+    // Nếu chưa có, cố gắng capture frame lần nữa
+    captureFrameToThumbnail(true);
+    if (!selectedThumbnailFile) {
+      showThumbError("Vui lòng chọn hoặc chụp ảnh bìa cho video.");
+      return;
+    }
+  }
+
+  // 3. Kiểm tra tiêu đề
+  const title = inputTitle.value.trim();
+  if (!title) {
+    showServerError("Tiêu đề video không được để trống.");
+    inputTitle.focus();
+    return;
+  }
+
+  // 4. Ghép mô tả và hashtags
+  let finalDescription = inputDesc.value.trim();
+  if (selectedHashtags.size > 0) {
+    const tagsString = Array.from(selectedHashtags)
+      .map((t) => `#${t}`)
+      .join(" ");
+    finalDescription = finalDescription ? `${finalDescription}\n\n${tagsString}` : tagsString;
+  }
+
+  // 5. Chuẩn bị FormData
+  const formData = new FormData();
+  formData.append("title", title);
+  formData.append("video", selectedVideoFile);
+  formData.append("thumbnail", selectedThumbnailFile);
+  if (finalDescription) {
+    formData.append("description", finalDescription);
+  }
+
+  // 6. Bắt đầu tải lên
+  try {
+    isUploading = true;
+    btnSubmit.disabled = true;
+    btnSubmit.textContent = "⏳ Đang đăng video...";
+    setUploadProgress(0, "Đang chuẩn bị tải video lên máy chủ...");
+
+    const res = await api.upload("/videos", formData, {
+      onUploadProgress: (progressEvent) => {
+        if (progressEvent.total) {
+          const percent = Math.round((progressEvent.loaded * 100) / progressEvent.total);
+          if (percent < 100) {
+            setUploadProgress(percent, `Đang tải lên dữ liệu... ${percent}%`);
+          } else {
+            setUploadProgress(100, "Đang xử lý định dạng video trên máy chủ...");
+          }
+        }
+      },
+    });
+
+    setUploadProgress(100, "✅ Đăng tải thành công!");
+    showToast("Đăng video thành công!", "success");
+
+    // Chuyển hướng sau 1.2s đến trang video vừa đăng hoặc về Feed
+    setTimeout(() => {
+      if (res && res.id) {
+        window.location.href = `video.html?id=${res.id}`;
+      } else {
+        window.location.href = "feed.html";
+      }
+    }, 1200);
+  } catch (err) {
+    console.error("Lỗi upload video:", err);
+    hideUploadProgress();
+    isUploading = false;
+    btnSubmit.disabled = false;
+    btnSubmit.textContent = "🚀 Đăng video ngay";
+
+    // Phân tích lỗi cụ thể
+    if (err.status === 413) {
+      showServerError("Dung lượng tệp quá lớn vượt giới hạn cho phép của máy chủ (tối đa 50MB).");
+    } else if (err.status === 422) {
+      showServerError(`Dữ liệu không hợp lệ: ${err.message}`);
+    } else if (err.status === 401) {
+      showServerError("Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại để đăng video.");
+    } else {
+      showServerError(err.message || "Có lỗi xảy ra khi tải video lên. Vui lòng thử lại.");
+    }
+  }
+}
+
+// ---------- GẮN SỰ KIỆN KHỞI TẠO ----------
+function initEvents() {
+  // Dropzone drag & drop
+  dropzone.addEventListener("click", () => videoFileInput.click());
+
+  dropzone.addEventListener("dragover", (e) => {
+    e.preventDefault();
+    dropzone.classList.add("drag-over");
+  });
+
+  dropzone.addEventListener("dragleave", () => {
+    dropzone.classList.remove("drag-over");
+  });
+
+  dropzone.addEventListener("drop", (e) => {
+    e.preventDefault();
+    dropzone.classList.remove("drag-over");
+    const files = e.dataTransfer.files;
+    if (files && files.length > 0) {
+      handleVideoSelection(files[0]);
+    }
+  });
+
+  videoFileInput.addEventListener("change", (e) => {
+    if (e.target.files && e.target.files.length > 0) {
+      handleVideoSelection(e.target.files[0]);
+    }
+  });
+
+  btnReselectVideo.addEventListener("click", () => {
+    resetVideoSelection();
+    videoFileInput.click();
+  });
+
+  // Chụp frame làm ảnh bìa
+  btnCaptureFrame.addEventListener("click", () => captureFrameToThumbnail(false));
+
+  // Tải ảnh bìa tùy chỉnh
+  thumbFileInput.addEventListener("change", (e) => {
+    if (e.target.files && e.target.files.length > 0) {
+      handleThumbnailSelection(e.target.files[0]);
+    }
+  });
+
+  // Đếm ký tự tiêu đề & mô tả
+  inputTitle.addEventListener("input", () => {
+    titleCharCounter.textContent = `${inputTitle.value.length} / 255`;
+  });
+
+  inputDesc.addEventListener("input", () => {
+    descCharCounter.textContent = `${inputDesc.value.length} / 1000`;
+  });
+
+  // Thêm hashtag
+  btnAddHashtag.addEventListener("click", () => addHashtag(inputHashtag.value));
+
+  inputHashtag.addEventListener("keydown", (e) => {
+    if (e.key === "Enter") {
+      e.preventDefault();
+      addHashtag(inputHashtag.value);
+    }
+  });
+
+  tagPills.forEach((pill) => {
+    pill.addEventListener("click", () => {
+      addHashtag(pill.dataset.tag);
+    });
+  });
+
+  hashtagsContainer.addEventListener("click", (e) => {
+    if (e.target.classList.contains("btn-remove-tag")) {
+      removeHashtag(e.target.dataset.tag);
+    }
+  });
+
+  // Submit form
+  formUpload.addEventListener("submit", handleSubmitUpload);
+}
+
+// Chạy khởi tạo khi trang đã sẵn sàng
+document.addEventListener("DOMContentLoaded", () => {
+  initEvents();
+});

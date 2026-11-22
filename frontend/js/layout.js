@@ -14,6 +14,7 @@ const MENU = [
   { href: "pages/shop-public.html", label: "🏪 Cửa hàng", access: "all" },
   { href: "pages/cart.html", label: "🛒 Giỏ hàng", access: "auth" },
   { href: "pages/upload.html", label: "➕ Đăng video", access: "auth", id: "upload" },
+  { href: "pages/my-videos.html", label: "🎬 Video của tôi", access: "auth", id: "my-videos" },
   { href: "pages/profile.html", label: "👤 Hồ sơ cá nhân", access: "auth", id: "profile" },
   { href: "pages/seller-register.html", label: "📝 Đăng ký bán", access: "auth" },
   { href: "pages/seller.html", label: "🧾 Seller Center", access: "role:SELLER" },

@@ -1,0 +1,142 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Quản lý video của tôi | ClipShop AI</title>
+  <link rel="icon" href="../assets/images/logo.svg">
+  <link rel="stylesheet" href="../css/style.css">
+</head>
+<body data-root="../" data-auth="required">
+  <header id="app-header"></header>
+
+  <main class="container my-videos-page-wrap">
+    <!-- Thanh điều hướng và tiêu đề -->
+    <div class="my-videos-top-bar">
+      <div>
+        <h1 class="my-videos-title">🎬 Quản lý video của tôi</h1>
+        <p class="muted">Xem danh sách, sửa mô tả, ẩn hoặc xoá video bạn đã đăng tải.</p>
+      </div>
+      <div class="my-videos-top-actions">
+        <a href="profile.html" class="btn btn-small">👤 Về trang hồ sơ</a>
+        <a href="upload.html" class="btn btn-primary btn-small">➕ Đăng video mới</a>
+      </div>
+    </div>
+
+    <!-- Khung thống kê nhanh -->
+    <div class="manage-stats-grid">
+      <div class="manage-stat-box">
+        <span class="stat-box-num" id="stat-total-count">0</span>
+        <span class="stat-box-label">Tổng video</span>
+      </div>
+      <div class="manage-stat-box stat-box-success">
+        <span class="stat-box-num" id="stat-visible-count">0</span>
+        <span class="stat-box-label">🟢 Đang hiển thị</span>
+      </div>
+      <div class="manage-stat-box stat-box-warning">
+        <span class="stat-box-num" id="stat-hidden-count">0</span>
+        <span class="stat-box-label">🟡 Đang ẩn</span>
+      </div>
+      <div class="manage-stat-box">
+        <span class="stat-box-num" id="stat-views-count">0</span>
+        <span class="stat-box-label">👁️ Tổng lượt xem</span>
+      </div>
+    </div>
+
+    <!-- Thanh công cụ: Lọc theo tab & Tìm kiếm -->
+    <div class="card manage-toolbar-card">
+      <div class="manage-toolbar-inner">
+        <div class="manage-tabs" id="status-tabs">
+          <button type="button" class="manage-tab-btn active" data-filter="ALL">Tất cả (<span id="tab-all-num">0</span>)</button>
+          <button type="button" class="manage-tab-btn" data-filter="VISIBLE">Đang hiển thị (<span id="tab-visible-num">0</span>)</button>
+          <button type="button" class="manage-tab-btn" data-filter="HIDDEN">Đang ẩn (<span id="tab-hidden-num">0</span>)</button>
+        </div>
+        <div class="manage-search-box">
+          <input type="text" id="input-search-video" placeholder="🔍 Tìm kiếm theo tiêu đề...">
+        </div>
+      </div>
+    </div>
+
+    <!-- Trạng thái đang tải -->
+    <div id="manage-loading" class="card" style="text-align:center;padding:48px 16px;">
+      <div style="font-size:28px;margin-bottom:8px;">⏳</div>
+      <div class="muted">Đang tải danh sách video của bạn...</div>
+    </div>
+
+    <!-- Thông báo khi chưa có video nào -->
+    <div id="manage-empty-notice" class="card manage-empty-card" style="display:none;">
+      <div class="empty-icon">📹</div>
+      <h3>Chưa có video nào</h3>
+      <p class="muted">Bạn chưa đăng tải video nào hoặc không có video phù hợp với bộ lọc.</p>
+      <a href="upload.html" class="btn btn-primary" style="margin-top:12px;">🚀 Đăng video ngay</a>
+    </div>
+
+    <!-- Danh sách video dạng bảng / card quản lý -->
+    <div id="manage-videos-list-container" class="manage-videos-list" style="display:none;">
+      <!-- Các dòng video được render động bằng JS -->
+    </div>
+  </main>
+
+  <!-- Modal sửa mô tả video (Yêu cầu đề bài) -->
+  <div id="modal-edit-desc" class="modal-backdrop" style="display:none;">
+    <div class="modal-dialog">
+      <div class="modal-header">
+        <h3 class="modal-title">✏️ Sửa mô tả video</h3>
+        <button type="button" class="btn-close-modal" id="btn-close-edit-modal">&times;</button>
+      </div>
+      <div class="modal-body">
+        <div class="modal-video-title-preview" id="edit-video-title-text">Tiêu đề video</div>
+        <div class="label-row" style="margin-top:12px;">
+          <label for="edit-desc-textarea">Nội dung mô tả mới</label>
+          <span id="edit-desc-counter" class="char-counter">0 / 1000</span>
+        </div>
+        <textarea
+          id="edit-desc-textarea"
+          rows="4"
+          maxlength="1000"
+          placeholder="Nhập mô tả video và hashtag..."
+        ></textarea>
+        <div id="edit-desc-error" class="upload-error-banner" style="display:none;margin-top:8px;"></div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn" id="btn-cancel-edit">Hủy</button>
+        <button type="button" class="btn btn-primary" id="btn-save-desc">💾 Lưu thay đổi</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal xác nhận xóa video (Yêu cầu đề bài) -->
+  <div id="modal-confirm-delete" class="modal-backdrop" style="display:none;">
+    <div class="modal-dialog modal-dialog-sm">
+      <div class="modal-header">
+        <h3 class="modal-title text-danger">🗑️ Xác nhận xóa video</h3>
+        <button type="button" class="btn-close-modal" id="btn-close-delete-modal">&times;</button>
+      </div>
+      <div class="modal-body">
+        <p>Bạn có chắc chắn muốn xóa vĩnh viễn video này không?</p>
+        <p class="muted" style="font-size:13px;margin-top:4px;">
+          Tên video: <strong id="delete-video-title-text">-</strong>
+        </p>
+        <p class="text-danger" style="font-size:12px;margin-top:8px;">
+          ⚠️ Thao tác này sẽ xóa tệp video và không thể khôi phục!
+        </p>
+        <div id="delete-video-error" class="upload-error-banner" style="display:none;margin-top:8px;"></div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn" id="btn-cancel-delete">Hủy</button>
+        <button type="button" class="btn btn-danger" id="btn-confirm-delete">Xác nhận xóa</button>
+      </div>
+    </div>
+  </div>
+
+  <footer id="app-footer"></footer>
+
+  <!-- Scripts -->
+  <script src="https://cdn.jsdelivr.net/npm/axios@1.7.9/dist/axios.min.js"></script>
+  <script src="../js/config.js"></script>
+  <script src="../js/api.js"></script>
+  <script src="../js/utils.js"></script>
+  <script src="../js/layout.js"></script>
+  <script src="../js/pages/my-videos.js"></script>
+</body>
+</html>

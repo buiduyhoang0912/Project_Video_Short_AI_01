@@ -180,36 +180,44 @@ function updateFollowButtonUI(isFollowing) {
 }
 
 // ---------- RENDER DANH SÁCH VIDEO CỦA USER ----------
+// ---------- RENDER DANH SÁCH LƯỚI VIDEO (TASK T3D226A) ----------
 function renderUserVideos(videos) {
   const gridEl = document.getElementById("profile-videos-grid");
   const emptyEl = document.getElementById("profile-videos-empty");
 
+  if (!gridEl) return;
   gridEl.innerHTML = "";
 
   if (!videos || videos.length === 0) {
-    emptyEl.style.display = "block";
+    if (emptyEl) emptyEl.style.display = "block";
     return;
   }
 
-  emptyEl.style.display = "none";
+  if (emptyEl) emptyEl.style.display = "none";
 
   videos.forEach((v) => {
     const item = document.createElement("div");
     item.className = "profile-video-thumb-card";
+    item.setAttribute("title", v.title || "Video ngắn");
 
-    let thumbSrc = v.thumbnail_url;
+    let thumbSrc = v.thumbnail_url || "";
     if (thumbSrc && thumbSrc.startsWith("/uploads/")) {
       thumbSrc = `${CONFIG.API_BASE_URL.replace("/api", "")}${thumbSrc}`;
+    } else if (!thumbSrc) {
+      thumbSrc = "../assets/images/logo.svg";
     }
 
+    const viewsFormatted = Number(v.view_count || 0).toLocaleString("vi-VN");
+
     item.innerHTML = `
-      ${thumbSrc ? `<img src="${thumbSrc}" alt="${v.title}" onerror="this.style.display='none'">` : ""}
+      <img src="${escapeHtml(thumbSrc)}" alt="${escapeHtml(v.title || "")}" loading="lazy" onerror="this.src='../assets/images/logo.svg'">
       <div class="profile-video-thumb-overlay">
-        <span>▶</span>
-        <span>${v.view_count || 0}</span>
+        <span class="video-views-badge">▶ ${viewsFormatted}</span>
       </div>
+      <div class="profile-video-title-hover">${escapeHtml(v.title || "")}</div>
     `;
 
+    // Bấm mở trang xem video (Yêu cầu đề bài)
     item.addEventListener("click", () => {
       window.location.href = `video.html?id=${v.id}`;
     });

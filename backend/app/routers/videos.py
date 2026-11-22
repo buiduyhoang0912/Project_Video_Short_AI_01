@@ -8,6 +8,7 @@ from fastapi import APIRouter, Depends, File, Form, HTTPException, Query, Respon
 from sqlalchemy.orm import Session
 
 from app.core.video_auth import get_video_user
+from app.dependencies.auth import get_optional_user
 from app.core.video_media import (
     UploadTooLargeError,
     prepare_thumbnail_upload,
@@ -204,15 +205,21 @@ def get_user_video_list(
     user_id: int,
     limit: int = Query(10, ge=1, le=50, description="Số lượng video mỗi lần tải (1 - 50)"),
     cursor: int | None = Query(None, description="ID video cuối cùng ở lần tải trước"),
+    include_hidden: bool = Query(False, description="Lấy cả video đang ẩn (nếu là chủ sở hữu hoặc admin)"),
+    user: User | None = Depends(get_optional_user),
     db: Session = Depends(get_db),
 ):
     """
-    API Danh sách video công khai của một người dùng:
+    API Danh sách video của một người dùng:
     - Lọc theo `user_id`.
-    - Bỏ qua video HIDDEN.
+    - Nếu include_hidden=True và là chủ sở hữu thì trả về cả video HIDDEN.
     """
+    is_owner = user is not None and user.id == user_id
+    is_admin = user is not None and getattr(user, "role", "USER") == "ADMIN"
+    allow_hidden = (is_owner or is_admin) and include_hidden
+
     items, next_cursor, has_more = get_user_videos(
-        db=db, user_id=user_id, limit=limit, cursor=cursor
+        db=db, user_id=user_id, limit=limit, cursor=cursor, include_hidden=allow_hidden
     )
 
     return UserVideoListResponse(

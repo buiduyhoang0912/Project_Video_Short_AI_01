@@ -161,6 +161,7 @@ def change_my_shop_order_status(
 
 
 @router.post("/me/orders/{order_id}/confirm", response_model=OrderResponse)
+@router.post("/me/orders/{order_id}/confirm-payment", response_model=OrderResponse, summary="Người bán xác nhận đã nhận tiền chuyển khoản QR VietQR")
 def confirm_my_shop_order(
     order_id: int,
     user: User = Depends(get_current_user),
@@ -168,6 +169,7 @@ def confirm_my_shop_order(
 ):
     shop = _get_owned_shop_or_404(db, user)
     return shop_crud.update_shop_order_status(db, shop, order_id, "confirmed")
+
 
 
 @router.post("/me/orders/{order_id}/ship", response_model=OrderResponse)

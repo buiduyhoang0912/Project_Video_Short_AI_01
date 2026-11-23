@@ -9,7 +9,7 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(
-        env_file=".env",
+        env_file=(".env", "backend/.env"),
         env_file_encoding="utf-8",
         extra="ignore",
     )
@@ -41,6 +41,14 @@ class Settings(BaseSettings):
     AI_PROVIDER: str = "auto"
     AI_TIMEOUT_SECONDS: float = 15.0
     AI_DAILY_QUESTION_LIMIT: int = 20
+
+    # Cấu hình lưu trữ tệp tin: Local hoặc Cloudflare R2 (Task T3D2BC7)
+    STORAGE_DRIVER: str = "local"
+    R2_ACCOUNT_ID: str = ""
+    R2_ACCESS_KEY_ID: str = ""
+    R2_SECRET_ACCESS_KEY: str = ""
+    R2_BUCKET: str = ""
+    R2_PUBLIC_URL: str = ""
 
     @property
     def database_url(self) -> str:

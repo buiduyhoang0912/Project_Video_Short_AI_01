@@ -40,6 +40,16 @@ class OrderItemResponse(BaseModel):
     line_total: float | None = None
 
 
+class OrderStatusTimeline(BaseModel):
+    """Một mốc trên dòng thời gian trạng thái đơn hàng."""
+    status_code: str
+    title: str
+    description: str
+    timestamp: datetime | None = None
+    is_current: bool = False
+    is_completed: bool = False
+
+
 class OrderResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
@@ -59,12 +69,20 @@ class OrderResponse(BaseModel):
     subtotal_amount: float | None = None
     discount_amount: float = 0.0
     voucher_code: str | None = None
+    timeline: list[OrderStatusTimeline] = []
     # VietQR payment fields (T3D2C15)
     payment_status: str = "UNPAID"
     vietqr_url: str | None = None
     bank_name: str | None = None
     bank_account_number: str | None = None
     bank_account_holder: str | None = None
+
+
+class OrderCancelResponse(BaseModel):
+    message: str
+    order_id: int
+    status: str
+    restocked_items_count: int
 
 
 

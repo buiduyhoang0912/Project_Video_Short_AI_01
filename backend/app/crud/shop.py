@@ -160,6 +160,19 @@ def _serialize_order(o: Order, shop_name: str) -> OrderResponse:
         )
         for it in o.items
     ]
+    is_bank = (o.payment_method or "").upper() in ("BANK_TRANSFER", "QR_TRANSFER")
+    vietqr_url = None
+    b_name = None
+    b_num = None
+    b_holder = None
+    if is_bank and o.shop:
+        b_name = o.shop.bank_name or "MB"
+        b_num = o.shop.bank_account_number or "0987654321"
+        b_holder = o.shop.bank_account_holder or shop_name.upper()
+        if hasattr(o.shop, "generate_vietqr_url"):
+            vietqr_url = o.shop.generate_vietqr_url(float(o.total_amount), o.id)
+    pay_status = "PAID" if (o.status or "").lower() in ("confirmed", "shipping", "completed") else "UNPAID"
+
     return OrderResponse(
         id=o.id,
         buyer_id=o.buyer_id,
@@ -173,6 +186,11 @@ def _serialize_order(o: Order, shop_name: str) -> OrderResponse:
         recipient_address=o.recipient_address,
         created_at=o.created_at,
         items=item_resps,
+        payment_status=pay_status,
+        vietqr_url=vietqr_url,
+        bank_name=b_name,
+        bank_account_number=b_num,
+        bank_account_holder=b_holder,
     )
 
 

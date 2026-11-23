@@ -908,10 +908,12 @@ function renderOrderStepper(status) {
 
 function renderOrderActionButtons(order) {
   const st = (order.status || "pending").toLowerCase();
+  const isBank = (order.payment_method || "").toUpperCase() === "BANK_TRANSFER";
+
   if (st === "pending") {
     return `
       <button type="button" class="btn btn-small btn-primary" data-order-action="confirmed" data-order-id="${order.id}">
-        ✅ Xác nhận đơn
+        ${isBank ? "💰 Xác nhận đã nhận tiền (VietQR)" : "✅ Xác nhận đơn"}
       </button>
       <button type="button" class="btn btn-small btn-danger" data-order-action="cancelled" data-order-id="${order.id}">
         ❌ Huỷ đơn

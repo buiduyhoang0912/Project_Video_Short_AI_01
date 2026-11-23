@@ -307,18 +307,64 @@ if (checkoutForm) {
         voucher_codes: voucherCodes.length > 0 ? voucherCodes : null,
       });
 
+      const isBankTransfer = payMethodSelect.value === "BANK_TRANSFER";
       const discountMsg =
         res.total_discount > 0
           ? ` (Đã giảm ${formatMoney(res.total_discount)}, còn ${formatMoney(res.total_amount)})`
           : "";
       showToast(`🎉 Đặt hàng thành công!${discountMsg}`);
       appliedVouchersByShop = {};
+
+      // Hiển thị VietQR Modal nếu phương thức là chuyển khoản
+      if (isBankTransfer && res.orders && res.orders.length > 0) {
+        showVietQrModal(res.orders[0]);
+      }
+
       await Promise.all([loadCart(), loadMyOrders()]);
     } catch (error) {
       showToast(error.message, "error");
     } finally {
       submitCheckoutBtn.disabled = false;
     }
+  });
+}
+
+function showVietQrModal(order) {
+  const modal = document.getElementById("vietqr-modal");
+  if (!modal) return;
+
+  const qrImg = document.getElementById("vietqr-image");
+  const bankEl = document.getElementById("vietqr-bank-name");
+  const accNumEl = document.getElementById("vietqr-account-number");
+  const accHolderEl = document.getElementById("vietqr-account-holder");
+  const amountEl = document.getElementById("vietqr-amount");
+  const memoEl = document.getElementById("vietqr-memo");
+
+  const bankName = order.bank_name || "MB";
+  const accNumber = order.bank_account_number || "0987654321";
+  const accHolder = order.bank_account_holder || (order.shop_name ? order.shop_name.toUpperCase() : "SHOP");
+  const amount = Number(order.total_amount || 0);
+  const memo = `DH${order.id}`;
+
+  const qrUrl = order.vietqr_url || 
+    `https://img.vietqr.io/image/${bankName}-${accNumber}-compact2.png?amount=${Math.round(amount)}&addInfo=${encodeURIComponent(memo)}&accountName=${encodeURIComponent(accHolder)}`;
+
+  if (qrImg) qrImg.src = qrUrl;
+  if (bankEl) bankEl.textContent = bankName;
+  if (accNumEl) accNumEl.textContent = accNumber;
+  if (accHolderEl) accHolderEl.textContent = accHolder;
+  if (amountEl) amountEl.textContent = formatMoney(amount);
+  if (memoEl) memoEl.textContent = memo;
+
+  modal.style.display = "flex";
+}
+
+const btnCloseVietQr = document.getElementById("btn-close-vietqr");
+if (btnCloseVietQr) {
+  btnCloseVietQr.addEventListener("click", () => {
+    const modal = document.getElementById("vietqr-modal");
+    if (modal) modal.style.display = "none";
+    showToast("Cảm ơn bạn! Đơn hàng đang chờ người bán xác nhận thanh toán.");
   });
 }
 

@@ -59,6 +59,13 @@ class OrderResponse(BaseModel):
     subtotal_amount: float | None = None
     discount_amount: float = 0.0
     voucher_code: str | None = None
+    # VietQR payment fields (T3D2C15)
+    payment_status: str = "UNPAID"
+    vietqr_url: str | None = None
+    bank_name: str | None = None
+    bank_account_number: str | None = None
+    bank_account_holder: str | None = None
+
 
 
 class OrderCheckoutResponse(BaseModel):

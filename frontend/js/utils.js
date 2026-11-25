@@ -34,13 +34,18 @@ function formatDateTime(value) {
     d.toLocaleDateString("vi-VN");
 }
 
-// Hiện thông báo nhỏ ở góc màn hình. type: "success" | "error"
+// Hiện thông báo nhỏ ở góc trên phải màn hình (tránh đè nút Chat AI). type: "success" | "error"
 function showToast(message, type = "success") {
+  document.querySelectorAll(".toast").forEach((el) => el.remove());
   const toast = document.createElement("div");
   toast.className = `toast toast-${type}`;
   toast.textContent = message;
+  toast.style.top = "108px";
+  toast.style.right = "20px";
+  toast.style.bottom = "auto";
+  toast.style.zIndex = "9999";
   document.body.appendChild(toast);
-  setTimeout(() => toast.remove(), 3000);
+  setTimeout(() => toast.remove(), 3500);
 }
 
 

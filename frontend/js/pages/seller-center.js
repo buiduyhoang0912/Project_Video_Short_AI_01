@@ -109,9 +109,15 @@ async function checkSellerSession() {
     try {
       currentShop = await api.get("/shops/me");
     } catch (shopErr) {
-      // Chưa có cửa hàng: không tự cấp quyền/tạo shop; hướng dẫn người dùng.
-      showToast(shopErr.response?.data?.detail || "Tài khoản chưa có cửa hàng. Hãy đăng ký bán hàng và chờ Admin duyệt.", "error");
-      showAuthPanel();
+      // Đã là Seller nhưng chưa tạo Shop (404) -> giữ nguyên trạng thái đã đăng nhập và nhắc tạo Shop
+      const msg = shopErr.status === 404
+        ? "Bạn đã được duyệt làm Seller! Hãy bấm 'Đơn đăng ký & Hồ sơ Shop' ở trên để tạo Cửa hàng trước."
+        : (shopErr.message || "Tài khoản chưa có cửa hàng. Hãy đăng ký bán hàng và chờ Admin duyệt.");
+      showToast(msg, "error");
+      currentShop = null;
+      currentShopBadge.hidden = true;
+      shopSubtitle.innerHTML = `${escapeHtml(msg)} <a href="seller-register.html" style="color:#fff;text-decoration:underline;font-weight:700;">Tạo Shop ngay &rarr;</a>`;
+      authSection.hidden = true;
       return false;
     }
 
@@ -550,7 +556,12 @@ existingImagesGrid.addEventListener("click", async (event) => {
 productForm.addEventListener("submit", async (event) => {
   event.preventDefault();
   if (!currentShop) {
-    showToast("Vui lòng đăng nhập tài khoản Seller trước", "error");
+    showToast(
+      currentUser
+        ? "Bạn chưa hoàn thiện thông tin Cửa hàng! Vui lòng tạo Shop ở mục 'Đơn đăng ký & Hồ sơ Shop' trước."
+        : "Vui lòng đăng nhập tài khoản Seller trước",
+      "error"
+    );
     return;
   }
 
@@ -1412,7 +1423,12 @@ if (voucherForm) {
   voucherForm.addEventListener("submit", async (event) => {
     event.preventDefault();
     if (!currentShop) {
-      showToast("Vui lòng đăng nhập tài khoản Người bán trước.", "error");
+      showToast(
+        currentUser
+          ? "Bạn chưa hoàn thiện thông tin Cửa hàng! Vui lòng tạo Shop ở mục 'Đơn đăng ký & Hồ sơ Shop' trước."
+          : "Vui lòng đăng nhập tài khoản Người bán trước.",
+        "error"
+      );
       return;
     }
 

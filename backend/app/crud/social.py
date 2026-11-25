@@ -11,6 +11,7 @@ from sqlalchemy.orm import Session
 
 from app.core.avatar import avatar_url_from_key
 from app.core.config import settings
+from app.core.storage import resolve_media_url
 from app.models.category import Category
 from app.models.product import Product
 from app.models.product_image import ProductImage
@@ -313,8 +314,8 @@ def get_following_feed(
             "author_avatar_url": avatar_url_from_key(user.avatar_key),
             "title": video.title,
             "description": video.description,
-            "video_url": video.video_url,
-            "thumbnail_url": video.thumbnail_url,
+            "video_url": resolve_media_url(video.video_url),
+            "thumbnail_url": resolve_media_url(video.thumbnail_url),
             "duration_seconds": video.duration_seconds,
             "created_at": video.created_at,
             "like_count": likes_grouped.get(video.id, 0),
@@ -401,8 +402,8 @@ def get_public_feed(
             "author_avatar_url": avatar_url_from_key(user.avatar_key),
             "title": video.title,
             "description": video.description,
-            "video_url": video.video_url,
-            "thumbnail_url": video.thumbnail_url,
+            "video_url": resolve_media_url(video.video_url),
+            "thumbnail_url": resolve_media_url(video.thumbnail_url),
             "duration_seconds": video.duration_seconds,
             "created_at": video.created_at,
             "like_count": likes_grouped.get(video.id, 0),
@@ -517,8 +518,8 @@ def get_video_detail(
         "title": video.title,
         "description": video.description,
         "hashtags": tags,
-        "video_url": video.video_url,
-        "thumbnail_url": video.thumbnail_url,
+        "video_url": resolve_media_url(video.video_url),
+        "thumbnail_url": resolve_media_url(video.thumbnail_url),
         "duration_seconds": video.duration_seconds,
         "view_count": getattr(video, "view_count", 0) or 0,
         "status": "VISIBLE",
@@ -583,8 +584,8 @@ def get_user_profile(
             {
                 "id": v.id,
                 "title": v.title,
-                "thumbnail_url": v.thumbnail_url,
-                "video_url": v.video_url,
+                "thumbnail_url": resolve_media_url(v.thumbnail_url),
+                "video_url": resolve_media_url(v.video_url),
                 "view_count": getattr(v, "view_count", 0),
                 "created_at": v.created_at,
             }
@@ -698,8 +699,8 @@ def search_videos(
             "title": video.title,
             "description": video.description,
             "hashtags": tags,
-            "video_url": video.video_url,
-            "thumbnail_url": video.thumbnail_url,
+            "video_url": resolve_media_url(video.video_url),
+            "thumbnail_url": resolve_media_url(video.thumbnail_url),
             "duration_seconds": video.duration_seconds,
             "view_count": getattr(video, "view_count", 0),
             "created_at": video.created_at,

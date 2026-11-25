@@ -61,6 +61,21 @@ def ensure_schema_columns(db_engine) -> None:
                 "ALTER TABLE products ADD COLUMN moderated_at DATETIME NULL"
             )
 
+    if insp.has_table("shops"):
+        shop_cols = {c["name"] for c in insp.get_columns("shops")}
+        if "bank_name" not in shop_cols:
+            alter_stmts.append(
+                "ALTER TABLE shops ADD COLUMN bank_name VARCHAR(100) NULL"
+            )
+        if "bank_account_number" not in shop_cols:
+            alter_stmts.append(
+                "ALTER TABLE shops ADD COLUMN bank_account_number VARCHAR(50) NULL"
+            )
+        if "bank_account_holder" not in shop_cols:
+            alter_stmts.append(
+                "ALTER TABLE shops ADD COLUMN bank_account_holder VARCHAR(100) NULL"
+            )
+
     if insp.has_table("videos"):
         vid_cols = {c["name"] for c in insp.get_columns("videos")}
         if "moderation_reason" not in vid_cols:
@@ -115,6 +130,14 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+
+@app.middleware("http")
+async def disable_stale_frontend_cache(request: Request, call_next):
+    response = await call_next(request)
+    if request.url.path == "/" or request.url.path.endswith((".html", ".css", ".js")):
+        response.headers.setdefault("Cache-Control", "no-cache")
+    return response
 
 # Mọi API đều bắt đầu bằng /api. Thêm router mới thì include ở đây.
 app.include_router(health.router, prefix="/api")

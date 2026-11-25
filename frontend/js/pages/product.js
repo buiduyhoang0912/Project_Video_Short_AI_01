@@ -5,7 +5,7 @@
 (function () {
   'use strict';
 
-  const BASE_URL = (typeof CONFIG !== 'undefined' && CONFIG.API_BASE_URL) || '';
+  const BASE_URL = ((typeof CONFIG !== 'undefined' && (CONFIG.AUTH_BASE_URL || CONFIG.API_BASE_URL)) || '').replace(/\/api\/?$/, '');
 
   let product = null;
   let currentQty = 1;
@@ -29,7 +29,6 @@
   const shopNameEl   = document.getElementById('shop-name');
   const shopLinkEl   = document.getElementById('shop-link');
   const breadcrumb   = document.getElementById('breadcrumb-name');
-  const toastEl      = document.getElementById('toast');
 
   // ── Init ──────────────────────────────────────────────────────────────────
   async function init() {
@@ -164,7 +163,7 @@
     const token = getToken();
     if (!token) {
       showToast('Vui lòng đăng nhập để thêm vào giỏ hàng', 'error');
-      setTimeout(() => { window.location.href = 'login.html?redirect=' + encodeURIComponent(window.location.href); }, 1200);
+      setTimeout(() => { window.location.href = typeof loginUrl === 'function' ? loginUrl() : 'login.html?next=' + encodeURIComponent('pages/product.html' + window.location.search); }, 1200);
       return;
     }
 
@@ -213,12 +212,6 @@
   function formatPrice(price) {
     if (price == null) return '—';
     return new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(price);
-  }
-
-  function showToast(msg, type) {
-    toastEl.textContent = msg;
-    toastEl.className = 'toast show' + (type ? ' ' + type : '');
-    setTimeout(() => { toastEl.className = 'toast'; }, 2800);
   }
 
   function showError(msg) {

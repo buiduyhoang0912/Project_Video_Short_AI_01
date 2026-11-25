@@ -1,5 +1,6 @@
 from datetime import datetime
 from typing import Annotated, Literal
+from app.core.storage import resolve_media_url
 from app.schemas.product import ProductListItemOut
 
 from pydantic import AfterValidator, BaseModel, ConfigDict, Field, field_validator
@@ -55,6 +56,11 @@ class VideoRead(BaseModel):
     created_at: datetime
     product_ids: list[int]
 
+    @field_validator("video_url", "thumbnail_url", mode="after")
+    @classmethod
+    def resolve_r2_urls(cls, value: str | None) -> str | None:
+        return resolve_media_url(value)
+
 class VideoProductsUpdate(BaseModel):
     product_ids: list[int] = Field(default_factory=list, max_length=3)
 
@@ -87,6 +93,11 @@ class VideoItemOut(BaseModel):
     status: Literal["VISIBLE", "HIDDEN"] = "VISIBLE"
     created_at: datetime
     products: list[ProductListItemOut] = []
+
+    @field_validator("video_url", "thumbnail_url", mode="after")
+    @classmethod
+    def resolve_r2_urls(cls, value: str | None) -> str | None:
+        return resolve_media_url(value)
 
 
 class VideoFeedResponse(BaseModel):

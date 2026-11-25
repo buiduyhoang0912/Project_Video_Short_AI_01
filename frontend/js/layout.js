@@ -24,6 +24,12 @@ const MENU = [
 // TASK T3D2BAD: Biến lưu timer polling thông báo (phải khai báo trước khi renderLayout() chạy)
 let notifPollingTimer = null;
 
+function resolveRootPrefix() {
+  if (typeof getRootPrefix === "function") return getRootPrefix();
+  if (document.body && document.body.dataset.root) return document.body.dataset.root;
+  return window.location.pathname.includes("/pages/") ? "../" : "./";
+}
+
 function getCurrentUser() {
   return session.getUser();
 }
@@ -60,7 +66,7 @@ function roleLabel(role) {
 }
 
 function renderLayout() {
-  const root = document.body.dataset.root || "./";
+  const root = resolveRootPrefix();
   const user = session.getToken() ? session.getUser() : null;
 
   const links = MENU.filter((item) => canSee(item.access, user))
@@ -136,7 +142,7 @@ async function logout() {
     // token đã hết hạn/đã logout cũng coi như đăng xuất xong
   }
   session.clear();
-  const root = document.body.dataset.root || "./";
+  const root = resolveRootPrefix();
   window.location.href = `${root}pages/feed.html`;
 }
 
@@ -147,7 +153,7 @@ function showLoginModal() {
 
 // Trang đích sau khi đăng nhập: ưu tiên ?next=, nếu không thì theo role
 function pageAfterLogin(user) {
-  const root = document.body.dataset.root || "./";
+  const root = resolveRootPrefix();
   const next = new URLSearchParams(window.location.search).get("next");
   if (next && /^[\w\-\/]+\.html(\?[\w=&%\-]*)?$/.test(next)) return `${root}${next}`;
   if (user.role === "ADMIN") return `${root}pages/admin.html`;
@@ -157,7 +163,7 @@ function pageAfterLogin(user) {
 
 function showAccessDenied(message, user) {
   const main = document.querySelector("main");
-  const root = document.body.dataset.root || "./";
+  const root = resolveRootPrefix();
   if (main) {
     main.innerHTML = `
       <section class="card access-denied">
@@ -228,7 +234,7 @@ initAiChatbotWidget();
 function initAiChatbotWidget() {
   if (document.getElementById("ai-chatbot-widget")) return;
 
-  const root = document.body.dataset.root || "./";
+  const root = resolveRootPrefix();
   const widget = document.createElement("div");
   widget.id = "ai-chatbot-widget";
   widget.className = "ai-chatbot-widget";
@@ -615,6 +621,10 @@ function getNotifIcon(type) {
       return "👤";
     case "ORDER_STATUS":
       return "📦";
+    case "SELLER_APPROVED":
+      return "✅";
+    case "SELLER_REJECTED":
+      return "❌";
     default:
       return "🔔";
   }
@@ -651,7 +661,7 @@ async function loadNotificationsDropdown() {
       return;
     }
 
-    const root = document.body.dataset.root || "./";
+    const root = resolveRootPrefix();
     listEl.innerHTML = items
       .map((item) => {
         const icon = getNotifIcon(item.type);
@@ -708,6 +718,8 @@ async function handleNotificationClick(el, root) {
     window.location.href = `${root}pages/cart.html?order_id=${encodeURIComponent(orderId)}#order-${encodeURIComponent(orderId)}`;
   } else if (type === "FOLLOW" && actorUsername) {
     window.location.href = `${root}pages/profile.html?username=${encodeURIComponent(actorUsername)}`;
+  } else if (type === "SELLER_APPROVED" || type === "SELLER_REJECTED") {
+    window.location.href = `${root}pages/seller-register.html`;
   }
 }
 

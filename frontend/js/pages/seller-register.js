@@ -125,9 +125,15 @@ async function loadMyApplicationsAndShop() {
     myApplications = [];
   }
 
-  try {
-    myShop = await api.get("/shops/me");
-  } catch (_) {
+  const user = typeof session !== "undefined" ? session.getUser() : null;
+  const hasApprovedApp = Array.isArray(myApplications) && myApplications.some((a) => a.status === "APPROVED");
+  if ((user && user.role === "SELLER") || hasApprovedApp) {
+    try {
+      myShop = await api.get("/shops/me");
+    } catch (_) {
+      myShop = null;
+    }
+  } else {
     myShop = null;
   }
 

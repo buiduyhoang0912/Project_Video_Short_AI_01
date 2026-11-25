@@ -327,6 +327,16 @@ async function handleSubmitUpload(e) {
 
   if (isUploading) return;
 
+  // Kiểm tra đăng nhập
+  if (!session.getToken()) {
+    showServerError("Bạn chưa đăng nhập! Vui lòng đăng nhập tài khoản trước khi đăng tải video.");
+    showToast("Vui lòng đăng nhập để đăng video", "error");
+    setTimeout(() => {
+      window.location.href = typeof loginUrl === "function" ? loginUrl() : "login.html?next=pages/upload.html";
+    }, 1500);
+    return;
+  }
+
   // 1. Kiểm tra video
   if (!selectedVideoFile) {
     showVideoError("Vui lòng chọn hoặc kéo thả tệp video trước khi đăng.");
@@ -442,7 +452,7 @@ async function handleSubmitUpload(e) {
 async function checkSellerAndLoadProducts() {
   try {
     const user = session.getUser();
-    if (!user) return;
+    if (!user || user.role !== "SELLER") return;
 
     // Dùng API sản phẩm của module Người bán (Task T3D2296)
     const prods = await api.get("/shops/me/products");

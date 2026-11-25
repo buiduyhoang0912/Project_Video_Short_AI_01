@@ -6,6 +6,7 @@ from fastapi import HTTPException, status
 from sqlalchemy import or_, select
 from sqlalchemy.orm import Session, joinedload
 
+from app.core.storage import resolve_media_url
 from app.models.order import Order, OrderItem
 from app.models.product import Product
 from app.models.shop import Shop
@@ -124,8 +125,8 @@ def get_shop_videos(db: Session, shop: Shop) -> list[dict]:
                 "user_id": video.user_id,
                 "title": video.title,
                 "description": video.description,
-                "video_url": video.video_url,
-                "thumbnail_url": video.thumbnail_url,
+                "video_url": resolve_media_url(video.video_url),
+                "thumbnail_url": resolve_media_url(video.thumbnail_url),
                 "duration_seconds": video.duration_seconds,
                 "view_count": int(video.view_count or 0),
                 "status": video.status,

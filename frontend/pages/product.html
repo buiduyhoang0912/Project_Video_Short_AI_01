@@ -1,10 +1,10 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="vi">
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Chi tiết sản phẩm – ShortAI</title>
-  <link rel="stylesheet" href="../css/style.css" />
+  <link rel="stylesheet" href="../css/style.css?v=3" />
   <style>
     body { background: #f5f5f5; }
     .product-detail-page { max-width: 1100px; margin: 0 auto; padding: 20px 16px 40px; }
@@ -101,21 +101,10 @@
     .shop-info-link { font-size: 0.84rem; color: #6366f1; text-decoration: none; }
     .shop-info-link:hover { text-decoration: underline; }
 
-    /* Toast */
-    .toast {
-      position: fixed; bottom: 30px; left: 50%; transform: translateX(-50%);
-      background: #333; color: #fff; padding: 12px 28px; border-radius: 30px;
-      font-size: 0.95rem; z-index: 9999; opacity: 0;
-      transition: opacity 0.3s; pointer-events: none;
-    }
-    .toast.show { opacity: 1; }
-    .toast.success { background: #22c55e; }
-    .toast.error { background: #ef4444; }
   </style>
 </head>
-<body>
-  <div id="app-header"></div>
-  <div id="toast" class="toast"></div>
+<body data-root="../">
+  <header id="app-header"></header>
 
   <div class="product-detail-page">
     <div class="breadcrumb">
@@ -177,10 +166,13 @@
     </div>
   </div>
 
+  <footer id="app-footer"></footer>
+
+  <script src="https://cdn.jsdelivr.net/npm/axios@1.7.9/dist/axios.min.js"></script>
   <script src="../js/config.js"></script>
-  <script src="../js/api.js"></script>
-  <script src="../js/utils.js"></script>
-  <script src="../js/layout.js"></script>
-  <script src="../js/pages/product.js"></script>
+  <script src="../js/api.js?v=3"></script>
+  <script src="../js/utils.js?v=3"></script>
+  <script src="../js/layout.js?v=3"></script>
+  <script src="../js/pages/product.js?v=3"></script>
 </body>
 </html>

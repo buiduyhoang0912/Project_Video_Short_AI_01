@@ -182,3 +182,49 @@ def get_storage() -> BaseStorage:
             return LocalStorage()
 
     return LocalStorage()
+
+
+_r2_storage_cache: R2Storage | None = None
+_r2_cache_key: tuple[str, str, str, str, str] | None = None
+
+
+def resolve_media_url(url: str | None, expires_in: int = 3600) -> str | None:
+    """Chuyển đổi R2 public URL sang presigned URL để phát/hiển thị ổn định kể cả khi r2.dev chưa bật public."""
+    if not url or not isinstance(url, str):
+        return url
+
+    driver = (settings.STORAGE_DRIVER or "local").strip().lower()
+    public_base = (settings.R2_PUBLIC_URL or "").rstrip("/")
+    if driver != "r2" or not public_base or not url.startswith(public_base + "/"):
+        return url
+
+    if not (
+        settings.R2_ACCOUNT_ID
+        and settings.R2_ACCESS_KEY_ID
+        and settings.R2_SECRET_ACCESS_KEY
+        and settings.R2_BUCKET
+    ):
+        return url
+
+    global _r2_storage_cache, _r2_cache_key
+    current_key = (
+        settings.R2_ACCOUNT_ID,
+        settings.R2_ACCESS_KEY_ID,
+        settings.R2_SECRET_ACCESS_KEY,
+        settings.R2_BUCKET,
+        public_base,
+    )
+    if _r2_storage_cache is None or _r2_cache_key != current_key:
+        _r2_storage_cache = R2Storage()
+        _r2_cache_key = current_key
+
+    object_key = url[len(public_base) :].lstrip("/")
+    try:
+        return _r2_storage_cache.client.generate_presigned_url(
+            "get_object",
+            Params={"Bucket": _r2_storage_cache.bucket, "Key": object_key},
+            ExpiresIn=expires_in,
+        )
+    except Exception as err:
+        logger.warning("Không tạo được presigned URL cho %s: %s", object_key, err)
+        return url

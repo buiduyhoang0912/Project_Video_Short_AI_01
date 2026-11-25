@@ -5,7 +5,7 @@
 (function () {
   'use strict';
 
-  const BASE_URL = (typeof CONFIG !== 'undefined' && CONFIG.API_BASE_URL) || '';
+  const BASE_URL = ((typeof CONFIG !== 'undefined' && (CONFIG.AUTH_BASE_URL || CONFIG.API_BASE_URL)) || '').replace(/\/api\/?$/, '');
   const PAGE_SIZE = 12;
 
   let currentPage = 1;
@@ -118,7 +118,7 @@
       const imgUrl = getProductThumb(p);
       const price  = formatPrice(p.price);
       const sold   = p.sold_count || 0;
-      const shopName = (p.shop && p.shop.name) ? p.shop.name : '';
+      const shopName = p.shop_name || (p.shop && p.shop.name) || '';
       return `
         <a class="product-card" href="product.html?id=${p.id}">
           <img src="${imgUrl}" alt="${escHtml(p.name)}"

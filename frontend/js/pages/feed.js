@@ -784,19 +784,7 @@ function formatTimeAgo(dateString) {
   return `${Math.floor(diffSec / 86400)} ngày trước`;
 }
 
-function showToast(message, type = "success") {
-  const existing = document.querySelector(".toast");
-  if (existing) existing.remove();
-
-  const toast = document.createElement("div");
-  toast.className = `toast toast-${type}`;
-  toast.innerText = message;
-  document.body.appendChild(toast);
-
-  setTimeout(() => {
-    toast.remove();
-  }, 3000);
-}
+// Dùng showToast chung từ utils.js (góc trên phải, z-index: 9999)
 
 // ---------- 10. HÀM HỖ TRỢ TASK T3D2282 (BẬT/TẮT TIẾNG & TẢI THÊM KHI GẦN CUỐI) ----------
 

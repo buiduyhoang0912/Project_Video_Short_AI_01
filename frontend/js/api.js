@@ -71,9 +71,17 @@ function getErrorMessage(data, status) {
   return `Lỗi ${status}`;
 }
 
+// Tiền tố đường dẫn về thư mục gốc frontend ("../" nếu đang ở /pages/, "./" nếu ở gốc)
+function getRootPrefix() {
+  if (document.body && document.body.dataset.root) {
+    return document.body.dataset.root;
+  }
+  return window.location.pathname.includes("/pages/") ? "../" : "./";
+}
+
 // Đường dẫn trang đăng nhập (tính theo vị trí trang hiện tại) + trang đang mở để quay lại
 function loginUrl(extra = "") {
-  const root = document.body.dataset.root || "./";
+  const root = getRootPrefix();
   // trang trong /pages/ (root = "../") thì login.html nằm cùng thư mục; trang gốc thì vào pages/
   const path = window.location.pathname;
   const rel = path.includes("/pages/") ? "pages/" + path.split("/pages/")[1] : path.split("/").pop();

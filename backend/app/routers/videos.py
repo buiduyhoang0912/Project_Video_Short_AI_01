@@ -8,6 +8,7 @@ from tempfile import TemporaryDirectory
 from fastapi import APIRouter, Depends, File, Form, HTTPException, Query, Response, UploadFile
 from sqlalchemy.orm import Session
 
+from app.core.storage import resolve_media_url
 from app.core.video_auth import get_video_user
 from app.dependencies.auth import get_current_user, get_optional_user
 from app.core.video_media import (
@@ -151,8 +152,8 @@ def create_video(
 
             return {
                 "id": record.id,
-                "video_url": record.video_url,
-                "thumbnail_url": record.thumbnail_url,
+                "video_url": resolve_media_url(record.video_url),
+                "thumbnail_url": resolve_media_url(record.thumbnail_url),
                 "duration_seconds": record.duration_seconds,
             }
 

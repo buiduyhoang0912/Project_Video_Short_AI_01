@@ -3,6 +3,7 @@
 from sqlalchemy import or_, select
 from sqlalchemy.orm import Session
 
+from app.crud.notification import create_notification
 from app.models.seller_application import SellerApplication
 from app.models.user import User, utc_now
 
@@ -55,6 +56,13 @@ def approve_application(db: Session, application_id: int, admin_id: int):
         application.reviewed_at = utc_now()
         if applicant.role == "USER":
             applicant.role = "SELLER"
+        create_notification(
+            db,
+            recipient_id=applicant.id,
+            actor_id=admin_id,
+            type="SELLER_APPROVED",
+            content=f"Đơn đăng ký bán hàng '{application.proposed_shop_name}' của bạn đã được duyệt! Hãy tạo cửa hàng ngay.",
+        )
         db.commit()
     except Exception:
         db.rollback()
@@ -69,6 +77,13 @@ def reject_application(db: Session, application_id: int, admin_id: int, reason: 
         application.rejection_reason = reason
         application.reviewed_by = admin_id
         application.reviewed_at = utc_now()
+        create_notification(
+            db,
+            recipient_id=application.user_id,
+            actor_id=admin_id,
+            type="SELLER_REJECTED",
+            content=f"Đơn đăng ký bán hàng '{application.proposed_shop_name}' bị từ chối. Lý do: {reason}",
+        )
         db.commit()
     except Exception:
         db.rollback()

@@ -226,16 +226,4 @@ function renderUserVideos(videos) {
   });
 }
 
-function showToast(message, type = "success") {
-  const existing = document.querySelector(".toast");
-  if (existing) existing.remove();
-
-  const toast = document.createElement("div");
-  toast.className = `toast toast-${type}`;
-  toast.innerText = message;
-  document.body.appendChild(toast);
-
-  setTimeout(() => {
-    toast.remove();
-  }, 3000);
-}
+// Dùng showToast chung từ utils.js (góc trên phải, z-index: 9999)

@@ -16,6 +16,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session, joinedload
 
 from app.crud import voucher as voucher_crud
+from app.crud.notification import create_notification
 from app.models.cart import Cart, CartItem
 from app.models.order import Address, Order, OrderItem
 from app.models.product import Product
@@ -214,6 +215,20 @@ def create_orders_from_cart(
         for it in items_to_order:
             db.delete(it)
 
+        # Tạo thông báo đơn hàng mới cho từng chủ shop
+        for o in created_orders:
+            shop_for_notif = db.get(Shop, o.shop_id)
+            if shop_for_notif and shop_for_notif.owner_id:
+                amount_str = f"{int(o.total_amount):,}".replace(",", ".")
+                create_notification(
+                    db,
+                    recipient_id=shop_for_notif.owner_id,
+                    actor_id=user_id,
+                    type="ORDER_NEW",
+                    content=f"Bạn có đơn hàng mới #{o.id} ({amount_str} ₫)",
+                    order_id=o.id,
+                )
+
         # Commit toàn bộ transaction nếu không có lỗi
         db.commit()
 
@@ -246,7 +261,7 @@ def create_orders_from_cart(
                 )
             )
 
-        qr_info = _extract_vietqr_info(o, shop_record)
+        qr_info = _extract_vietqr_info(o, shop_obj)
         order_responses.append(
             OrderResponse(
                 id=o.id,
@@ -524,6 +539,16 @@ def cancel_order(db: Session, user_id: int, order_id: int) -> OrderCancelRespons
                     product.sold_count = 0
 
     order.status = "CANCELLED"
+    shop_for_notif = db.get(Shop, order.shop_id)
+    if shop_for_notif and shop_for_notif.owner_id:
+        create_notification(
+            db,
+            recipient_id=shop_for_notif.owner_id,
+            actor_id=user_id,
+            type="ORDER_CANCELLED",
+            content=f"Khách hàng đã hủy đơn hàng #{order.id}",
+            order_id=order.id,
+        )
     db.commit()
     db.refresh(order)
 

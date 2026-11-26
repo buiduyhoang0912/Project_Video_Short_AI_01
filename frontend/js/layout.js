@@ -621,10 +621,18 @@ function getNotifIcon(type) {
       return "👤";
     case "ORDER_STATUS":
       return "📦";
+    case "ORDER_NEW":
+      return "🛒";
+    case "ORDER_CANCELLED":
+      return "🚫";
     case "SELLER_APPROVED":
       return "✅";
     case "SELLER_REJECTED":
       return "❌";
+    case "MODERATION_VIDEO":
+      return "🎬";
+    case "MODERATION_PRODUCT":
+      return "⚠️";
     default:
       return "🔔";
   }
@@ -712,7 +720,11 @@ async function handleNotificationClick(el, root) {
   if (dropdown) dropdown.style.display = "none";
 
   // Điều hướng tương ứng
-  if (videoId) {
+  if (type === "ORDER_NEW" || type === "ORDER_CANCELLED" || type === "MODERATION_PRODUCT") {
+    window.location.href = `${root}pages/seller.html`;
+  } else if (type === "MODERATION_VIDEO") {
+    window.location.href = `${root}pages/my-videos.html`;
+  } else if (videoId) {
     window.location.href = `${root}pages/video.html?id=${videoId}`;
   } else if (orderId) {
     window.location.href = `${root}pages/cart.html?order_id=${encodeURIComponent(orderId)}#order-${encodeURIComponent(orderId)}`;

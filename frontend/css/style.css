@@ -3340,12 +3340,12 @@ body.auth-checking main { visibility: hidden; }
 
 /* 1. Nút giỏ hàng & Thẻ sản phẩm nổi trên Feed Video */
 .feed-product-tag-pill {
-  position: absolute;
-  left: 16px;
-  bottom: 84px;
-  display: inline-flex;
+  position: relative;
+  display: flex;
+  width: fit-content;
   align-items: center;
   gap: 6px;
+  margin-bottom: 8px;
   background: rgba(17, 24, 39, 0.85);
   backdrop-filter: blur(8px);
   color: #fff;
@@ -3353,6 +3353,7 @@ body.auth-checking main { visibility: hidden; }
   border-radius: 20px;
   border: 1px solid rgba(255, 255, 255, 0.2);
   cursor: pointer;
+  pointer-events: auto;
   z-index: 20;
   max-width: 240px;
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
@@ -3574,6 +3575,7 @@ body.auth-checking main { visibility: hidden; }
 .picker-products-list {
   max-height: 340px;
   overflow-y: auto;
+  overflow-x: hidden;
   display: flex;
   flex-direction: column;
   gap: 8px;
@@ -3602,9 +3604,12 @@ body.auth-checking main { visibility: hidden; }
   background: #eef2ff;
 }
 
-.picker-item-checkbox {
+.picker-item-checkbox,
+.picker-checkbox {
   width: 18px;
   height: 18px;
+  flex-shrink: 0;
+  margin: 0;
   accent-color: var(--color-primary, #4f46e5);
   cursor: pointer;
 }

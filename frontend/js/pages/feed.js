@@ -213,16 +213,6 @@ function createVideoCard(video) {
         </div>
         <span class="action-label" id="share-count-${video.id}">${video.share_count || 0}</span>
       </div>
-
-      <!-- 5. Nút Giỏ hàng trên video (Task T3D2296) -->
-      ${(video.products && video.products.length > 0) ? `
-        <div class="action-item cart feed-cart-action-btn" data-video-id="${video.id}" title="Xem ${video.products.length} sản phẩm trong video">
-          <div class="action-icon-wrap" style="background:#f59e0b;border:1px solid #d97706;">
-            <span style="font-size:18px;">🛒</span>
-          </div>
-          <span class="action-label" style="color:#fbbf24;font-weight:700;">${video.products.length}</span>
-        </div>
-      ` : ""}
     </div>
   `;
 

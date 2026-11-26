@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Xem Video & Chia sẻ | ClipShop AI</title>
   <link rel="icon" href="../assets/images/logo.svg">
-  <link rel="stylesheet" href="../css/style.css?v=3">
+  <link rel="stylesheet" href="../css/style.css?v=4">
 </head>
 <body data-root="../">
   <header id="app-header"></header>
@@ -97,6 +97,17 @@
             <span id="video-created-at">Vừa xong</span>
           </div>
 
+          <!-- Sản phẩm được gắn trong video (Task T3D2296) - hiển thị ngay trên mô tả -->
+          <div id="video-tagged-products-wrap" class="video-tagged-products-box" style="display:none;">
+            <div class="tagged-prods-header">
+              <span class="tagged-prods-title">🛒 Sản phẩm trong video (<strong id="video-prods-count">0</strong>)</span>
+              <span class="tagged-prods-hint">Bấm vào để mở trang chi tiết sản phẩm</span>
+            </div>
+            <div id="video-tagged-products-list" class="video-tagged-products-list">
+              <!-- Danh sách thẻ sản phẩm gắn vào video -->
+            </div>
+          </div>
+
           <p class="single-video-description" id="video-description"></p>
 
           <div class="single-video-hashtags" id="video-hashtags"></div>
@@ -141,17 +152,6 @@
               <button type="button" id="btn-copy-link" class="btn btn-primary btn-copy-link">
                 📋 Sao chép link
               </button>
-            </div>
-          </div>
-
-          <!-- 3.5. Sản phẩm được gắn trong video (Task T3D2296) -->
-          <div id="video-tagged-products-wrap" class="video-tagged-products-box" style="display:none;">
-            <div class="tagged-prods-header">
-              <span class="tagged-prods-title">🛍️ Sản phẩm trong video (<strong id="video-prods-count">0</strong>)</span>
-              <span class="tagged-prods-hint">Bấm vào để mở trang chi tiết sản phẩm</span>
-            </div>
-            <div id="video-tagged-products-list" class="video-tagged-products-list">
-              <!-- Danh sách thẻ sản phẩm gắn vào video -->
             </div>
           </div>
         </section>

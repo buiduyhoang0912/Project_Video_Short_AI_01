@@ -7,6 +7,7 @@ from sqlalchemy import func, or_, select
 from sqlalchemy.orm import Session, selectinload
 
 from app.crud.admin import AdminError, _escape_like
+from app.crud.notification import create_notification
 from app.models.order import Order
 from app.models.product import Product
 from app.models.shop import Shop
@@ -56,6 +57,14 @@ def hide_video(db: Session, video_id: int, admin_id: int, reason: str):
         video.moderation_reason = reason
         video.moderated_by = admin_id
         video.moderated_at = utc_now()
+        create_notification(
+            db,
+            recipient_id=video.user_id,
+            actor_id=admin_id,
+            type="MODERATION_VIDEO",
+            content=f"Video '{video.title}' đã bị Admin ẩn. Lý do: {reason}",
+            video_id=video.id,
+        )
         db.commit()
     except Exception:
         db.rollback()
@@ -72,6 +81,14 @@ def show_video(db: Session, video_id: int):
         video.moderation_reason = None
         video.moderated_by = None
         video.moderated_at = None
+        create_notification(
+            db,
+            recipient_id=video.user_id,
+            actor_id=None,
+            type="MODERATION_VIDEO",
+            content=f"Video '{video.title}' đã được Admin hiển thị lại.",
+            video_id=video.id,
+        )
         db.commit()
     except Exception:
         db.rollback()
@@ -122,6 +139,15 @@ def hide_product(db: Session, product_id: int, admin_id: int, reason: str):
         product.moderation_reason = reason
         product.moderated_by = admin_id
         product.moderated_at = utc_now()
+        shop_obj = db.get(Shop, product.shop_id)
+        if shop_obj and shop_obj.owner_id:
+            create_notification(
+                db,
+                recipient_id=shop_obj.owner_id,
+                actor_id=admin_id,
+                type="MODERATION_PRODUCT",
+                content=f"Sản phẩm '{product.name}' đã bị Admin ẩn. Lý do: {reason}",
+            )
         db.commit()
     except Exception:
         db.rollback()
@@ -138,6 +164,15 @@ def show_product(db: Session, product_id: int):
         product.moderation_reason = None
         product.moderated_by = None
         product.moderated_at = None
+        shop_obj = db.get(Shop, product.shop_id)
+        if shop_obj and shop_obj.owner_id:
+            create_notification(
+                db,
+                recipient_id=shop_obj.owner_id,
+                actor_id=None,
+                type="MODERATION_PRODUCT",
+                content=f"Sản phẩm '{product.name}' đã được Admin hiển thị lại.",
+            )
         db.commit()
     except Exception:
         db.rollback()

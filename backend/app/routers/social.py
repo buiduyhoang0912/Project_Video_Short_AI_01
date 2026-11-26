@@ -173,8 +173,8 @@ def create_comment(
 
         # Tạo thông báo bình luận video cho chủ video (T3D2BAD)
         video = db.get(Video, video_id)
+        actor_name = user.display_name or user.username
         if video and video.user_id != user.id:
-            actor_name = user.display_name or user.username
             notif_crud.create_notification(
                 db=db,
                 recipient_id=video.user_id,
@@ -183,6 +183,18 @@ def create_comment(
                 content=f"{actor_name} đã bình luận video của bạn",
                 video_id=video_id,
             )
+
+        # Nếu là trả lời bình luận -> báo thêm cho tác giả bình luận gốc
+        if data.parent_id is not None and parent and parent.user_id != user.id:
+            if not video or parent.user_id != video.user_id:
+                notif_crud.create_notification(
+                    db=db,
+                    recipient_id=parent.user_id,
+                    actor_id=user.id,
+                    type="COMMENT",
+                    content=f"{actor_name} đã trả lời bình luận của bạn",
+                    video_id=video_id,
+                )
 
         db.commit()
         db.refresh(comment)

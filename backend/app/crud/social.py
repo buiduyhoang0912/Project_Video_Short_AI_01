@@ -18,7 +18,26 @@ from app.models.product_image import ProductImage
 from app.models.shop import Shop
 from app.models.social import AiChatLog, Comment, Follow, Like, VideoShare
 from app.models.user import User
-from app.models.video import Video
+from app.models.video import Video, VideoProduct
+
+
+def _get_products_by_video_ids(db: Session, video_ids: list[int]) -> dict[int, list[dict]]:
+    """Lấy danh sách sản phẩm ACTIVE được gắn vào từng video theo batch (tránh N+1 query)."""
+    grouped: dict[int, list[dict]] = {}
+    if not video_ids:
+        return grouped
+    try:
+        from app.crud.video import serialize_product_item
+        rows = db.execute(
+            select(VideoProduct.video_id, Product)
+            .join(Product, VideoProduct.product_id == Product.id)
+            .where(VideoProduct.video_id.in_(video_ids), Product.status == "ACTIVE")
+        ).all()
+        for vid, prod in rows:
+            grouped.setdefault(vid, []).append(serialize_product_item(prod))
+    except Exception:
+        pass
+    return grouped
 
 VIDEOS = table(
     "videos",
@@ -303,6 +322,8 @@ def get_following_feed(
         ).all()
     )
 
+    products_grouped = _get_products_by_video_ids(db, video_ids)
+
     results = []
     for video, user in rows:
         results.append({
@@ -323,6 +344,7 @@ def get_following_feed(
             "share_count": shares_grouped.get(video.id, 0),
             "is_liked": video.id in liked_video_ids,
             "is_following": True,
+            "products": products_grouped.get(video.id, []),
         })
 
     return results
@@ -391,6 +413,8 @@ def get_public_feed(
         ).all()
     )
 
+    products_grouped = _get_products_by_video_ids(db, video_ids)
+
     results = []
     for video, user in rows:
         results.append({
@@ -411,6 +435,7 @@ def get_public_feed(
             "share_count": shares_grouped.get(video.id, 0),
             "is_liked": video.id in liked_video_ids,
             "is_following": user.id in following_author_ids,
+            "products": products_grouped.get(video.id, []),
         })
 
     return results

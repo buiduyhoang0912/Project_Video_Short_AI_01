@@ -158,6 +158,11 @@ app.include_router(profile.router, prefix="/api")
 app.include_router(auth.router)
 
 
+@app.get("/", include_in_schema=False)
+def redirect_root_to_feed():
+    return RedirectResponse(url="/pages/feed.html")
+
+
 @app.get("/video/{video_id}", include_in_schema=False)
 def redirect_share_video_page(video_id: int):
     return RedirectResponse(url=f"/pages/video.html?id={video_id}")

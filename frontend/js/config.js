@@ -1,12 +1,11 @@
-// Cấu hình chung của frontend: tự nhận diện môi trường Local hay Production (Vercel / Domain riêng).
-const isLocalHost =
+// Cấu hình chung của frontend: kết nối trực tiếp tới Backend/Database chung của nhóm trên clipshopai.phancopako.com
+// để dữ liệu video (Cloudflare R2), sản phẩm, shop, bình luận và tài khoản giống hệt 100% với bản nhóm đang chạy.
+const BASE_ORIGIN =
   window.location.hostname === "127.0.0.1" ||
   window.location.hostname === "localhost" ||
-  window.location.protocol === "file:";
-
-const BASE_ORIGIN = isLocalHost
-  ? "http://127.0.0.1:8000"
-  : window.location.origin;
+  window.location.protocol === "file:"
+    ? "https://clipshopai.phancopako.com"
+    : window.location.origin;
 
 const CONFIG = {
   // Các API nghiệp vụ nằm dưới /api

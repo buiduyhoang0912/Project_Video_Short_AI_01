@@ -134,9 +134,15 @@ app.add_middleware(
 
 @app.middleware("http")
 async def disable_stale_frontend_cache(request: Request, call_next):
+    if request.url.path == "/" or request.url.path.endswith((".html", ".css", ".js")):
+        request.scope["headers"] = [
+            (k, v)
+            for k, v in request.scope["headers"]
+            if k.lower() not in (b"if-none-match", b"if-modified-since")
+        ]
     response = await call_next(request)
     if request.url.path == "/" or request.url.path.endswith((".html", ".css", ".js")):
-        response.headers.setdefault("Cache-Control", "no-cache")
+        response.headers["Cache-Control"] = "no-store, no-cache, must-revalidate, max-age=0"
     return response
 
 # Mọi API đều bắt đầu bằng /api. Thêm router mới thì include ở đây.

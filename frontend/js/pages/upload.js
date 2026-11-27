@@ -386,30 +386,84 @@ async function handleSubmitUpload(e) {
     formData.append("product_ids", JSON.stringify(Array.from(selectedProductIds)));
   }
 
-  // 6. Bắt đầu tải lên
+  // 6. Bắt đầu tải lên (ưu tiên đẩy thẳng lên R2 để hỗ trợ tới 50MB qua Vercel)
   try {
     isUploading = true;
     btnSubmit.disabled = true;
     btnSubmit.textContent = "⏳ Đang đăng video...";
     setUploadProgress(0, "Đang chuẩn bị tải video lên máy chủ...");
 
-    const res = await api.upload("/videos", formData, {
-      onUploadProgress: (progressEvent) => {
-        if (progressEvent.total) {
-          const percent = Math.round(
-            (progressEvent.loaded * 100) / progressEvent.total,
-          );
-          if (percent < 100) {
-            setUploadProgress(percent, `Đang tải lên dữ liệu... ${percent}%`);
-          } else {
-            setUploadProgress(
-              100,
-              "Đang xử lý định dạng video trên máy chủ...",
+    let res = null;
+    const videoCt = (selectedVideoFile.type || "video/mp4").split(";")[0].trim();
+    const thumbCt = (selectedThumbnailFile.type || "image/jpeg").split(";")[0].trim();
+
+    let directPrep = null;
+    try {
+      directPrep = await api.post("/videos/upload-urls", {
+        video_filename: selectedVideoFile.name || "video.mp4",
+        video_content_type: videoCt,
+        video_size_bytes: selectedVideoFile.size,
+        thumbnail_filename: selectedThumbnailFile.name || "thumb.jpg",
+        thumbnail_content_type: thumbCt,
+        thumbnail_size_bytes: selectedThumbnailFile.size,
+      });
+    } catch (prepErr) {
+      if (prepErr.status === 413 || prepErr.status === 401 || prepErr.status === 422) {
+        throw prepErr;
+      }
+      directPrep = null;
+    }
+
+    if (directPrep && directPrep.direct_upload) {
+      setUploadProgress(5, "Đang tải ảnh bìa lên Cloudflare R2...");
+      await axios.put(directPrep.thumbnail_upload_url, selectedThumbnailFile, {
+        headers: { "Content-Type": thumbCt },
+        timeout: 60000,
+      });
+
+      setUploadProgress(10, "Đang tải video trực tiếp lên Cloudflare R2...");
+      await axios.put(directPrep.video_upload_url, selectedVideoFile, {
+        headers: { "Content-Type": videoCt },
+        timeout: 300000,
+        onUploadProgress: (progressEvent) => {
+          if (progressEvent.total) {
+            const percent = Math.min(
+              95,
+              10 + Math.round((progressEvent.loaded * 85) / progressEvent.total),
             );
+            setUploadProgress(percent, `Đang tải video lên R2... ${percent}%`);
           }
-        }
-      },
-    });
+        },
+      });
+
+      setUploadProgress(96, "Đang lưu thông tin video...");
+      res = await api.post("/videos/direct", {
+        title,
+        description: finalDescription || null,
+        video_key: directPrep.video_key,
+        thumbnail_key: directPrep.thumbnail_key,
+        duration_seconds: Math.round(Number.isFinite(videoPlayer.duration) ? videoPlayer.duration : 0),
+        product_ids: Array.from(selectedProductIds),
+      });
+    } else {
+      res = await api.upload("/videos", formData, {
+        onUploadProgress: (progressEvent) => {
+          if (progressEvent.total) {
+            const percent = Math.round(
+              (progressEvent.loaded * 100) / progressEvent.total,
+            );
+            if (percent < 100) {
+              setUploadProgress(percent, `Đang tải lên dữ liệu... ${percent}%`);
+            } else {
+              setUploadProgress(
+                100,
+                "Đang xử lý định dạng video trên máy chủ...",
+              );
+            }
+          }
+        },
+      });
+    }
 
     setUploadProgress(100, "✅ Đăng tải thành công!");
     showToast("Đăng video thành công!", "success");

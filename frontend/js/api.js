@@ -47,7 +47,7 @@ const session = {
 // Instance axios dùng chung: mọi request tự nối thêm baseURL phía trước
 const http = axios.create({
   baseURL: CONFIG.API_BASE_URL,
-  timeout: 10000, // quá 10 giây không phản hồi thì báo lỗi
+  timeout: 20000, // quá 20 giây không phản hồi thì báo lỗi
   headers: { "Content-Type": "application/json" },
 });
 
@@ -146,7 +146,12 @@ http.interceptors.response.use(
       }
       return Promise.reject(new ApiError(message, status, data));
     }
-    // Không có response: server tắt, sai URL, bị chặn CORS, hoặc quá thời gian chờ
+    if (error.code === "ECONNABORTED") {
+      return Promise.reject(new ApiError(
+        "Máy chủ phản hồi quá thời gian chờ. Vui lòng thử lại sau.", 408,
+      ));
+    }
+    // Không có response: server tắt, sai URL, bị chặn CORS
     showNetworkBanner();
     return Promise.reject(new ApiError(
       "Không kết nối được máy chủ. Hãy kiểm tra mạng/backend rồi thử lại.", 0,
@@ -155,11 +160,11 @@ http.interceptors.response.use(
 );
 
 const api = {
-  get: (path, params) => http.get(path, { params }).then((res) => res.data),
-  post: (path, body) => http.post(path, body).then((res) => res.data),
-  put: (path, body) => http.put(path, body).then((res) => res.data),
-  patch: (path, body) => http.patch(path, body).then((res) => res.data),
-  delete: (path) => http.delete(path).then((res) => res.data),
+  get: (path, params, config = {}) => http.get(path, { params, ...config }).then((res) => res.data),
+  post: (path, body, config = {}) => http.post(path, body, config).then((res) => res.data),
+  put: (path, body, config = {}) => http.put(path, body, config).then((res) => res.data),
+  patch: (path, body, config = {}) => http.patch(path, body, config).then((res) => res.data),
+  delete: (path, config = {}) => http.delete(path, config).then((res) => res.data),
   // Upload tệp (FormData): để trình duyệt tự gắn boundary cho multipart
     // Upload tệp (FormData): hỗ trợ config (như onUploadProgress) và timeout 60s cho video
   upload: (path, formData, config = {}) =>

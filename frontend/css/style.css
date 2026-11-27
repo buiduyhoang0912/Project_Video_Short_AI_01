@@ -1,4 +1,4 @@
-﻿/* ==========================================================
+/* ==========================================================
    Style chung cho mọi trang.
    Đổi màu chủ đạo cả web: sửa các biến trong :root bên dưới.
    ========================================================== */
@@ -506,6 +506,26 @@ th { font-size: 13px; color: var(--color-muted); text-transform: uppercase; }
   padding: 2px 6px;
   border-radius: 4px;
   margin-right: 4px;
+}
+.comment-thread {
+  margin-bottom: 4px;
+}
+.comment-replies {
+  margin-left: 48px;
+  padding-left: 12px;
+  border-left: 2px solid #e5e7eb;
+  margin-top: -4px;
+  margin-bottom: 12px;
+}
+.comment-replies:empty {
+  display: none;
+}
+.comment-row.is-reply {
+  margin-bottom: 10px;
+}
+.comment-row.is-reply .comment-avatar {
+  width: 28px;
+  height: 28px;
 }
 
 /* Khung nhập bình luận */
@@ -1171,11 +1191,96 @@ body.auth-checking main { visibility: hidden; }
 .role-SELLER { background: #fef3c7; color: #92400e; }
 .role-ADMIN { background: #fee2e2; color: #991b1b; }
 
-/* Điện thoại: menu thành 1 hàng cuộn ngang, chiếm trọn chiều rộng */
+/* Điện thoại: navbar gọn 1 dòng + feed vừa khít 100% khung hình không bị cuộn thừa */
 @media (max-width: 800px) {
-  .header-inner { gap: 8px; }
-  .nav { order: 3; width: 100%; flex-wrap: nowrap; overflow-x: auto; -webkit-overflow-scrolling: touch; padding-bottom: 4px; }
-  .user-greeting { display: none; }
+  .header-inner {
+    flex-wrap: nowrap;
+    height: 52px;
+    min-height: 52px;
+    padding: 0 10px;
+    gap: 6px;
+  }
+  .brand {
+    flex-shrink: 0;
+    gap: 0;
+  }
+  .brand span {
+    display: none;
+  }
+  .nav {
+    order: 0;
+    flex: 1;
+    min-width: 0;
+    width: auto;
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+    padding-bottom: 0;
+    gap: 2px;
+  }
+  .nav::-webkit-scrollbar {
+    display: none;
+  }
+  .nav a {
+    padding: 5px 8px;
+    font-size: 13px;
+    flex-shrink: 0;
+  }
+  .header-right {
+    order: 0;
+    flex-shrink: 0;
+    margin-left: 0;
+    gap: 4px;
+  }
+  .header-right .btn-small {
+    padding: 4px 8px;
+    font-size: 12px;
+    white-space: nowrap;
+  }
+  .user-greeting {
+    display: none;
+  }
+
+  body:has(.feed-page-wrap) {
+    height: 100dvh;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+  }
+  body:has(.feed-page-wrap) #app-footer {
+    display: none;
+  }
+  body:has(.feed-page-wrap) .feed-page-wrap {
+    flex: 1;
+    min-height: 0;
+    height: calc(100dvh - 52px);
+    width: 100%;
+  }
+  .feed-container {
+    max-width: 100%;
+    width: 100%;
+    height: 100%;
+    overscroll-behavior-y: contain;
+  }
+  .feed-tabs {
+    top: 10px;
+    padding: 4px 12px;
+    gap: 10px;
+  }
+  .feed-tab-btn {
+    font-size: 14px;
+  }
+  .video-actions-right {
+    right: 10px;
+    bottom: 84px;
+    gap: 12px;
+  }
+  .video-info-bottom {
+    bottom: 16px;
+    left: 12px;
+    right: 74px;
+  }
 }
 
 .auth-card { max-width: 420px; margin: 24px auto; }

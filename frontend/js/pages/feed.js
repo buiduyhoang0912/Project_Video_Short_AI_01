@@ -562,48 +562,76 @@ async function loadCommentsForSheet(videoId) {
     }
 
     listEl.innerHTML = "";
+    const byId = new Map();
+    comments.forEach((c) => byId.set(c.id, c));
+
+    const roots = comments.filter((c) => !c.parent_id || !byId.has(c.parent_id));
+    const repliesByParent = new Map();
     comments.forEach((c) => {
-      listEl.appendChild(createCommentRow(c));
+      if (c.parent_id && byId.has(c.parent_id)) {
+        if (!repliesByParent.has(c.parent_id)) repliesByParent.set(c.parent_id, []);
+        repliesByParent.get(c.parent_id).push(c);
+      }
+    });
+
+    roots.forEach((c) => {
+      const thread = document.createElement("div");
+      thread.className = "comment-thread";
+      thread.id = `comment-thread-${c.id}`;
+      thread.appendChild(createCommentRow(c));
+
+      const repliesBox = document.createElement("div");
+      repliesBox.className = "comment-replies";
+      repliesBox.id = `comment-replies-${c.id}`;
+      const childList = repliesByParent.get(c.id) || [];
+      const parentName = c.display_name || c.username || `User #${c.user_id}`;
+      childList.forEach((r) => {
+        repliesBox.appendChild(createCommentRow(r, parentName));
+      });
+      thread.appendChild(repliesBox);
+      listEl.appendChild(thread);
     });
   } catch (err) {
     listEl.innerHTML = `<div style="color:var(--color-danger);text-align:center;padding:20px;">Lỗi tải bình luận: ${err.message}</div>`;
   }
 }
 
-function createCommentRow(comment) {
+function createCommentRow(comment, parentAuthorName = null) {
   const row = document.createElement("div");
-  row.className = "comment-row";
+  row.className = comment.parent_id ? "comment-row is-reply" : "comment-row";
   row.id = `comment-row-${comment.id}`;
 
   const currentU = getCurrentUser();
   const canDelete = currentU && (currentU.id === comment.user_id || currentU.role === "ADMIN");
 
   const formattedTime = formatTimeAgo(comment.created_at);
+  const authorName = comment.display_name || comment.username || `User #${comment.user_id}`;
+  const avatarSrc = comment.avatar_url || "../assets/images/logo.svg";
 
   row.innerHTML = `
-    <img src="../assets/images/logo.svg" alt="avatar" class="comment-avatar">
+    <img src="${escapeHtml(avatarSrc)}" alt="${escapeHtml(authorName)}" class="comment-avatar" onerror="this.src='../assets/images/logo.svg'">
     <div class="comment-content-box">
       <div class="comment-author-name">
-        <a href="profile.html?user_id=${comment.user_id}" style="color:inherit;text-decoration:none;">User #${comment.user_id}</a>
+        <a href="profile.html?user_id=${comment.user_id}" style="color:inherit;text-decoration:none;">${escapeHtml(authorName)}</a>
         <span class="comment-time">${formattedTime}</span>
       </div>
       <div class="comment-text">
-        ${comment.parent_id ? `<span class="reply-badge-target">Trả lời #${comment.parent_id}</span>` : ""}
+        ${comment.parent_id ? `<span class="reply-badge-target">@${escapeHtml(parentAuthorName || `#${comment.parent_id}`)}</span>` : ""}
         ${escapeHtml(comment.content)}
       </div>
       <div class="comment-actions">
-        <button class="comment-act-btn reply-btn" data-id="${comment.id}" data-author="User #${comment.user_id}">Trả lời</button>
+        <button class="comment-act-btn reply-btn" data-id="${comment.id}" data-author="${escapeHtml(authorName)}">Trả lời</button>
         ${canDelete ? `<button class="comment-act-btn delete" data-id="${comment.id}">Xóa</button>` : ""}
       </div>
     </div>
   `;
 
-  // Bấm trả lời
+  // Bấm trả lời (nếu đang bấm vào reply thì gắn vào bình luận gốc cùng thread)
   const replyBtn = row.querySelector(".reply-btn");
   if (replyBtn) {
     replyBtn.addEventListener("click", () => {
-      currentReplyingCommentId = comment.id;
-      currentReplyingUsername = `User #${comment.user_id}`;
+      currentReplyingCommentId = comment.parent_id || comment.id;
+      currentReplyingUsername = authorName;
       document.getElementById("reply-to-user").innerText = `@${currentReplyingUsername}`;
       document.getElementById("reply-banner").classList.add("active");
       const input = document.getElementById("input-comment-text");
@@ -666,9 +694,32 @@ async function submitComment() {
     cancelReplyState();
 
     const listEl = document.getElementById("sheet-comments-list");
-    // Thêm comment mới vào danh sách
-    const newRow = createCommentRow(newComment);
-    listEl.prepend(newRow);
+    // Xóa thông báo "Chưa có bình luận nào" nếu có
+    if (listEl.querySelectorAll(".comment-row").length === 0) {
+      listEl.innerHTML = "";
+    }
+
+    if (newComment.parent_id) {
+      const repliesBox = document.getElementById(`comment-replies-${newComment.parent_id}`);
+      const parentRow = document.getElementById(`comment-row-${newComment.parent_id}`);
+      const parentAuthor = parentRow?.querySelector(".comment-author-name a")?.textContent || null;
+      const newRow = createCommentRow(newComment, parentAuthor);
+      if (repliesBox) {
+        repliesBox.appendChild(newRow);
+      } else {
+        listEl.prepend(newRow);
+      }
+    } else {
+      const thread = document.createElement("div");
+      thread.className = "comment-thread";
+      thread.id = `comment-thread-${newComment.id}`;
+      thread.appendChild(createCommentRow(newComment));
+      const repliesBox = document.createElement("div");
+      repliesBox.className = "comment-replies";
+      repliesBox.id = `comment-replies-${newComment.id}`;
+      thread.appendChild(repliesBox);
+      listEl.prepend(thread);
+    }
 
     // Cập nhật số bình luận ngay lập tức
     const countEl = document.getElementById(`comment-count-${currentVideoIdForComments}`);
@@ -764,9 +815,11 @@ function escapeHtml(str) {
 
 function formatTimeAgo(dateString) {
   if (!dateString) return "";
-  const date = new Date(dateString);
+  let normalized = String(dateString).trim().replace(" ", "T");
+  if (!/[zZ]|[+-]\d{2}:?\d{2}$/.test(normalized)) normalized += "Z";
+  const date = new Date(normalized);
   const now = new Date();
-  const diffSec = Math.floor((now - date) / 1000);
+  const diffSec = Math.max(0, Math.floor((now - date) / 1000));
 
   if (diffSec < 60) return "vừa xong";
   if (diffSec < 3600) return `${Math.floor(diffSec / 60)} phút trước`;

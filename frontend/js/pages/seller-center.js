@@ -1210,7 +1210,7 @@ if (aiSuggestBtn) {
         price: priceVal,
         features: currentDesc,
         duration_seconds: 45,
-      });
+      }, { timeout: 60000 });
 
       // Điền tên và mô tả gợi ý vào form để người bán có thể chỉnh sửa trước khi bấm Lưu
       nameInput.value = res.suggested_name || rawName;

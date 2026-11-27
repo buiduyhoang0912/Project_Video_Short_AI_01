@@ -590,8 +590,34 @@ async function loadSingleComments(videoId) {
     }
 
     listEl.innerHTML = "";
+    const byId = new Map();
+    comments.forEach((c) => byId.set(c.id, c));
+
+    const roots = comments.filter((c) => !c.parent_id || !byId.has(c.parent_id));
+    const repliesByParent = new Map();
     comments.forEach((c) => {
-      listEl.appendChild(renderSingleCommentRow(c));
+      if (c.parent_id && byId.has(c.parent_id)) {
+        if (!repliesByParent.has(c.parent_id)) repliesByParent.set(c.parent_id, []);
+        repliesByParent.get(c.parent_id).push(c);
+      }
+    });
+
+    roots.forEach((c) => {
+      const thread = document.createElement("div");
+      thread.className = "comment-thread";
+      thread.id = `single-thread-${c.id}`;
+      thread.appendChild(renderSingleCommentRow(c));
+
+      const repliesBox = document.createElement("div");
+      repliesBox.className = "comment-replies";
+      repliesBox.id = `single-replies-${c.id}`;
+      const childList = repliesByParent.get(c.id) || [];
+      const parentName = c.display_name || c.username || `User #${c.user_id}`;
+      childList.forEach((r) => {
+        repliesBox.appendChild(renderSingleCommentRow(r, parentName));
+      });
+      thread.appendChild(repliesBox);
+      listEl.appendChild(thread);
     });
   } catch (err) {
     listEl.innerHTML = `<div class="text-error" style="text-align:center;padding:20px;">Không thể tải bình luận: ${escapeHtml(
@@ -600,9 +626,9 @@ async function loadSingleComments(videoId) {
   }
 }
 
-function renderSingleCommentRow(comment) {
+function renderSingleCommentRow(comment, parentAuthorName = null) {
   const row = document.createElement("div");
-  row.className = "comment-row";
+  row.className = comment.parent_id ? "comment-row is-reply" : "comment-row";
   row.id = `single-comment-${comment.id}`;
 
   const currentU = typeof getCurrentUser === "function" ? getCurrentUser() : null;
@@ -612,17 +638,20 @@ function renderSingleCommentRow(comment) {
   const isAdmin = currentU && currentU.role === "ADMIN";
   const canDelete = isCommentOwner || isVideoOwner || isAdmin;
 
+  const authorName = comment.display_name || comment.username || `User #${comment.user_id}`;
+  const avatarSrc = comment.avatar_url || "../assets/images/logo.svg";
+
   row.innerHTML = `
-    <img src="../assets/images/logo.svg" alt="avatar" class="comment-avatar">
+    <img src="${escapeHtml(avatarSrc)}" alt="${escapeHtml(authorName)}" class="comment-avatar" onerror="this.src='../assets/images/logo.svg'">
     <div class="comment-content-box">
       <div class="comment-author-name">
-        <a href="profile.html?id=${comment.user_id}" style="color:inherit;text-decoration:none;">User #${comment.user_id}</a>
+        <a href="profile.html?id=${comment.user_id}" style="color:inherit;text-decoration:none;">${escapeHtml(authorName)}</a>
         <span class="comment-time">${formatTimeAgo(comment.created_at)}</span>
       </div>
       <div class="comment-text">
         ${
           comment.parent_id
-            ? `<span class="reply-badge-target">Trả lời #${comment.parent_id}</span>`
+            ? `<span class="reply-badge-target">@${escapeHtml(parentAuthorName || `#${comment.parent_id}`)}</span>`
             : ""
         }
         ${escapeHtml(comment.content)}
@@ -646,7 +675,7 @@ function renderSingleCommentRow(comment) {
   if (replyBtn) {
     replyBtn.addEventListener("click", () => {
       replyingCommentId = comment.id;
-      replyingUsername = `User #${comment.user_id}`;
+      replyingUsername = authorName;
       const replyUserEl = document.getElementById("single-reply-user");
       const bannerEl = document.getElementById("single-reply-banner");
       const inputEl = document.getElementById("single-comment-input");
@@ -725,9 +754,11 @@ function formatDuration(seconds) {
 
 function formatTimeAgo(dateString) {
   if (!dateString) return "";
-  const date = new Date(dateString);
+  let normalized = String(dateString).trim().replace(" ", "T");
+  if (!/[zZ]|[+-]\d{2}:?\d{2}$/.test(normalized)) normalized += "Z";
+  const date = new Date(normalized);
   const now = new Date();
-  const diffSec = Math.floor((now - date) / 1000);
+  const diffSec = Math.max(0, Math.floor((now - date) / 1000));
 
   if (diffSec < 60) return "Vừa xong";
   if (diffSec < 3600) return `${Math.floor(diffSec / 60)} phút trước`;
